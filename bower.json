@@ -1,0 +1,27 @@
+{
+  "name": "elm",
+  "version": "0.0.1",
+  "moduleType": [
+    "node"
+  ],
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-functions": "~0.1.0",
+    "purescript-globals": "~0.2.2",
+    "purescript-integers": "~0.2.1",
+    "purescript-lists": "~0.7.7",
+    "purescript-math": "~0.2.0",
+    "purescript-orders": "~0.1.1",
+    "purescript-strings": "~0.7.1",
+    "purescript-tuples": "~0.4.0"
+  },
+  "devDependencies": {
+    "purescript-console": "~0.1.1",
+    "purescript-test-unit": "~3.0.0"
+  }
+}
