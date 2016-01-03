@@ -16,3 +16,4 @@ main =
         Test.Elm.ListTest.tests
         Test.Elm.BasicsTest.tests
         Test.Elm.ElmBasicsTest.tests
+        Test.Elm.BitwiseTest.tests
