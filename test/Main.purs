@@ -15,3 +15,4 @@ main =
         Test.Elm.MaybeTest.tests
         Test.Elm.ListTest.tests
         Test.Elm.BasicsTest.tests
+        Test.Elm.ElmBasicsTest.tests
