@@ -85,6 +85,14 @@ converted to using records instead. In either case, you'll need to make some
 modifications to your own code that uses Tuples.
 
 
+## Booleans
+
+The Purescript type is `Boolean`, rather than the Elm `Bool`. I've put a type
+alias in `Elm.Basics` to cover that.
+
+The Boolean literals are `true` and `false`, rather than Elm's `True` and `False`.
+
+
 ## Records
 
 Purescript records are broadly similar to Elm records, with some differences
@@ -175,7 +183,8 @@ value.
 
 ## Numbers
 
-Purescript uses `Number` for what Elm calls a `Float`.
+Purescript uses `Number` for what Elm calls a `Float`. I've put a type alias
+in `Elm.Basics` to cover that.
 
 I believe that Elm distinguishes between `Int` and `Float` literals via type
 inference.  Purescript instead looks at the form of the literal -- for

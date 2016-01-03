@@ -7,6 +7,7 @@ module Elm.Basics
     , radians, degrees, turns, fromPolar, toPolar
     , toString, isInfinite
     , identity, always, (<|), (|>), (<<), (>>)
+    , Bool()
     ) where
 
 
@@ -43,6 +44,7 @@ import Data.Int (round, toNumber)
 
 
 type Float = Number
+type Bool = Boolean
 
 
 {-| Convert radians to standard Elm angles (radians). -}
