@@ -1,0 +1,245 @@
+module Elm.Result
+    ( module Virtual
+    , Result(Ok, Err)
+    , withDefault
+    , map2, map3, map4, map5
+    , andThen
+    , toMaybe, fromMaybe, formatError
+    ) where
+
+
+-- For re-export
+
+import Prelude (map) as Virtual
+
+
+-- Internal
+
+import Prelude
+import Control.Alt (Alt)
+import Control.Extend (Extend)
+import Control.Apply (lift2, lift3, lift4, lift5)
+import Data.Bifoldable (Bifoldable)
+import Data.Bifunctor (Bifunctor, lmap)
+import Data.Bitraversable (Bitraversable)
+import Data.Foldable (Foldable)
+import Data.Monoid (mempty)
+import Data.Traversable (Traversable)
+
+import Elm.Maybe (Maybe (Just, Nothing))
+
+
+{-| A `Result` is either `Ok` meaning the computation succeeded, or it is an
+`Err` meaning that there was some failure.
+-}
+data Result error value
+    = Ok value
+    | Err error
+
+
+{-| If the result is `Ok` return the value, but if the result is an `Err` then
+return a given default value. The following examples try to parse integers.
+
+    Result.withDefault 0 (String.toInt "123") == 123
+    Result.withDefault 0 (String.toInt "abc") == 0
+-}
+withDefault :: forall x a. a -> Result x a -> a
+withDefault _ (Ok a)  = a
+withDefault d (Err _) = d
+
+
+{-| Apply a function to two results, if both results are `Ok`. If not,
+the first argument which is an `Err` will propagate through.
+
+    map2 (+) (String.toInt "1") (String.toInt "2") == Ok 3
+    map2 (+) (String.toInt "1") (String.toInt "y") == Err "could not convert string 'y' to an Int"
+    map2 (+) (String.toInt "x") (String.toInt "y") == Err "could not convert string 'x' to an Int"
+-}
+map2 :: forall a b x value. (a -> b -> value) -> Result x a -> Result x b -> Result x value
+map2 = lift2
+
+
+map3 :: forall a b c x value. (a -> b -> c -> value) -> Result x a -> Result x b -> Result x c -> Result x value
+map3 = lift3
+
+
+map4 :: forall a b c d x value. (a -> b -> c -> d -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x value
+map4 = lift4
+
+
+map5 :: forall a b c d e x value. (a -> b -> c -> d -> e -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x e -> Result x value
+map5 = lift5
+
+
+{-| Chain together a sequence of computations that may fail. It is helpful
+to see its definition:
+
+    andThen : Result e a -> (a -> Result e b) -> Result e b
+    andThen result callback =
+        case result of
+          Ok value -> callback value
+          Err msg -> Err msg
+
+This means we only continue with the callback if things are going well. For
+example, say you need to use (`toInt : String -> Result String Int`) to parse
+a month and make sure it is between 1 and 12:
+
+    toValidMonth : Int -> Result String Int
+    toValidMonth month =
+        if month >= 1 && month <= 12
+            then Ok month
+            else Err "months must be between 1 and 12"
+
+    toMonth : String -> Result String Int
+    toMonth rawString =
+        toInt rawString `andThen` toValidMonth
+
+    -- toMonth "4" == Ok 4
+    -- toMonth "9" == Ok 9
+    -- toMonth "a" == Err "cannot parse to an Int"
+    -- toMonth "0" == Err "months must be between 1 and 12"
+
+This allows us to come out of a chain of operations with quite a specific error
+message. It is often best to create a custom type that explicitly represents
+the exact ways your computation may fail. This way it is easy to handle in your
+code.
+-}
+andThen :: forall x a b. Result x a -> (a -> Result x b) -> Result x b
+andThen = bind
+
+
+{-| Format the error value of a result. If the result is `Ok`, it stays exactly
+the same, but if the result is an `Err` we will format the error. For example,
+say the errors we get have too much information:
+
+    parseInt : String -> Result ParseError Int
+
+    type ParseError =
+        { message : String
+        , code : Int
+        , position : (Int,Int)
+        }
+
+    formatError .message (parseInt "123") == Ok 123
+    formatError .message (parseInt "abc") == Err "char 'a' is not a number"
+-}
+formatError :: forall error error' a. (error -> error') -> Result error a -> Result error' a
+formatError = lmap
+
+
+{-| Convert to a simpler `Maybe` if the actual error message is not needed or
+you need to interact with some code that primarily uses maybes.
+
+    parseInt : String -> Result ParseError Int
+
+    maybeParseInt : String -> Maybe Int
+    maybeParseInt string =
+        toMaybe (parseInt string)
+-}
+toMaybe :: forall x a. Result x a -> Maybe a
+toMaybe (Ok v)  = Just v
+toMaybe (Err _) = Nothing
+
+
+{-| Convert from a simple `Maybe` to interact with some code that primarily
+uses `Results`.
+
+    parseInt : String -> Maybe Int
+
+    resultParseInt : String -> Result String Int
+    resultParseInt string =
+        fromMaybe ("error parsing string: " ++ toString string) (parseInt string)
+-}
+fromMaybe :: forall x a. x -> Maybe a -> Result x a
+fromMaybe _ (Just v) = Ok v
+fromMaybe err Nothing = Err err
+
+
+result :: forall a b c. (a -> c) -> (b -> c) -> Result a b -> c
+result f _ (Err a) = f a
+result _ g (Ok b)  = g b
+
+
+instance functorResult :: Functor (Result a) where
+    map _ (Err x) = Err x
+    map f (Ok y)  = Ok (f y)
+
+instance bifunctorResult :: Bifunctor Result where
+    bimap f _ (Err l) = Err (f l)
+    bimap _ g (Ok r)  = Ok (g r)
+
+instance applyResult :: Apply (Result e) where
+    apply (Err e) _ = Err e
+    apply (Ok f) r  = f <$> r
+
+instance applicativeResult :: Applicative (Result e) where
+    pure = Ok
+
+instance altResult :: Alt (Result e) where
+    alt (Err _) r = r
+    alt l       _ = l
+
+instance bindResult :: Bind (Result e) where
+    bind = result (\e _ -> Err e) (\a f -> f a)
+
+instance monadResult :: Monad (Result e)
+
+instance extendResult :: Extend (Result e) where
+    extend _ (Err y)  = Err y
+    extend f x        = Ok (f x)
+
+instance showResult :: (Show a, Show b) => Show (Result a b) where
+    show (Err x) = "Err (" ++ show x ++ ")"
+    show (Ok y)  = "Ok (" ++ show y ++ ")"
+
+instance eqResult :: (Eq a, Eq b) => Eq (Result a b) where
+    eq (Err a1) (Err a2)  = a1 == a2
+    eq (Ok b1)  (Ok b2)   = b1 == b2
+    eq _          _       = false
+
+instance ordResult :: (Ord a, Ord b) => Ord (Result a b) where
+    compare (Err a1) (Err a2) = compare a1 a2
+    compare (Ok b1)  (Ok b2)  = compare b1 b2
+    compare (Err a)  _        = LT
+    compare _        (Err b)  = GT
+
+instance boundedResult :: (Bounded a, Bounded b) => Bounded (Result a b) where
+    top = Ok top
+    bottom = Err bottom
+
+instance foldableResult :: Foldable (Result a) where
+    foldr _ z (Err _) = z
+    foldr f z (Ok x)  = f x z
+    foldl _ z (Err _) = z
+    foldl f z (Ok x)  = f z x
+    foldMap f (Err _) = mempty
+    foldMap f (Ok x)  = f x
+
+instance bifoldableResult :: Bifoldable Result where
+    bifoldr f _ z (Err a) = f a z
+    bifoldr _ g z (Ok b)  = g b z
+    bifoldl f _ z (Err a) = f z a
+    bifoldl _ g z (Ok b)  = g z b
+    bifoldMap f _ (Err a) = f a
+    bifoldMap _ g (Ok b)  = g b
+
+instance traversableResult :: Traversable (Result a) where
+    traverse _ (Err x) = pure (Err x)
+    traverse f (Ok x)  = Ok <$> f x
+    sequence (Err x)   = pure (Err x)
+    sequence (Ok x)    = Ok <$> x
+
+instance bitraversableResult :: Bitraversable Result where
+    bitraverse f _ (Err a) = Err <$> f a
+    bitraverse _ g (Ok b)  = Ok <$> g b
+    bisequence (Err a) = Err <$> a
+    bisequence (Ok b)  = Ok <$> b
+
+instance semiringResult :: (Semiring b) => Semiring (Result a b) where
+    one = Ok one
+    mul x y = mul <$> x <*> y
+    zero = Ok zero
+    add x y = add <$> x <*> y
+
+instance semigroupResult :: (Semigroup b) => Semigroup (Result a b) where
+    append x y = append <$> x <*> y
