@@ -15,3 +15,4 @@ main =
         Test.Elm.BitwiseTest.tests
         Test.Elm.CharTest.tests
         Test.Elm.ResultTest.tests
+        Test.Elm.DictTest.tests
