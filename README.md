@@ -208,14 +208,18 @@ Purescript doesn't import anything by default. So, if you want something, you
 have to import it manually.
 
 A "plain" import statement imports everything in a module. So, in Purescript,
-`import Data.List` is equivalent to the Elm `import List(..)`. If you want to
-import just the module name, without any symbols, you can do `import Data.List()`.
+`import Data.List` is equivalent to the Elm `import List(..)`.
+
+If you're going to refer to something in fully-qualified way, it appears that
+you don't actually have to import it at all, which is unlike Elm.
 
 To import a type, you need to supply the parentheses ... for instance, `import
 Data.List (List())`. If you try it without the parentheses, then Purescript
 thinks you're trying to import a type class, rather than a type. Of course, you
 can import all or some of the constructors, in the usual way -- i.e.
-`import Data.List (..)` or `import Data.List (Cons, Nil)`.
+`import Data.List (..)` or `import Data.List (Cons, Nil)`. Note that this will
+change in Purescript 0.8 -- I belive you'll have to use the `class` keyword to
+import classes, and you'll import types without the parentheses.
 
 If you want to re-export something, you need to re-export a whole module. However,
 it can be an aliased module name, and you can import specific symbols from other
@@ -263,4 +267,14 @@ import Elm.List (List(..))
 ```
 
 ... or, there would be a way to do it with `do` notation.
+
+
+## Array
+
+There is a literal syntax for Array, e.g. `[1, 2, 3]`. However, the `Array` type in Purescript
+is actually a Javascript array, which is typically not what you want (unless you're getting
+one from elsewhere anyway). And, it's not what `Elm.Array` is.
+
+However, given that there is a literal syntax, I suppose it might be nice to have an
+`Elm.List.fromArray`, to make it easier to port code that uses the literal syntax?
 
