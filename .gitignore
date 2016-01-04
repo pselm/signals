@@ -3,3 +3,4 @@
 /output/
 /.psci*
 /src/.webpack.js
+*.notyet
