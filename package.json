@@ -5,6 +5,7 @@
     "build": "pulp build && rimraf docs && pulp docs"
   },
   "devDependencies": {
+    "bower": "^1.7.2",
     "pulp": "^6.1.0",
     "rimraf": "^2.5.0"
   }
