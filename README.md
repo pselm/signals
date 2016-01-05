@@ -275,6 +275,10 @@ There is a literal syntax for Array, e.g. `[1, 2, 3]`. However, the `Array` type
 is actually a Javascript array, which is typically not what you want (unless you're getting
 one from elsewhere anyway). And, it's not what `Elm.Array` is.
 
-However, given that there is a literal syntax, I suppose it might be nice to have an
-`Elm.List.fromArray`, to make it easier to port code that uses the literal syntax?
+What you can do, though, to get a list is something like this:
 
+```purescript
+Data.List.toList [1, 2, 3]
+```
+
+... which is a nice little trick when porting code, as all you have to add is the `Data.List.toList`.
