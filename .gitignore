@@ -4,3 +4,4 @@
 /.psci*
 /src/.webpack.js
 *.notyet
+**/.DS_Store
