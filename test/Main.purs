@@ -16,3 +16,4 @@ main =
         Test.Elm.CharTest.tests
         Test.Elm.ResultTest.tests
         Test.Elm.DictTest.tests
+        Test.Elm.StringTest.tests
