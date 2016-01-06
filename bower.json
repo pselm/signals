@@ -20,6 +20,7 @@
     "purescript-maps": "~0.5.4",
     "purescript-math": "~0.2.0",
     "purescript-orders": "~0.1.1",
+    "purescript-sequences": "~0.4.3",
     "purescript-sets": "~0.5.5",
     "purescript-strings": "~0.7.1",
     "purescript-tuples": "~0.4.0"
