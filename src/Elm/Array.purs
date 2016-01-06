@@ -136,17 +136,7 @@ If the index is out of range, the array is unaltered.
 -}
 set :: forall a. Int -> a -> Array a -> Array a
 set = flip replace
-{-
-    -- Note that Data.Sequence.replace doesn't behave quite as we would like
-    if index < 0
-       then array
-       else case splitAt index array of
-            Tuple left right ->
-                if null right
-                    then array
-                    else
-                        left ++ (cons elem (drop 1 right))
-                        -}
+
 
 {-| Get a sub-section of an array: `(slice start end array)`. The `start` is a
 zero-based index where we will start our slice. The `end` is a zero-based index
