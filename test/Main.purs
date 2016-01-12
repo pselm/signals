@@ -10,6 +10,7 @@ main =
     runTest do
         Test.Elm.MaybeTest.tests
         Test.Elm.ListTest.tests
+        Test.Elm.ElmListTest.tests
         Test.Elm.BasicsTest.tests
         Test.Elm.ElmBasicsTest.tests
         Test.Elm.BitwiseTest.tests

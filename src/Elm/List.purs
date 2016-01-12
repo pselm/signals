@@ -5,13 +5,14 @@ module Elm.List
     , foldl, intersperse, scanl
     , indexedMap, filterMap, partition, unzip
     , repeat, sortBy, sortWith
+    , (..)
     ) where
 
 
 -- For re-export
 
 import Data.List
-    ( List(..), (..), head, tail, filter, length, reverse
+    ( List(..), head, tail, filter, length, reverse
     , concat, concatMap, take, drop, sort
     ) as Virtual
 
@@ -36,7 +37,7 @@ import Data.Traversable ()
 import Data.Tuple (Tuple(..))
 import Data.Function (on)
 import Control.Apply (lift3, lift4, lift5)
-import Prelude (Eq, Semiring, Ord, (-), ($), compare, Ordering(), flip)
+import Prelude (Eq, Semiring, Ord, (-), ($), compare, Ordering(), flip, (>))
 
 
 infixr 5 :
@@ -240,3 +241,12 @@ to define any other: `sort == sortWith compare`
 -}
 sortWith :: forall a. (a -> a -> Ordering) -> List a -> List a
 sortWith = Data.List.sortBy
+
+
+{-| The Elm built-in range operator `(..)`. Note that this differs from the
+equivalent in `Data.List` in that it only produces ascending lists. -}
+(..) :: Int -> Int -> List Int
+(..) low high =
+    if low > high
+        then Nil
+        else Data.List.range low high

@@ -147,6 +147,10 @@ tests = do
     test "List.sortWith" do
         assert "sortWith" <| sortWith flippedComparison (1 .. 5) == (5 : 4 : 3 : 2 : 1 : Nil)
 
+    test "List.(..)" do
+        assert "ascending" <| (1 .. 5) == (1 : 2 : 3 : 4 : 5 : Nil)
+        assert "descending" <| (5 .. 1) == (Nil :: List Int)
+    
     where
         func3 a b c =
             a + b + c
