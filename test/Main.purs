@@ -19,3 +19,5 @@ main =
         Test.Elm.StringTest.tests
         Test.Elm.SetTest.tests
         Test.Elm.ArrayTest.tests
+        Test.Elm.DateTest.tests
+        Test.Elm.TimeTest.tests
