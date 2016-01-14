@@ -36,7 +36,8 @@ import Prelude
     , (||), (&&)
     , Ring, negate, not, zero
     , Show, show
-    , Ord, Ordering(..)
+    , ModuloSemiring, Semiring
+    , Ord, Ordering()
     )
 
 import Math (cos, sqrt, log, pi, sin, atan2)
@@ -99,7 +100,7 @@ toPolar {x, y} =
 infixl 7 //
 
 {-| Integer division. The remainder is discarded. -}
-(//) :: Int -> Int -> Int
+(//) :: forall a. (ModuloSemiring a) => a -> a -> a
 (//) = Prelude.(/)
 
 
@@ -114,7 +115,7 @@ infixl 7 //
 
 Note that this is the Purescript `Prelude.mod`.
 -}
-rem :: Int -> Int -> Int
+rem :: forall a. (ModuloSemiring a) => a -> a -> a
 rem = Prelude.mod
 
 
@@ -125,47 +126,47 @@ infixl 7 %
      7 % 2 == 1
     -1 % 4 == 3
 
-Note that this represents different semantics than the Purescript `Prelude.(%)`.
+Note that this represents different semantics than the Purescript `Prelude.mod`.
 -}
-(%) :: Int -> Int -> Int
+(%) :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
 (%) a b =
     let
+        r :: a
         r =
             a `rem` b
 
+        m :: a
         m =
-            if a == 0
+            if a == zero
                 then
-                    0 
+                    zero
                 else 
-                    if b > 0
-                        then
-                            if a >= 0
-                                then r 
-                                else r + b
-                        else
-                            -(-a % -b)
+                    if b == zero
+                        then Elm.Debug.crash "Cannot perform mod 0. Division by zero error."
+                        else    
+                            if b > zero
+                                then
+                                    if a >= zero
+                                        then r 
+                                        else r + b
+                                else
+                                    -((-a) % (-b))
 
     in
         if m == b
-           then 0
-           else m
+            then zero
+            else m
 
 
-class Pow a b where
-    pow :: a -> b -> a
+class Pow a where
+    pow :: a -> a -> a
 
-instance intIntPow :: Pow Int Int where
+instance intIntPow :: Pow Int where
     pow a b = round <| Math.pow (toNumber a) (toNumber b)
 
-instance floatFloatPow :: Pow Number Number where
+instance floatFloatPow :: Pow Number where
     pow a b = Math.pow a b
 
-instance intFloatPow :: Pow Int Number where
-    pow a b = round <| Math.pow (toNumber a) b
-
-instance floatIntPow :: Pow Number Int where
-    pow a b = Math.pow a (toNumber b)
 
 infixr 8 ^
 
@@ -173,7 +174,7 @@ infixr 8 ^
 
     3^2 == 9
 -}
-(^) :: forall a b. (Pow a b) => a -> b -> a 
+(^) :: forall a. (Pow a) => a -> a -> a 
 (^) = pow
 
 

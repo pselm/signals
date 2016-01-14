@@ -201,6 +201,26 @@ I think the Purescript unary `(-)` operator behaves a little differently from
 Elm's -- at least, I find that I sometimes need to put something like
 `(-7)` in parentheses to get the results I want.
 
+Purescript actually enforces at run-time that an `Int` will have no fractional
+part. I believe this is unlike Elm, where the distinction between `Float` and
+`Int` is purely a question of types, and disappears at run-time. One
+consequence is that Purescript essentially enforces that `Int` cannot be bigger
+than 2147483647 nor smaller than -2147483648 -- the implementation of the
+"fraction truncating" via `| 0` has the side-effect of enforcing those
+boundaries. So, this can cause some subtle problems when converting Elm code
+that uses integers outside that range.
+
+One way of summarizing this is that the Purescript `Int` type is basically
+an `Int32`. However, the Elm `Integer` type is essentially an `Int53`, in the
+sense that you can safely use 53 bits before things like adding 1 don't work
+quite right.
+
+To deal with this, I've implemented an `Int53` type in `Elm.Int53`. It was
+an interesting exercise ... by implementing the various numeric typeclasses,
+one can re-use the familiar operators. And, one can then define functions
+that work on multiple types -- essentially, you can treat `Int53` as a
+reasonably first-class alternative to `Int`, when you need the extra bits.
+This is, for instance, the case in the `Elm.Random` module.
 
 ## Imports
 

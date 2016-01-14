@@ -110,4 +110,12 @@ sortBy :: forall a comparable. (Ord comparable) => (a -> comparable) -> List a -
 sortWith :: forall a. (a -> a -> Ordering) -> List a -> List a
 ```
 
+#### `(..)`
+
+``` purescript
+(..) :: Int -> Int -> List Int
+```
+
+_left-associative / precedence -1_
+
 

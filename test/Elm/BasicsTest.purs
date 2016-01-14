@@ -95,8 +95,6 @@ tests = do
     test "Basics.(^)" do
         assert "int int" <| 2 ^ 3 == 8
         assert "float float" <| 2.0 ^ 3.0 == 8.0
-        assert "int float" <| 2 ^ 3.0 == 8
-        assert "float int" <| 2.0 ^ 3 == 8.0
 
     test "Basics.(//)" do
         assert "even" <| 9 // 3 == 3

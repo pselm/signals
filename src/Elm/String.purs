@@ -29,7 +29,6 @@ import Prelude (append) as Virtual
 -- Internal
 
 import Data.String (null, fromCharArray, toCharArray, fromChar, length, take, drop)
-import Data.Maybe (Maybe(..))
 import Elm.Result (Result(..))
 import Elm.Basics (Bool(), Float(), (<|))
 import Elm.Char (isDigit)

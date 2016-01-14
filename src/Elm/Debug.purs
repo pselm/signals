@@ -6,7 +6,7 @@ module Elm.Debug
 -- Internal
 
 import Debug.Trace (trace, spy)
-import Elm.Basics ((++))
+import Prelude ((++))
 import Data.String
 
 

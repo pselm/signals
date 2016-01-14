@@ -22,3 +22,5 @@ main =
         Test.Elm.ArrayTest.tests
         Test.Elm.DateTest.tests
         Test.Elm.TimeTest.tests
+        Test.Elm.RandomTest.tests
+        Test.Elm.Int53Test.tests

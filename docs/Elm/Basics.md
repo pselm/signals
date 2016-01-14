@@ -49,7 +49,7 @@ toPolar :: { x :: Float, y :: Float } -> { r :: Float, theta :: Float }
 #### `(//)`
 
 ``` purescript
-(//) :: Int -> Int -> Int
+(//) :: forall a. (ModuloSemiring a) => a -> a -> a
 ```
 
 _left-associative / precedence 7_
@@ -59,13 +59,13 @@ Integer division. The remainder is discarded.
 #### `rem`
 
 ``` purescript
-rem :: Int -> Int -> Int
+rem :: forall a. (ModuloSemiring a) => a -> a -> a
 ```
 
 #### `(%)`
 
 ``` purescript
-(%) :: Int -> Int -> Int
+(%) :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
 ```
 
 _left-associative / precedence 7_
@@ -73,22 +73,20 @@ _left-associative / precedence 7_
 #### `Pow`
 
 ``` purescript
-class Pow a b where
-  pow :: a -> b -> a
+class Pow a where
+  pow :: a -> a -> a
 ```
 
 ##### Instances
 ``` purescript
-Pow Int Int
-Pow Number Number
-Pow Int Number
-Pow Number Int
+Pow Int
+Pow Number
 ```
 
 #### `(^)`
 
 ``` purescript
-(^) :: forall a b. (Pow a b) => a -> b -> a
+(^) :: forall a. (Pow a) => a -> a -> a
 ```
 
 _right-associative / precedence 8_
