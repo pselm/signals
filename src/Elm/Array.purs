@@ -16,7 +16,7 @@ import Prelude (append) as Virtual
 -- Internal
 
 import Data.Sequence
-    ( Seq(), toSeq, fromSeq, empty, replace 
+    ( Seq(), toUnfoldable, fromFoldable, empty, replace
     , snoc, index, null, take, drop, length
     )
 
@@ -47,7 +47,7 @@ initialize len func =
        then empty
        else
             func <$>
-               toSeq (Data.Array.range 0 (len - 1))
+               fromFoldable (Data.Array.range 0 (len - 1))
 
 
 {-| Creates an array with a given length, filled with a default element.
@@ -64,7 +64,7 @@ repeat n e =
 
 {-| Create an array from a list. -}
 fromList :: forall f a. (Foldable f) => f a -> Array a
-fromList = toSeq
+fromList = fromFoldable
 
 
 {-| Create a list of elements from an array.
@@ -72,7 +72,7 @@ fromList = toSeq
     toList (fromList [3,5,8]) == [3,5,8]
 -}
 toList :: forall f a. (Functor f, Unfoldable f) => Array a -> f a
-toList = fromSeq
+toList = toUnfoldable
 
 
 {-| Create an indexed list from an array. Each element of the array will be
