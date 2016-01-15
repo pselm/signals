@@ -2,8 +2,6 @@ module Elm.Result
     ( module Virtual
     , Result(Ok, Err)
     , withDefault
-    , map2, map3, map4, map5
-    , andThen
     , toMaybe, fromMaybe, formatError
     ) where
 
@@ -11,6 +9,8 @@ module Elm.Result
 -- For re-export
 
 import Prelude (map) as Virtual
+import Elm.Apply (map2, map3, map4, map5) as Virtual
+import Elm.Bind (andThen) as Virtual
 
 
 -- Internal
@@ -18,7 +18,6 @@ import Prelude (map) as Virtual
 import Prelude
 import Control.Alt (Alt)
 import Control.Extend (Extend)
-import Control.Apply (lift2, lift3, lift4, lift5)
 import Data.Bifoldable (Bifoldable)
 import Data.Bifunctor (Bifunctor, lmap)
 import Data.Bitraversable (Bitraversable)
@@ -46,66 +45,6 @@ return a given default value. The following examples try to parse integers.
 withDefault :: forall x a. a -> Result x a -> a
 withDefault _ (Ok a)  = a
 withDefault d (Err _) = d
-
-
-{-| Apply a function to two results, if both results are `Ok`. If not,
-the first argument which is an `Err` will propagate through.
-
-    map2 (+) (String.toInt "1") (String.toInt "2") == Ok 3
-    map2 (+) (String.toInt "1") (String.toInt "y") == Err "could not convert string 'y' to an Int"
-    map2 (+) (String.toInt "x") (String.toInt "y") == Err "could not convert string 'x' to an Int"
--}
-map2 :: forall a b x value. (a -> b -> value) -> Result x a -> Result x b -> Result x value
-map2 = lift2
-
-
-map3 :: forall a b c x value. (a -> b -> c -> value) -> Result x a -> Result x b -> Result x c -> Result x value
-map3 = lift3
-
-
-map4 :: forall a b c d x value. (a -> b -> c -> d -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x value
-map4 = lift4
-
-
-map5 :: forall a b c d e x value. (a -> b -> c -> d -> e -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x e -> Result x value
-map5 = lift5
-
-
-{-| Chain together a sequence of computations that may fail. It is helpful
-to see its definition:
-
-    andThen : Result e a -> (a -> Result e b) -> Result e b
-    andThen result callback =
-        case result of
-          Ok value -> callback value
-          Err msg -> Err msg
-
-This means we only continue with the callback if things are going well. For
-example, say you need to use (`toInt : String -> Result String Int`) to parse
-a month and make sure it is between 1 and 12:
-
-    toValidMonth : Int -> Result String Int
-    toValidMonth month =
-        if month >= 1 && month <= 12
-            then Ok month
-            else Err "months must be between 1 and 12"
-
-    toMonth : String -> Result String Int
-    toMonth rawString =
-        toInt rawString `andThen` toValidMonth
-
-    -- toMonth "4" == Ok 4
-    -- toMonth "9" == Ok 9
-    -- toMonth "a" == Err "cannot parse to an Int"
-    -- toMonth "0" == Err "months must be between 1 and 12"
-
-This allows us to come out of a chain of operations with quite a specific error
-message. It is often best to create a custom type that explicitly represents
-the exact ways your computation may fail. This way it is easy to handle in your
-code.
--}
-andThen :: forall x a b. Result x a -> (a -> Result x b) -> Result x b
-andThen = bind
 
 
 {-| Format the error value of a result. If the result is `Ok`, it stays exactly

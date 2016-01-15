@@ -1,9 +1,8 @@
 module Elm.Random
-    ( Generator(), Seed()
+    ( module Virtual
+    , Generator(), Seed()
     , bool, int, float
     , list, pair
-    , map, map2, map3, map4, map5
-    , andThen
     , minInt, maxInt
     , generate, initialSeed
     ) where
@@ -26,6 +25,13 @@ L'Ecuyer for 32-bit computers. It is almost a direct translation from the
 module. It has a period of roughly 2.30584e18.
 -}
 
+-- For re-export
+
+import Elm.Apply (map2, map3, map4, map5) as Virtual
+import Elm.Bind (andThen) as Virtual
+
+
+-- Internal
 
 import Prelude
     ( (==), (/), (*), (-), (+), (<), ($), (++)
@@ -34,7 +40,7 @@ import Prelude
     , Applicative, pure
     )
 
-import Control.Apply (lift2, lift3, lift4, lift5)
+import Elm.Apply (map2)
 import Data.Tuple
 import Data.Ord (max)
 import Data.Monoid (Monoid, mempty)
@@ -260,46 +266,6 @@ apply (Generator genAB) (Generator genA) =
             { value: func.value a.value
             , seed: a.seed
             }
-
-
-{-| Combine two generators.
-
-This function is used to define things like [`pair`](#pair) where you want to
-put two generators together.
-
-    pair : Generator a -> Generator b -> Generator (a,b)
-    pair genA genB =
-      map2 (,) genA genB
-
--}
-map2 :: forall a b c. (a -> b -> c) -> Generator a -> Generator b -> Generator c
-map2 = lift2
-
-
-{-| Combine three generators. This could be used to produce random colors.
-
-    import Color
-
-    rgb : Generator Color.Color
-    rgb =
-      map3 Color.rgb (int 0 255) (int 0 255) (int 0 255)
-
-    hsl : Generator Color.Color
-    hsl =
-      map3 Color.hsl (map degrees (int 0 360)) (float 0 1) (float 0 1)
--}
-map3 :: forall a b c d. (a -> b -> c -> d) -> Generator a -> Generator b -> Generator c -> Generator d
-map3 = lift3
-
-
-{-| Combine four generators. -}
-map4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Generator a -> Generator b -> Generator c -> Generator d -> Generator e
-map4 = lift4
-
-
-{-| Combine five generators. -}
-map5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Generator a -> Generator b -> Generator c -> Generator d -> Generator e -> Generator f
-map5 = lift5
 
 
 {-| Chain random operations, threading through the seed. In the following

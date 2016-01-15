@@ -8,9 +8,9 @@ module Elm.Array
 
 -- For re-export
 
-import Data.Sequence (map, filter, empty, length) as Virtual
+import Data.Sequence (filter, empty, length) as Virtual
 import Data.Foldable (foldr) as Virtual
-import Prelude (append) as Virtual
+import Prelude (append, map) as Virtual
 
 
 -- Internal

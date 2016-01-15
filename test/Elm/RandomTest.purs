@@ -4,7 +4,7 @@ import Test.Unit
 import Test.Unit.Console
 
 import Elm.Random
-import Prelude (bind, Eq, (<), (-), (+), negate)
+import Prelude (bind, Eq, (<), (-), (+), negate, map)
 import Elm.Basics ((<|), (==), abs)
 import Elm.Int53
 import Data.List (toList)
