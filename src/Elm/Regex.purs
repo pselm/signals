@@ -17,7 +17,7 @@ that I just ported the native code.
 
 import Data.List (List(..), reverse, toList)
 import Data.Maybe (Maybe(..))
-import Prelude (Show, (>>>), ($))
+import Prelude (Show, ($))
 
 
 {-| A regular expression, describing a certain set of strings.

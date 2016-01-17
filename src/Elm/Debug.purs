@@ -7,7 +7,6 @@ module Elm.Debug
 
 import Debug.Trace (trace, spy)
 import Prelude ((++))
-import Data.String
 
 
 {-| Log a tagged value on the developer console, and then return the value.
