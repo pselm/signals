@@ -24,3 +24,4 @@ main =
         Test.Elm.TimeTest.tests
         Test.Elm.RandomTest.tests
         Test.Elm.Int53Test.tests
+        Test.Elm.RegexTest.tests

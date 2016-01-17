@@ -58,6 +58,9 @@ import Elm.List hiding
 import Elm.Maybe
 import Elm.Random
 
+-- Conflicts with String
+import Elm.Regex hiding (contains, split)
+
 {- Possibly unify `withDefault` with `Maybe` -}
 import Elm.Result hiding (withDefault)
 
