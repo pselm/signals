@@ -1,7 +1,7 @@
 module Test.Elm.StringTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import qualified Elm.String as String
 import Prelude (bind, Eq, not, (&&))
@@ -11,17 +11,17 @@ import Elm.Result (Result(..))
 import Data.List (toList)
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
 
-assertResult :: forall a. (Eq a) => String -> Result String a -> Result String a -> Test ( testOutput :: TestOutput )
+assertResult :: forall a e. (Eq a) => String -> Result String a -> Result String a -> Assertion e 
 assertResult name expected actual =
     assert name <| expected == actual 
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Simple Stuff" do
         assert "is empty" (String.isEmpty "")

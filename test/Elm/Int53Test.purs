@@ -1,7 +1,7 @@
 module Test.Elm.Int53Test (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Int53
 import Prelude (bind, Eq, negate, not, top, bottom)
@@ -13,7 +13,7 @@ nothing :: Maybe Int53
 nothing = Nothing
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Int53.truncate" do
         assert "positive" <| fromInt 1 == truncate 1.5

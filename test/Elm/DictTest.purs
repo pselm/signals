@@ -1,7 +1,7 @@
 module Test.Elm.DictTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Dict as Dict
 import Elm.Dict (Dict())
@@ -18,7 +18,7 @@ infixl 9 :=
 (:=) = Tuple
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
@@ -40,7 +40,7 @@ animalsPlus =
         )
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Dict.build Tests" do
         assertEqual "empty" (Dict.fromList (Nil :: List (Tuple String String))) (Dict.empty)

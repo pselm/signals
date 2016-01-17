@@ -1,7 +1,7 @@
 module Test.Elm.DateTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Date 
 import Prelude (bind, Eq, (<$>))
@@ -12,12 +12,12 @@ import Elm.Result (toMaybe, Result(..))
 import Data.Maybe
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e 
 assertEqual name expected actual =
     assert name <| expected == actual 
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Date.conversion" do
         assert "fromString good" <| toMaybe (fromString "May 27, 2014") == fromEpochMilliseconds (Milliseconds 1401166800000.0)

@@ -1,7 +1,7 @@
 module Test.Elm.MaybeTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Maybe
 import Elm.Basics ((+), (<|), (==), sqrt)
@@ -9,7 +9,7 @@ import Elm.List (List(..), (:))
 import Prelude (bind)
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Maybe.withDefault" do
         assert "with Just" <| withDefault 100 (Just 42) == 42

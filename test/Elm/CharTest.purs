@@ -1,7 +1,7 @@
 module Test.Elm.CharTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Char 
 import Prelude (bind, Eq)
@@ -10,7 +10,7 @@ import Elm.List as List
 import Data.List (List(), (..))
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
@@ -56,7 +56,7 @@ oneOf :: forall a. (Eq a) => List a -> a -> Boolean
 oneOf = flip List.member
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "toCode" do
         assertEqual "a-z" (lowerCodes) (List.map toCode lower)

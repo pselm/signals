@@ -1,7 +1,7 @@
 module Test.Elm.ListTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.List
 
@@ -13,7 +13,7 @@ import Data.Tuple (Tuple(..))
 import Prelude (bind, Ordering(..))
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "List.(:)" do
         assert "with rest" <| (1 : 2 : 3 : Nil) == (Cons 1 (Cons 2 (Cons 3 Nil)))

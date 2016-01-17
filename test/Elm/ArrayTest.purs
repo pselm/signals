@@ -1,7 +1,7 @@
 module Test.Elm.ArrayTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import qualified Elm.Array as Array
 import qualified Elm.List as List
@@ -12,7 +12,7 @@ import Elm.Basics ((<|), identity, sqrt, (%), always)
 import Data.Tuple (Tuple(..))
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
@@ -44,7 +44,7 @@ mapArray array =
     ) array
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Elm.Array.Creation" do
         assertEqual "empty" Array.empty (Array.fromList (Nil :: List Int))

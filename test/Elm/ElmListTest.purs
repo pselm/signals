@@ -1,7 +1,7 @@
 module Test.Elm.ElmListTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.List
 
@@ -12,12 +12,12 @@ import Data.Tuple (Tuple(..))
 import Prelude (bind, Eq, negate, (*), (/), (++), (-), flip, (&&))
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     testListOfN 0
     testListOfN 1
@@ -25,7 +25,7 @@ tests = do
     testListOfN 1000
 
 
-testListOfN :: Int -> Test ( testOutput :: TestOutput )
+testListOfN :: forall e. Int -> TestUnit e 
 testListOfN n =
     let
         xs =

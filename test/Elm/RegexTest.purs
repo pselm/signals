@@ -1,7 +1,7 @@
 module Test.Elm.RegexTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Regex
 import Prelude (bind, Eq, (&&), not, show, map, (++))
@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..))
 import Elm.Maybe (withDefault)
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual
 
@@ -35,7 +35,7 @@ match =
     }
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Regex" do
         -- contains

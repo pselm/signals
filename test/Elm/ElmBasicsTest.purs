@@ -1,19 +1,19 @@
 module Test.Elm.ElmBasicsTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Basics
 import Elm.List (List(..), (:))
 import Prelude (bind, Ordering(..), Eq)
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Comparison" do
         assertEqual "max" 42 (max 32 42)

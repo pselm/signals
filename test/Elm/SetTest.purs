@@ -1,7 +1,7 @@
 module Test.Elm.SetTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import qualified Elm.Set as Set
 import Elm.Set (Set())
@@ -10,7 +10,7 @@ import Prelude (bind, Eq)
 import Elm.List (List(..), (:), (..))
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
@@ -31,7 +31,7 @@ pred :: Int -> Bool
 pred x = x <= 50
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Set.build" do
         assertEqual "empty" (Set.fromList (Nil :: List Int)) (Set.empty)

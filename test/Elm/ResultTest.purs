@@ -1,7 +1,7 @@
 module Test.Elm.ResultTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Result as Result
 import Elm.Result (Result(..))
@@ -10,12 +10,12 @@ import Elm.Basics ((<|), (==), (+), (%), (++))
 import Elm.Maybe (Maybe(..))
 
 
-assertEqual :: String -> Result String Int -> Result String Int -> Test ( testOutput :: TestOutput )
+assertEqual :: forall e. String -> Result String Int -> Result String Int -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual
 
 
-assertMaybe :: String -> Maybe Int -> Maybe Int -> Test ( testOutput :: TestOutput )
+assertMaybe :: forall e. String -> Maybe Int -> Maybe Int -> Assertion e
 assertMaybe name expected actual =
     assert name <| expected == actual
 
@@ -42,7 +42,7 @@ add5 a b c d e =
     a + b + c + d + e
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Result.map" do
         assertEqual "map Ok"  (Ok 3)        (Result.map ((+) 1) (Ok 2))

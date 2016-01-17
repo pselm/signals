@@ -1,19 +1,19 @@
 module Test.Elm.BitwiseTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Bitwise as Bitwise
 import Prelude (bind, Eq)
 import Elm.Basics ((<|), (==), negate)
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e 
 assertEqual name expected actual =
     assert name <| expected == actual 
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Bitwise.and" do
         assertEqual "and with 32 bit integers" 1 (Bitwise.and 5 3)

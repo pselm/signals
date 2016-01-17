@@ -1,7 +1,7 @@
 module Test.Elm.TimeTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import qualified Elm.Time as Time
 import qualified Data.Time as DT
@@ -9,12 +9,12 @@ import Prelude (bind, Eq)
 import Elm.Basics ((<|), (==), (*))
 
 
-assertEqual :: forall a. (Eq a) => String -> a -> a -> Test ( testOutput :: TestOutput )
+assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e
 assertEqual name expected actual =
     assert name <| expected == actual 
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Time.Conversion Factors" do
         assert "Time.millisecond -> second" <| 500.0 * Time.millisecond == 0.5 * Time.second

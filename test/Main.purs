@@ -4,8 +4,14 @@ import Prelude
 import Test.Unit
 import Test.Unit.Console
 import Control.Monad.Eff
+import Control.Monad.Aff.AVar
 
-main :: Eff ( testOutput :: TestOutput ) Unit
+
+main :: Eff
+    ( testOutput :: TESTOUTPUT
+    , avar :: AVAR
+    , timer :: TIMER
+    ) Unit
 main =
     runTest do
         Test.Elm.MaybeTest.tests

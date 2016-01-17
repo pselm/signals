@@ -1,7 +1,7 @@
 module Test.Elm.BasicsTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Basics
 import Elm.List (List(..), (..), (:))
@@ -9,7 +9,7 @@ import Data.Int (even)
 import Prelude (bind, Ordering(..))
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Basics.(==)" do
         assert "true" <| 5 == 5

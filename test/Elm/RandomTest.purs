@@ -1,7 +1,7 @@
 module Test.Elm.RandomTest (tests) where
 
 import Test.Unit
-import Test.Unit.Console
+import Test.Unit.Assert
 
 import Elm.Random
 import Prelude (bind, Eq, (<), (-), (+), negate, map)
@@ -48,7 +48,7 @@ doer = do
     int 0 y
 
 
-tests :: Test ( testOutput :: TestOutput )
+tests :: forall e. TestUnit e
 tests = do
     test "Random.bool" do
         assert "seed1" <| false == (generate bool seed1).value
