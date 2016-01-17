@@ -36,36 +36,6 @@ Bitraversable Result
 withDefault :: forall x a. a -> Result x a -> a
 ```
 
-#### `map2`
-
-``` purescript
-map2 :: forall a b x value. (a -> b -> value) -> Result x a -> Result x b -> Result x value
-```
-
-#### `map3`
-
-``` purescript
-map3 :: forall a b c x value. (a -> b -> c -> value) -> Result x a -> Result x b -> Result x c -> Result x value
-```
-
-#### `map4`
-
-``` purescript
-map4 :: forall a b c d x value. (a -> b -> c -> d -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x value
-```
-
-#### `map5`
-
-``` purescript
-map5 :: forall a b c d e x value. (a -> b -> c -> d -> e -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x e -> Result x value
-```
-
-#### `andThen`
-
-``` purescript
-andThen :: forall x a b. Result x a -> (a -> Result x b) -> Result x b
-```
-
 #### `formatError`
 
 ``` purescript
