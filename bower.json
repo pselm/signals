@@ -11,7 +11,6 @@
     "output"
   ],
   "dependencies": {
-    "purescript-css": "~0.5.2",
     "purescript-datetime": "~0.9.1",
     "purescript-debug": "~0.1.3",
     "purescript-functions": "~0.1.0",
