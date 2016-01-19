@@ -31,3 +31,4 @@ main =
         Test.Elm.RandomTest.tests
         Test.Elm.Int53Test.tests
         Test.Elm.RegexTest.tests
+        Test.Elm.TaskTest.tests

@@ -1,5 +1,6 @@
 module Elm.Apply
-    ( map2
+    ( andMap
+    , map2
     , map3
     , map4
     , map5
@@ -33,3 +34,8 @@ map4 = lift4
 -- | values wrapped with the type constructor `f`.
 map5 :: forall a b c d e f g. (Apply f) => (a -> b -> c -> d -> e -> g) -> f a -> f b -> f c -> f d -> f e -> f g
 map5 = lift5
+
+
+-- | Elm uses `andMap` as a synonym for `apply`
+andMap :: forall a b f. (Apply f) => f (a -> b) -> f a -> f b
+andMap = apply
