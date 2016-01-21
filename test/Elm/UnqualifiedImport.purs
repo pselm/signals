@@ -5,6 +5,8 @@ unqualified. Not that this is recommended, but it is nice to be able to
 support it as much as is reasonable.
 -}
 
+import Elm.Default
+
 import Elm.Basics
 
 -- `Array` conflicts with `Prim.Array`
