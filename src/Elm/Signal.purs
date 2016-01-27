@@ -15,6 +15,7 @@ module Elm.Signal
     -- how best to integrate this all.
     , current
     , Graph(), makeGraph
+    , DELAY()
     ) where
 
 {-| An implmenetation of the Elm `Signal` API.
@@ -27,14 +28,14 @@ Note the presence of `Graph` in the API and its role.
 
 import Prelude
     ( Eq, Unit(), unit, ($), (++), bind, (+)
-    , pure, (==), (&&), (||), const, void
+    , pure, (==), (/=), (&&), (||), const, (<<<) 
     )
 
 import Control.Monad
 import Control.Monad.Eff
 import Control.Monad.Eff.Class
+import Control.Monad.Eff.Console (error, CONSOLE())
 import Control.Monad.Eff.Ref
-import DOM.Timer (Timer(), delay)
 import Data.Array (cons)
 import Data.Exists
 import Data.Tuple
@@ -43,8 +44,9 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Date (nowEpochMilliseconds, Now())
 import Data.Time (Milliseconds())
 import Elm.Time (Time(), toTime)
-import Elm.Debug (crash)
 import Elm.Task (TaskE())
+import Elm.Debug (crash)
+import Debug.Trace
 
 
 {- This is a relatively crude or naive translation of the Elm `Signal`
@@ -314,7 +316,7 @@ in the Signal graph has changed.
 
 * The `Signal` is the signal whose children we're broadcasting to.
 -}
-broadcastToKids :: forall e a. Timestamp -> Boolean -> Signal a -> Eff (ref :: REF, now :: Now, timer :: Timer | e) Unit
+broadcastToKids :: forall e a. Timestamp -> Boolean -> Signal a -> Eff (ref :: REF, now :: Now | e) Unit
 broadcastToKids ts update (Signal node) = do
     kids <- readRef node.kids
     foreachE kids $
@@ -323,7 +325,7 @@ broadcastToKids ts update (Signal node) = do
 
 
 {- A convenience for the function each signal defines as its callback. -}
-type NotifyKid = forall e. Timestamp -> Boolean -> SignalID -> UntypedSignal -> Eff (ref :: REF, timer :: Timer, now :: Now | e) Unit
+type NotifyKid = forall e. Timestamp -> Boolean -> SignalID -> UntypedSignal -> Eff (ref :: REF, now :: Now | e) Unit
 
 
 {- Makes a signal that receives values from outside. -}
@@ -800,8 +802,6 @@ sampleOn (Signal ticker) (Signal parent) = do
     --  numbers => 0 0 3 3 5 5 5 4 ...
     --  noDups  => 0   3   5     4 ...
 
-The signal should not be a signal of functions, or a record that contains a
-function (you'll get a runtime error since functions cannot be equated).
 -}
 dropRepeats :: forall e a. (Eq a) => Signal a -> Eff (ref :: REF | e) (Signal a)
 dropRepeats (Signal parent) = do
@@ -817,7 +817,7 @@ dropRepeats (Signal parent) = do
                 myValue <- readRef value
                 parentValue <- readRef parent.value
 
-                let reallyUpdate = update && myValue == parentValue
+                let reallyUpdate = update && myValue /= parentValue
 
                 when reallyUpdate $
                     writeRef value parentValue
@@ -977,18 +977,18 @@ signals, so you can provide your own signal updates.
 The primary use case is when a `Task` or UI element needs to talk back to the
 main part of your application.
 -}
-newtype Address a = Address (forall e. a -> Eff (ref :: REF, timer :: Timer, now :: Now | e) Unit)
+newtype Address a = Address (forall e. a -> Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit)
 
 
 {- Updates the current value of the specified input `Signal`, and then broadcasts the
 update throughout the signal graph.
 -}
-notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: Now, timer :: Timer | e) Unit
+notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: Now, console :: CONSOLE | e) Unit
 notify (Signal signal) value = do
-    -- Check for synchronous calls .... I suppose instead of crashing, we could
+    -- Check for synchronous calls .... I suppose we could
     -- short-circuit and retry on the next tick?
     updateInProgress <- readUpdateInProgress signal.graph
-    when updateInProgress $ crash "The notify function has been called synchronously!"
+    when updateInProgress $ error "The notify function has been called synchronously!"
     
     -- Indicate we're in progress
     writeUpdateInProgress signal.graph true
@@ -1011,25 +1011,14 @@ notify (Signal signal) value = do
 {-| Create a mailbox you can send messages to. The primary use case is
 receiving updates from tasks and UI elements. The argument is a default value
 for the custom signal.
-
-Note: Creating new signals is inherently impure, so `(mailbox ())` and
-`(mailbox ())` produce two different mailboxes.
 -}
-mailbox :: forall e a. Graph -> a -> Eff (ref :: REF, timer :: Timer, now :: Now | e) (Mailbox a)
+mailbox :: forall e a. Graph -> a -> Eff (ref :: REF | e) (Mailbox a)
 mailbox graph base = do
     signal <- input graph "mailbox" base
 
-    let
-        send :: forall e1. a -> Eff (ref :: REF, now :: Now, timer :: Timer | e1) Unit 
-        send value =
-            void $
-                delay 0
-                    (notify signal)
-                        value
-
     pure
         { signal: signal
-        , address: Address send
+        , address: Address ((delay 0) <<< (notify signal))
         }
 
 
@@ -1060,7 +1049,7 @@ forwardTo (Address actuallySend) f =
 The address is filled out and the envelope is filled, but it will be sent at
 some point in the future.
 -}
-newtype Message e = Message (TaskE (ref :: REF, now :: Now, timer :: Timer | e) Unit Unit)
+newtype Message e = Message (TaskE (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit Unit)
 
 
 {-| Create a message that may be sent to a `Mailbox` at a later time.
@@ -1086,9 +1075,10 @@ message (Address actuallySend) value =
 The `Signal` associated with `address` will receive the `Undo` message
 and push it through the Elm program.
 -}
-send :: forall e x a. Address a -> a -> TaskE (ref :: REF, now :: Now, timer :: Timer | e) x Unit
+-- TODO: Need to make this a `Task`, actually.
+send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit
 send (Address actuallySend) value =
-    liftEff $ actuallySend value
+    actuallySend value
 
 
 {-| Gets the current value of a signal.
@@ -1100,7 +1090,24 @@ to be executed.
 
 However, there are cases in which it is useful to get a signal's value, so we provide
 for it here. (For instance, it's handy when testing ...)
+
+Note that some signal operations are async -- for instance, sending a value to a
+`Mailbox` occurs async. However, `current` is *not* async. So, you'll need to
+delay applying `current` in some cases to get the results you expect.
 -}
 current :: forall e a. Signal a -> Eff (ref :: REF | e) a
 current (Signal signal) =
     readRef signal.value
+
+
+{- I had used purescript-timers for this, but ran into problems unifying types
+when running tests. It turned out that purescript-test-unit and
+purescript-timers both use a `timer` effect, but specify a different type for
+it. So, I think that was causing the problem.
+-}
+foreign import data DELAY :: !
+
+foreign import delay :: forall eff a. 
+    Int -> 
+    Eff (delay :: DELAY | eff) a -> 
+    Eff (delay :: DELAY | eff) Unit

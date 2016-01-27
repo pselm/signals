@@ -25,7 +25,6 @@
     "purescript-sequences": "~0.5.0",
     "purescript-sets": "~0.5.5",
     "purescript-strings": "~0.7.1",
-    "purescript-timers": "~1.0.0",
     "purescript-tuples": "~0.4.0"
   },
   "devDependencies": {

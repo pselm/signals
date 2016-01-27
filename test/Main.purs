@@ -6,12 +6,11 @@ import Test.Unit.Console
 import Control.Monad.Eff
 import Control.Monad.Aff.AVar
 
-
-main :: Eff
+main :: forall e. Eff
     ( testOutput :: TESTOUTPUT
     , avar :: AVAR
     , timer :: TIMER
-    ) Unit
+    | e) Unit
 main =
     runTest do
         Test.Elm.MaybeTest.tests
@@ -32,3 +31,4 @@ main =
         Test.Elm.Int53Test.tests
         Test.Elm.RegexTest.tests
         Test.Elm.TaskTest.tests
+        Test.Elm.SignalTest.tests
