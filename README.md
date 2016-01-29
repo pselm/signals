@@ -18,6 +18,10 @@ existing Elm code, you would simply add `Elm.` to the imports. And, of course,
 you can always import `as` something to maintain any internal fully-qualified
 references.
 
+For a general reference to the Purescript language, this page is very helpful:
+
+https://github.com/purescript/purescript/wiki/Language-Guide
+
 Here are a few notes on issues I ran into when performing the port, and how I
 handled them. You may find some of this helpful if you are porting Elm code
 to Purescript.
