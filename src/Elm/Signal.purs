@@ -7,14 +7,15 @@ module Elm.Signal
     , filter, filterMap
     , dropRepeats
     , sampleOn
-    , Mailbox(), Address(), Message()
-    , mailbox, send, message, forwardTo
+    , Mailbox(), mailbox
+    , Address(), send, forwardTo
+    , Message(), message
 
     -- Everything below this line is not in the original Elm API.
     -- So, they are subject to experimentation, as I figure out
     -- how best to integrate this all.
+    , setup
     , current
-    , Graph(), makeGraph
     , DELAY()
     ) where
 
@@ -22,13 +23,11 @@ module Elm.Signal
 
 TODO: Write notes about usage.
 
-Note the presence of `Graph` in the API and its role.
-
 -}
 
 import Prelude
-    ( Eq, Unit(), unit, ($), (++), bind, (+)
-    , pure, (==), (/=), (&&), (||), const, (<<<) 
+    ( Eq, Monad, Unit(), unit, ($), (++), bind, (+)
+    , pure, (==), (/=), (&&), (||), const, (<<<)
     )
 
 import Control.Monad
@@ -36,17 +35,19 @@ import Control.Monad.Eff
 import Control.Monad.Eff.Class
 import Control.Monad.Eff.Console (error, CONSOLE())
 import Control.Monad.Eff.Ref
+import Control.Monad.State.Trans (StateT(), evalStateT)
+import Control.Monad.State.Class
 import Data.Array (cons)
+import Elm.List (List(..), reverse)
+import Data.List (foldM)
 import Data.Exists
 import Data.Tuple
-import Data.List (List(..), reverse, foldM)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Date (nowEpochMilliseconds, Now())
 import Data.Time (Milliseconds())
 import Elm.Time (Time(), toTime)
 import Elm.Task (TaskE())
 import Elm.Debug (crash)
-import Debug.Trace
 
 
 {- This is a relatively crude or naive translation of the Elm `Signal`
@@ -65,6 +66,10 @@ However, I didn't want to do this via the FFI if I could avoid it, so I
 "translated" the Elm Javascript implementation to Purescript. But, as I say,
 somewhat crudely or naively.  I'm gradually working on making it more idiomatic
 Purescript.
+
+As a first step, I've used `StateT` to make the `Graph` itself hidden state,
+which essentially matches the Elm API.
+
 -}
 
 
@@ -72,7 +77,7 @@ Purescript.
 type Timestamp = Milliseconds
 
 
-{- An ID for each signal ... made unique by the `Graph`. 
+{- An ID for each signal ... made unique by the `Graph`.
 
 Now, why do signals need an ID? It *seems* as though the only way we use the ID
 is as a test for equality, when we're doing the `notify` pulses. This raises
@@ -80,7 +85,8 @@ a couple of questions:
 
 * Could we handle signal equality in some other way? Note that we don't really
   need to treat two different signals as being possibly equal, at least for this
-  purpose -- the question is really identity here, rather than equality.
+  purpose -- the question is really identity here, rather than equality. So,
+  perhaps we could just use `refEq`?
 
 * The pulse can only be transmitted by one of the parents -- so, really, we're
   just trying to distinguish between one parent and the other.
@@ -94,9 +100,9 @@ have no runtime in Purescript.
 
 * `guid` is a reference to a unique ID (so, I guess not a guid, since it is per-graph.
 
-  Now, normally you'd have just one signal graph, but because we've made it explicit
-  (in Elm it's essentially implicit), we don't prohibit it. And, it ought to work,
-  though one problem is that you shouldn't connect two signals to each other if they
+  Now, normally you'd have just one signal graph, but we don't prohibit multiple signal
+  graphs ... indeed, the tests set up a signal graph for each test. So, it works.
+  However, one problem is that you shouldn't connect two signals to each other if they
   belong to different signal graphs. I wonder whether we can prevent that at the type
   layer? Probably not -- though we could detect it at run-time and report it.
 
@@ -125,70 +131,87 @@ have no runtime in Purescript.
 
 * `updateInProgress` is something which the Elm runtime tracks in order to show
   an error when dispatching updates while inside other updates.
+
+Note that we have mutable values here, even though we're using `StateT`, because I was
+having trouble getting the `NotifyKid` callbacks to work if they were forced to run
+inside the `StateT`. I'm not sure if there was a fundamental problem there, or just
+something I couldn't figure out. In any event, this way we can provide each `Signal` with
+the data it needs at runtime, without the `Signal` needing to consult the hidden graph
+state again.
 -}
-newtype Graph = Graph
-    { guid :: Ref SignalID
+type Graph =
+    { guid :: SignalID
     , inputs :: Ref (Array UntypedSignal)
     , programStart :: Milliseconds
     , updateInProgress :: Ref Boolean
     }
 
 
-{-| Just a convenient unwrapper. -}
-programStart :: Graph -> Milliseconds
-programStart (Graph graph) =
-    graph.programStart
+{-| A computational context that tracks the state of the signal graph
+as various signals are created and hooked up to each other.
+-}
+type GraphState m a = StateT Graph m a
 
 
-{-| Another convenient wrapper. -}
-readUpdateInProgress :: forall e. Graph -> Eff (ref :: REF | e) Boolean
-readUpdateInProgress (Graph graph) =
-    readRef graph.updateInProgress
+{-| Setup the signal graph.
 
+Basically, this provides a context in which you can do whatever you need to setup your
+signal graph. So, you might have something like:
 
-{-| And another. -}
-writeUpdateInProgress :: forall e. Graph -> Boolean -> Eff (ref :: REF | e) Unit
-writeUpdateInProgress (Graph graph) value =
-    writeRef graph.updateInProgress value
+main =
+    setup do
+        mbox <- mailbox "Initial value"
+        map <- map ((++) " concat") mbox
+        ...
 
+TODO: Write out a trivial working example once I have one!
 
-{-| And another. -}
-readInputs :: forall e. Graph -> Eff (ref :: REF | e) (Array UntypedSignal)
-readInputs (Graph graph) =
-    readRef graph.inputs
+Technically, this runs whatever commands you supply in the context of a newly initialized
+signal graph, and returns whatever your commands return.
+-}
+setup :: forall e m a. (MonadEff (ref :: REF, now :: Now | e) m) => GraphState m a -> m a
+setup cb = do
+    programStart <- liftEff $ nowEpochMilliseconds
+    inputs <- liftEff $ newRef []
+    updateInProgress <- liftEff $ newRef false
+
+    evalStateT cb
+        { guid: 0
+        , inputs
+        , programStart
+        , updateInProgress
+        }
 
 
 {-| Add the signal to the inputs. -}
-updateInputs :: forall e a. Graph -> Signal a -> Eff (ref :: REF | e) Unit
-updateInputs (Graph graph) node = do
-    modifyRef graph.inputs (cons (mkExists node))
+registerInput :: forall e m a. (MonadEff (ref :: REF | e) m) => Signal a -> GraphState m Unit
+registerInput node = do
+    inputs <- getInputs
+    modifyRefL inputs $ (cons (mkExists node))
+
+
+{-| Get the inputs. -}
+getInputs :: forall m. (Monad m) => GraphState m (Ref (Array UntypedSignal))
+getInputs =
+    gets _.inputs
+
+
+{-| Get the inputs. -}
+getProgramStart :: forall m. (Monad m) => GraphState m Milliseconds
+getProgramStart =
+    gets _.programStart
 
 
 {-| Get a guid and increment it. -}
-getGuid :: forall e. Graph -> Eff (ref :: REF | e) SignalID
-getGuid (Graph graph) = do
-    modifyRef graph.guid (+ 1)
-    readRef graph.guid
+getGuid :: forall m. (Monad m) => GraphState m SignalID
+getGuid = do
+    modify \graph -> graph {guid = graph.guid + 1}
+    gets _.guid
 
 
-{-| Construct a representation of the whole signal graph.
-
-This probably should be changed to be a kind of hidden state, using `StateT`
-and modifying the API to run inside the `StateT`.
--}
-makeGraph :: forall e. Eff (ref :: REF, now :: Now | e) Graph
-makeGraph = do
-    id <- newRef 0
-    inputs <- newRef []
-    now <- nowEpochMilliseconds  -- note Now effect
-    updateInProgress <- newRef false
-
-    pure $ Graph
-        { guid: id
-        , inputs: inputs
-        , programStart: now
-        , updateInProgress: updateInProgress
-        }
+getUpdateInProgress :: forall m. (Monad m) => GraphState m (Ref Boolean)
+getUpdateInProgress =
+    gets _.updateInProgress
 
 
 {-| A value that changes over time. So a `(Signal Int)` is an integer that is
@@ -207,11 +230,7 @@ newtype Signal a = Signal
     -- to work around that.
 
     -- Note comments about `id` above ... basically, just used for equality ...
-    -- which could possibly be handled in other ways. This is one of the
-    -- reasons why making a Signal is effectful, because the signal needs
-    -- an effectful computation to get a guid. Perhaps that could be changed
-    -- by only allowing signal creation in some monadic context that manages
-    -- the guid as hidden state?
+    -- which could possibly be handled in other ways.
     { id :: SignalID
 
     -- I don't think the name is used at all, except perhaps for debugging
@@ -228,7 +247,10 @@ newtype Signal a = Signal
     --
     -- Perhaps this could be solved by storing all the memoized values in
     -- the Graph object? With keys based on the signal's id? That way, we'd
-    -- confine the mutability there.
+    -- confine the mutability there. However, there may be some interesting
+    -- type issues involved, since we'd want to use arrays of the polymorphic
+    -- type, and yet I'm not sure `Exists` would help, because we really do
+    -- want to match up the types in the end.
     , value :: Ref a
 
     -- Oddly enough, I'm pretty sure this is never actually used! Also, the
@@ -237,31 +259,36 @@ newtype Signal a = Signal
     -- creating signals of functions, rather than a list of multiple parents.
     --
     -- However, I won't remove this just yet, because the nice thing about it
-    -- is that it is immutable. So, we 
+    -- is that it is immutable. So, we
     , parents :: Array UntypedSignal
 
     -- So, the difficulty here is that we need to keep track of kids to propagate
     -- changes, but of course the kids are created after the parent, so we're
     -- inherently looking at something mutable.
-    -- 
+    --
     -- Perhaps one alternative would be to maintain a kind of mutable tree in the
     -- `Graph` object, so that the signal itself doesn't need to mutate to track
-    -- its children.
+    -- its children. However, then the trick is making the tree from the graph
+    -- object available as the 'pulse' is iterated.
     , kids :: Ref (Array UntypedSignal)
+
+    -- It's actually only the inputs that need this ... should refactor. This is used
+    -- by the `notify` method to start the pulse at all the inputs, whenever an
+    -- input is updated.
+    , inputs :: Ref (Array UntypedSignal)
+
+    -- This also doesn't really belong here, but haven't figured out how to structure
+    -- this best yet.
+    , updateInProgress :: Ref Boolean
 
     -- I originally included this because I thought it might be needed for something.
     -- But it turns out that so far it isn't ... so perhaps could be removed.
     , role :: Role
 
     -- This represents what to do when we're notified by a parent that a change has
-    -- occurred somewhere.
+    -- occurred somewhere. Ideally, I'll simplify the method, and then actually
+    -- walk the tree from the outside, rather than the inside.
     , notify :: NotifyKid
-
-    -- A reference back to the graph we're part of. Which makes moving some data to
-    -- mutable stuff inside the graph feasible. Now, if we change things to that the
-    -- graph is managed monadically as hidden state, then we might not need this
-    -- reference any longer.
-    , graph :: Graph
     }
 
 
@@ -284,7 +311,10 @@ type UntypedSignal = Exists Signal
 changes to the kids. The child is the `UntypedSignal`, since we want to put
 them in an `Array` and they may have different value types.
 -}
-addKidToParent :: forall e a. Signal a -> UntypedSignal -> Eff (ref :: REF | e) Unit
+addKidToParent ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    Signal a -> UntypedSignal -> GraphState m Unit
+
 addKidToParent (Signal parent) kid =
     -- We're using a `Ref` to update the list of children, which is sort of
     -- lame. Ideally, we'd register for callbacks in a way that didn't have
@@ -300,7 +330,7 @@ addKidToParent (Signal parent) kid =
     -- at some particular moment. Of course, the *parents* never change --
     -- that is immutable -- so, if we have all the children, we can compute
     -- the depdencies.
-    modifyRef parent.kids $ cons kid
+    modifyRefL parent.kids $ cons kid
 
 
 {-| Send a "pulse" to a Signal's children, indicating that something above it
@@ -316,7 +346,7 @@ in the Signal graph has changed.
 
 * The `Signal` is the signal whose children we're broadcasting to.
 -}
-broadcastToKids :: forall e a. Timestamp -> Boolean -> Signal a -> Eff (ref :: REF, now :: Now | e) Unit
+broadcastToKids :: forall e a. Timestamp -> Boolean -> Signal a -> Eff (ref :: REF | e) Unit
 broadcastToKids ts update (Signal node) = do
     kids <- readRef node.kids
     foreachE kids $
@@ -324,16 +354,39 @@ broadcastToKids ts update (Signal node) = do
             kid'.notify ts update node.id $ mkExists (Signal kid')
 
 
-{- A convenience for the function each signal defines as its callback. -}
-type NotifyKid = forall e. Timestamp -> Boolean -> SignalID -> UntypedSignal -> Eff (ref :: REF, now :: Now | e) Unit
+{- Lift some functions, for the sake of convenience. -}
+
+newRef' :: forall e m s. (MonadEff (ref :: REF | e) m) => s -> m (Ref s)
+newRef' a = liftEff $ newRef a
+
+
+readRef' :: forall e m s. (MonadEff (ref :: REF | e) m) => Ref s -> m s
+readRef' a = liftEff $ readRef a
+
+
+writeRef' :: forall e m s. (MonadEff (ref :: REF | e) m) => Ref s -> s -> m Unit
+writeRef' a b = liftEff $ writeRef a b
+
+
+modifyRefL :: forall e m s. (MonadEff (ref :: REF | e) m) => Ref s -> (s -> s) -> m Unit
+modifyRefL a b = liftEff $ modifyRef a b
+
+
+{- A function each signal defines as its callback. -}
+type NotifyKid = forall e. Timestamp -> Boolean -> SignalID -> UntypedSignal -> Eff (ref :: REF | e) Unit
 
 
 {- Makes a signal that receives values from outside. -}
-input :: forall e a. Graph -> String -> a -> Eff (ref :: REF | e) (Signal a)
-input graph name base = do
-    id <- getGuid graph
-    kids <- newRef []
-    value <- newRef base
+input ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    String -> a -> GraphState m (Signal a)
+
+input name base = do
+    id <- getGuid
+    value <- newRef' base
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
 
     let
         -- Note that this actually does not do anything, and we don't expect it to be called.
@@ -344,21 +397,22 @@ input graph name base = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "input-" ++ name
-                , value: value
+                , value
                 -- Not that parents not really needed ... should redesign
                 -- to reflect this.
                 , parents: []
-                , kids: kids
+                , kids
+                , inputs
+                , updateInProgress
                 , role: Input
                 -- Note that this should never be called ... perhaps could
                 -- redesign to factor it out
-                , notify: notify
-                , graph: graph
+                , notify
                 }
 
-    updateInputs graph node
+    registerInput node
     pure node
 
 
@@ -367,8 +421,8 @@ to pass a combination of signals and normal values to a function:
 
     map3 view Window.dimensions Mouse.position (constant initialModel)
 -}
-constant :: forall e a. Graph -> a -> Eff (ref :: REF | e) (Signal a)
-constant graph = input graph "constant"
+constant :: forall e m a. (MonadEff (ref :: REF | e) m) => a -> GraphState m (Signal a)
+constant = input "constant"
 
 
 {- Note that this isn't actually used so far ... may end up handling it differently.
@@ -379,7 +433,6 @@ output name handler (Signal parent) = do
     kids <- newRef []
 
     let
-        notify :: NotifyKid
         notify ts update parentID kid = do
             when update do
                 value <- readRef parent.value
@@ -388,16 +441,15 @@ output name handler (Signal parent) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "output-" ++ name
                 , parents: [mkExists (Signal parent)]
                 -- Note that kids and value not really needed ... should
                 -- redesign the type to reflect this.
-                , kids: kids
+                , kids
                 , value: parent.value
-                , notify: notify
+                , notify
                 , role: Output
-                , graph: parent.graph
                 }
 
     addKidToParent (Signal parent) (mkExists node)
@@ -425,11 +477,16 @@ the initial value of the incoming signal, only by updates occurring on
 the latter. So the initial value of `sig` is completely ignored in
 `foldp f s sig`.
 -}
-foldp :: forall e a s. (a -> s -> s) -> s -> Signal a -> Eff (ref :: REF | e) (Signal s)
+foldp ::
+    forall e m a s. (MonadEff (ref :: REF | e) m) =>
+    (a -> s -> s) -> s -> Signal a -> GraphState m (Signal s)
+
 foldp func state (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    value <- newRef state
+    id <- getGuid
+    value <- newRef' state
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
 
     let
         notify :: NotifyKid
@@ -443,26 +500,34 @@ foldp func state (Signal parent) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "foldp"
                 , parents: [mkExists (Signal parent)]
-                , kids: kids
-                , value: value
+                , kids
+                , inputs
+                , updateInProgress
+                , value
                 , role: Transform
-                , notify: notify
-                , graph: parent.graph
+                , notify
                 }
 
     addKidToParent (Signal parent) (mkExists node)
     pure node
 
 
-timestamp :: forall e a. Signal a -> Eff (ref :: REF | e) (Signal (Tuple Time a))
+timestamp ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    Signal a -> GraphState m (Signal (Tuple Time a))
+
 timestamp (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    pv <- readRef parent.value
-    value <- newRef $ Tuple (toTime $ programStart parent.graph) pv
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    programStart <- getProgramStart
+    value <- newRef' $ Tuple (toTime $ programStart) pv
 
     let
         notify :: NotifyKid
@@ -476,14 +541,15 @@ timestamp (Signal parent) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "timestamp"
                 , parents: [mkExists (Signal parent)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: parent.graph
+                , notify
+                , value
+                , kids
+                , inputs
+                , updateInProgress
                 }
 
     addKidToParent (Signal parent) (mkExists node)
@@ -503,7 +569,10 @@ value of zero.
     evens =
         filter isEven 0 numbers
 -}
-filter :: forall e a. (a -> Boolean) -> a -> Signal a -> Eff (ref :: REF | e) (Signal a)
+filter ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    (a -> Boolean) -> a -> Signal a -> GraphState m (Signal a)
+
 filter isOk base signal =
     filterMap (\value ->
         if isOk value
@@ -526,12 +595,18 @@ read as integers.
     numbers =
         filterMap toInt 0 userInput
 -}
-filterMap :: forall e a b. (a -> Maybe b) -> b -> Signal a -> Eff (ref :: REF | e) (Signal b)
+filterMap ::
+    forall e m a b. (MonadEff (ref :: REF | e) m) =>
+    (a -> Maybe b) -> b -> Signal a -> GraphState m (Signal b)
+
 filterMap pred base (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    pv <- readRef parent.value
-    value <- newRef (fromMaybe base (pred pv))
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    value <- newRef' (fromMaybe base (pred pv))
 
     let
         notify :: NotifyKid
@@ -540,7 +615,7 @@ filterMap pred base (Signal parent) = do
                 if update
                     then do
                         parentValue <- readRef parent.value
-                        
+
                         case pred parentValue of
                             Just x -> do
                                 writeRef value x
@@ -548,20 +623,21 @@ filterMap pred base (Signal parent) = do
 
                             Nothing ->
                                 broadcastToKids ts false kid'
-                    
+
                     else
                         broadcastToKids ts false kid'
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "filterMap"
                 , parents: [mkExists (Signal parent)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: parent.graph
+                , notify
+                , value
+                , kids
+                , inputs
+                , updateInProgress
                 }
 
     addKidToParent (Signal parent) (mkExists node)
@@ -577,16 +653,22 @@ filterMap pred base (Signal parent) = do
     main =
         map Graphics.Element.show Mouse.position
 -}
-map :: forall e a b. (a -> b) -> Signal a -> Eff (ref :: REF | e) (Signal b)
+map ::
+    forall e m a b. (MonadEff (ref :: REF | e) m) =>
+    (a -> b) -> Signal a -> GraphState m (Signal b)
+
 map func (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    pv <- readRef parent.value
-    value <- newRef $ func pv
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    value <- newRef' $ func pv
 
     let
         notify :: NotifyKid
-        notify ts update parentID = 
+        notify ts update parentID =
             runExists \kid' -> do
                 when update do
                     parentValue <- readRef parent.value
@@ -596,27 +678,39 @@ map func (Signal parent) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "map"
                 , parents: [mkExists (Signal parent)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: parent.graph
+                , notify
+                , value
+                , kids
+                , inputs
+                , updateInProgress
                 }
 
     addKidToParent (Signal parent) (mkExists node)
     pure node
 
 
-applySignal :: forall e a b. Signal (a -> b) -> Signal a -> Eff (ref :: REF | e) (Signal b)
+{- I'm using this as the basis for map2 through map5, rather than what the Elm code does.
+
+Perhaps this should be exposed, as it could be useful?
+-}
+applySignal ::
+    forall e m a b. (MonadEff (ref :: REF | e) m) =>
+    Signal (a -> b) -> Signal a -> GraphState m (Signal b)
+
 applySignal (Signal funcs) (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    pv <- readRef parent.value
-    fv <- readRef funcs.value
-    value <- newRef $ fv pv
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    fv <- readRef' funcs.value
+
+    value <- newRef' $ fv pv
 
     -- We're keeping track of what we've been notified about each parent, as the pulses
     -- go through. On each pulse, we start at `Nothing` (not notified), and then switch
@@ -627,8 +721,8 @@ applySignal (Signal funcs) (Signal parent) = do
     --
     -- Note that this assumes that every node only broadcasts to kids once per pulse.
     -- This is, in fact, true, but we'll have to keep it that way!
-    parentUpdated <- newRef (Nothing :: Maybe Boolean)
-    funcsUpdated <- newRef (Nothing :: Maybe Boolean)
+    parentUpdated <- newRef' (Nothing :: Maybe Boolean)
+    funcsUpdated <- newRef' (Nothing :: Maybe Boolean)
 
     let
         notify :: NotifyKid
@@ -653,7 +747,7 @@ applySignal (Signal funcs) (Signal parent) = do
                             funcsValue <- readRef funcs.value
 
                             writeRef value $ funcsValue parentValue
-                        
+
                         -- In either case, broadcast
                         broadcastToKids ts reallyUpdate kid'
 
@@ -667,19 +761,20 @@ applySignal (Signal funcs) (Signal parent) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "map"
                 , parents: [mkExists (Signal parent), mkExists (Signal funcs)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: parent.graph
+                , notify
+                , value
+                , kids
+                , inputs
+                , updateInProgress
                 }
 
     addKidToParent (Signal parent) (mkExists node)
     addKidToParent (Signal funcs) (mkExists node)
-    
+
     pure node
 
 
@@ -694,14 +789,20 @@ height.
     aspectRatio =
         map2 ratio Window.width Window.height
 -}
-map2 :: forall eff a b r. (a -> b -> r) -> Signal a -> Signal b -> Eff (ref :: REF | eff) (Signal r)
+map2 ::
+    forall eff m a b r. (MonadEff (ref :: REF | eff) m) =>
+    (a -> b -> r) -> Signal a -> Signal b -> GraphState m (Signal r)
+
 map2 func a b = do
     ab <- map func a
     applySignal ab b
 
 
 {-|-}
-map3 :: forall eff a b c r. (a -> b -> c -> r) -> Signal a -> Signal b -> Signal c -> Eff (ref :: REF | eff) (Signal r)
+map3 ::
+    forall eff m a b c r. (MonadEff (ref :: REF | eff) m) =>
+    (a -> b -> c -> r) -> Signal a -> Signal b -> Signal c -> GraphState m (Signal r)
+
 map3 func a b c = do
     ab <- map func a
     bc <- applySignal ab b
@@ -709,7 +810,10 @@ map3 func a b c = do
 
 
 {-|-}
-map4 :: forall eff a b c d r. (a -> b -> c -> d -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> Eff (ref :: REF | eff) (Signal r)
+map4 ::
+    forall eff m a b c d r. (MonadEff (ref :: REF | eff) m) =>
+    (a -> b -> c -> d -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> GraphState m (Signal r)
+
 map4 func a b c d = do
     ab <- map func a
     bc <- applySignal ab b
@@ -718,7 +822,10 @@ map4 func a b c d = do
 
 
 {-|-}
-map5 :: forall eff a b c d e r. (a -> b -> c -> d -> e -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> Signal e -> Eff (ref :: REF | eff) (Signal r)
+map5 ::
+    forall eff m a b c d e r. (MonadEff (ref :: REF | eff) m) =>
+    (a -> b -> c -> d -> e -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> Signal e -> GraphState m (Signal r)
+
 map5 func a b c d e = do
     ab <- map func a
     bc <- applySignal ab b
@@ -731,15 +838,21 @@ map5 func a b c d e = do
 For example, `(sampleOn Mouse.clicks (Time.every Time.second))` will give the
 approximate time of the latest click.
 -}
-sampleOn :: forall e a b. Signal a -> Signal b -> Eff (ref :: REF | e) (Signal b)
-sampleOn (Signal ticker) (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    pv <- readRef parent.value
-    value <- newRef pv
+sampleOn ::
+    forall e m a b. (MonadEff (ref :: REF | e) m) =>
+    Signal a -> Signal b -> GraphState m (Signal b)
 
-    signalUpdated <- newRef (Nothing :: Maybe Boolean)
-    tickerUpdated <- newRef (Nothing :: Maybe Boolean)
+sampleOn (Signal ticker) (Signal parent) = do
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    value <- newRef' pv
+
+    signalUpdated <- newRef' (Nothing :: Maybe Boolean)
+    tickerUpdated <- newRef' (Nothing :: Maybe Boolean)
 
     let
         notify :: NotifyKid
@@ -769,20 +882,21 @@ sampleOn (Signal ticker) (Signal parent) = do
 
                         writeRef signalUpdated Nothing
                         writeRef tickerUpdated Nothing
-                        
+
                     Nothing ->
                         pure unit
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "sampleOn"
                 , parents: [mkExists (Signal ticker), mkExists (Signal parent)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: parent.graph
+                , notify
+                , value
+                , kids
+                , inputs
+                , updateInProgress
                 }
 
     addKidToParent (Signal ticker) (mkExists node)
@@ -803,12 +917,18 @@ sampleOn (Signal ticker) (Signal parent) = do
     --  noDups  => 0   3   5     4 ...
 
 -}
-dropRepeats :: forall e a. (Eq a) => Signal a -> Eff (ref :: REF | e) (Signal a)
+dropRepeats ::
+    forall e m a. (MonadEff (ref :: REF | e) m, Eq a) =>
+    Signal a -> GraphState m (Signal a)
+
 dropRepeats (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
-    pv <- readRef parent.value
-    value <- newRef pv
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    value <- newRef' pv
 
     let
         notify :: NotifyKid
@@ -826,14 +946,15 @@ dropRepeats (Signal parent) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "dropRepeats"
                 , parents: [mkExists (Signal parent)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: parent.graph
+                , notify
+                , value
+                , inputs
+                , kids
+                , updateInProgress
                 }
 
     addKidToParent (Signal parent) (mkExists node)
@@ -855,7 +976,10 @@ If an update comes from either of the incoming signals, it updates the outgoing
 signal. If an update comes on both signals at the same time, the update provided
 by the left input signal wins (i.e., the update from the second signal is discarded).
 -}
-merge :: forall e a. Signal a -> Signal a -> Eff (ref :: REF | e) (Signal a)
+merge ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    Signal a -> Signal a -> GraphState m (Signal a)
+
 merge = genericMerge const
 
 
@@ -873,7 +997,10 @@ update wins, just like with `merge`.
             , map (always Click) Mouse.clicks
             ]
 -}
-mergeMany :: forall e a. List (Signal a) -> Eff (ref :: REF | e) (Signal a)
+mergeMany ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    List (Signal a) -> GraphState m (Signal a)
+
 mergeMany signalList =
     case reverse signalList of
         Nil ->
@@ -883,16 +1010,23 @@ mergeMany signalList =
             foldM merge signal signals
 
 
-genericMerge :: forall e a. (a -> a -> a) -> Signal a -> Signal a -> Eff (ref :: REF | e) (Signal a)
-genericMerge tieBreaker (Signal left) (Signal right) = do
-    id <- getGuid left.graph
-    kids <- newRef []
-    lv <- readRef left.value
-    rv <- readRef right.value
-    value <- newRef $ tieBreaker lv rv 
+genericMerge ::
+    forall e m a. (MonadEff (ref :: REF | e) m) =>
+    (a -> a -> a) -> Signal a -> Signal a -> GraphState m (Signal a)
 
-    leftUpdated <- newRef (Nothing :: Maybe Boolean)
-    rightUpdated <- newRef (Nothing :: Maybe Boolean)
+genericMerge tieBreaker (Signal left) (Signal right) = do
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    lv <- readRef' left.value
+    rv <- readRef' right.value
+
+    value <- newRef' $ tieBreaker lv rv
+
+    leftUpdated <- newRef' (Nothing :: Maybe Boolean)
+    rightUpdated <- newRef' (Nothing :: Maybe Boolean)
 
     let
         notify :: NotifyKid
@@ -942,14 +1076,15 @@ genericMerge tieBreaker (Signal left) (Signal right) = do
 
         node =
             Signal
-                { id: id
+                { id
                 , name: "merge"
                 , parents: [mkExists (Signal left), mkExists (Signal right)]
-                , kids: kids
                 , role: Transform
-                , notify: notify
-                , value: value
-                , graph: left.graph
+                , notify
+                , value
+                , kids
+                , inputs
+                , updateInProgress
                 }
 
     addKidToParent (Signal left) (mkExists node)
@@ -977,7 +1112,8 @@ signals, so you can provide your own signal updates.
 The primary use case is when a `Task` or UI element needs to talk back to the
 main part of your application.
 -}
-newtype Address a = Address (forall e. a -> Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit)
+newtype Address a =
+    Address (forall e. a -> Eff (ref :: REF, now :: Now, console :: CONSOLE, delay :: DELAY | e) Unit)
 
 
 {- Updates the current value of the specified input `Signal`, and then broadcasts the
@@ -987,38 +1123,42 @@ notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: Now, console :: C
 notify (Signal signal) value = do
     -- Check for synchronous calls .... I suppose we could
     -- short-circuit and retry on the next tick?
-    updateInProgress <- readUpdateInProgress signal.graph
+    updateInProgress <- readRef signal.updateInProgress
     when updateInProgress $ error "The notify function has been called synchronously!"
-    
+
     -- Indicate we're in progress
-    writeUpdateInProgress signal.graph true
-    
+    writeRef signal.updateInProgress true
+
     -- Actually update the target signal's value
     writeRef signal.value value
 
     -- Notify all the inputs
     timestep <- nowEpochMilliseconds
-    inputs <- readInputs signal.graph
-    
-    foreachE inputs $
+    inputs <- readRef signal.inputs
+
+    foreachE inputs (
         runExists \(Signal node') ->
             broadcastToKids timestep (signal.id == node'.id) (Signal node')
+    )
 
     -- Stop checking for synchronous calls
-    writeUpdateInProgress signal.graph false
+    writeRef signal.updateInProgress false
 
 
 {-| Create a mailbox you can send messages to. The primary use case is
 receiving updates from tasks and UI elements. The argument is a default value
 for the custom signal.
 -}
-mailbox :: forall e a. Graph -> a -> Eff (ref :: REF | e) (Mailbox a)
-mailbox graph base = do
-    signal <- input graph "mailbox" base
+mailbox ::
+    forall e m a. (MonadEff (ref :: REF, delay :: DELAY | e) m) =>
+    a -> GraphState m (Mailbox a)
+
+mailbox base = do
+    signal <- input "mailbox" base
 
     pure
         { signal: signal
-        , address: Address ((delay 0) <<< (notify signal))
+        , address: Address (delay 0 <<< notify signal)
         }
 
 
@@ -1107,7 +1247,7 @@ it. So, I think that was causing the problem.
 -}
 foreign import data DELAY :: !
 
-foreign import delay :: forall eff a. 
-    Int -> 
-    Eff (delay :: DELAY | eff) a -> 
+foreign import delay :: forall eff a.
+    Int ->
+    Eff (delay :: DELAY | eff) a ->
     Eff (delay :: DELAY | eff) Unit
