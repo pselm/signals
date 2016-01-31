@@ -4,12 +4,14 @@ import Prelude
 import Test.Unit
 import Test.Unit.Console
 import Control.Monad.Eff
-import Control.Monad.Aff.AVar
+import Control.Monad.Eff.Random (RANDOM())
+import Control.Monad.Aff.AVar (AVAR())
 
 main :: forall e. Eff
     ( testOutput :: TESTOUTPUT
     , avar :: AVAR
     , timer :: TIMER
+    , random :: RANDOM
     | e) Unit
 main =
     runTest do
