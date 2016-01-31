@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "purescript-console": "~0.1.1",
-    "purescript-test-unit": "~4.1.0"
+    "purescript-test-unit": "~4.1.0",
+    "purescript-generics": "~0.7.2"
   }
 }

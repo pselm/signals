@@ -32,3 +32,4 @@ main =
         Test.Elm.RegexTest.tests
         Test.Elm.TaskTest.tests
         Test.Elm.SignalTest.tests
+        Test.Elm.JsonTest.tests
