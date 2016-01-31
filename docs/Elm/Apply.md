@@ -36,4 +36,12 @@ map5 :: forall a b c d e f g. (Apply f) => (a -> b -> c -> d -> e -> g) -> f a -
 Lift a function of five arguments to a function which accepts and returns
 values wrapped with the type constructor `f`.
 
+#### `andMap`
+
+``` purescript
+andMap :: forall a b f. (Apply f) => f (a -> b) -> f a -> f b
+```
+
+Elm uses `andMap` as a synonym for `apply`
+
 
