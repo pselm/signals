@@ -2,19 +2,23 @@ module Test.Elm.Int53Test (tests) where
 
 import Test.Unit
 import Test.Unit.Assert
+import Test.Unit.QuickCheck (quickCheck)
+import Test.QuickCheck ((===), Result())
 
 import Elm.Int53
-import Prelude (bind, Eq, negate, not, top, bottom)
+import Control.Monad.Eff.Random
+import Prelude (bind, Eq, negate, not, top, bottom, ($))
 import Elm.Basics ((<|), (==))
 import Data.Maybe
+import qualified Data.Int as Int
 
 
 nothing :: Maybe Int53
 nothing = Nothing
 
 
-tests :: forall e. TestUnit e
-tests = do
+tests :: forall e. TestUnit (random :: RANDOM | e)
+tests = test "Elm.Int53\n" do
     test "Int53.truncate" do
         assert "positive" <| fromInt 1 == truncate 1.5
         assert "negative" <| fromInt (-1) == truncate (-1.5)
@@ -47,3 +51,19 @@ tests = do
         assert "1" <| odd <| fromInt 1
         assert "2" <| not <| odd <| fromInt 2
         assert "3" <| odd <| fromInt 3
+
+    test "Quickcheck even" $
+        quickCheck quickEven
+
+    test "Quickcheck odd" $
+        quickCheck quickOdd
+
+
+quickEven :: Int -> Result
+quickEven a =
+    Int.even a === even (fromInt a)
+
+
+quickOdd :: Int -> Result
+quickOdd a =
+    Int.odd a === odd (fromInt a)
