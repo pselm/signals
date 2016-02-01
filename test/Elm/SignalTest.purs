@@ -19,7 +19,7 @@ infixl 9 ===
 (===) = flip equal
 
 
-tests = do
+tests = test "Elm.Signal\n" do
     test "Signal.constant" do
         signal <- setup do
             constant 17

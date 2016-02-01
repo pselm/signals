@@ -18,7 +18,7 @@ assertEqual name expected actual =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.ElmList\n" do
     testListOfN 0
     testListOfN 1
     testListOfN 2

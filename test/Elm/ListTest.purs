@@ -14,7 +14,7 @@ import Prelude (bind, Ordering(..))
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.List\n" do
     test "List.(:)" do
         assert "with rest" <| (1 : 2 : 3 : Nil) == (Cons 1 (Cons 2 (Cons 3 Nil)))
         assert "by itself" <| (1 : Nil) == (Cons 1 Nil)

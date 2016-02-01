@@ -36,7 +36,7 @@ match =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Regex\n" do
     test "Regex" do
         -- contains
         let containsExp = regex("a")

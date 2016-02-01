@@ -14,7 +14,7 @@ assertEqual name expected actual =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Bitwise\n" do
     test "Bitwise.and" do
         assertEqual "and with 32 bit integers" 1 (Bitwise.and 5 3)
         assertEqual "and with 0 as first argument" 0 (Bitwise.and 0 1450)

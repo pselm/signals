@@ -48,7 +48,7 @@ evenAfter50 int =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Task\n" do
     test "Task.succeed" do
         result <- toAff (succeed 42)
         result === Right 42 :: Either String Int

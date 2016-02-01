@@ -10,7 +10,7 @@ import Prelude (bind)
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Maybe\n" do
     test "Maybe.withDefault" do
         assert "with Just" <| withDefault 100 (Just 42) == 42
         assert "with Nothing" <| withDefault 100 Nothing == 100

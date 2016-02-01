@@ -32,7 +32,7 @@ pred x = x <= 50
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Set\n" do
     test "Set.build" do
         assertEqual "empty" (Set.fromList (Nil :: List Int)) (Set.empty)
         assertEqual "singleton" (Set.fromList (27 : Nil)) (Set.singleton 27)

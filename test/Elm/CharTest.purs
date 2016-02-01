@@ -57,7 +57,7 @@ oneOf = flip List.member
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Char\n" do
     test "toCode" do
         assertEqual "a-z" (lowerCodes) (List.map toCode lower)
         assertEqual "A-Z" (upperCodes) (List.map toCode upper)

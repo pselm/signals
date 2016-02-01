@@ -15,7 +15,7 @@ assertEqual name expected actual =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Time\n" do
     test "Time.Conversion Factors" do
         assert "Time.millisecond -> second" <| 500.0 * Time.millisecond == 0.5 * Time.second
         assert "Time.minute -> hour" <| 30.0 * Time.minute == 0.5 * Time.hour

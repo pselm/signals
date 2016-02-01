@@ -14,7 +14,7 @@ assertEqual name expected actual =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.ElmBasics\n" do
     test "Comparison" do
         assertEqual "max" 42 (max 32 42)
         assertEqual "min" 42 (min 91 42)

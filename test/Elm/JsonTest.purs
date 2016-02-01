@@ -66,7 +66,7 @@ instance eqShape :: Eq Shape where
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Json\n" do
     test "encode object with scalar types" do
         let
             person =

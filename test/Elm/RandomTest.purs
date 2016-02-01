@@ -49,7 +49,7 @@ doer = do
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Random\n" do
     test "Random.bool" do
         assert "seed1" <| false == (generate bool seed1).value
         assert "seed2" <| false == (generate bool seed2).value

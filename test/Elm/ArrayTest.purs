@@ -45,7 +45,7 @@ mapArray array =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Array\n" do
     test "Elm.Array.Creation" do
         assertEqual "empty" Array.empty (Array.fromList (Nil :: List Int))
         assertEqual "initialize" (Array.initialize 4 identity) (Array.fromList [0,1,2,3])

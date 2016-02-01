@@ -10,7 +10,7 @@ import Prelude (bind, Ordering(..))
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Basics\n" do
     test "Basics.(==)" do
         assert "true" <| 5 == 5
         assert "false" <| not <| 4 == 5

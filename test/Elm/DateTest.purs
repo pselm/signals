@@ -18,7 +18,7 @@ assertEqual name expected actual =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Date\n" do
     test "Date.conversion" do
         assert "fromString good" <| toMaybe (fromString "May 27, 2014") == fromEpochMilliseconds (Milliseconds 1401166800000.0)
         assert "fromString bad"  <| toMaybe (fromString "bob") == (Nothing :: Maybe Date)

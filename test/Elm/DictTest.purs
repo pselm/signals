@@ -41,7 +41,7 @@ animalsPlus =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Dict\n" do
     test "Dict.build Tests" do
         assertEqual "empty" (Dict.fromList (Nil :: List (Tuple String String))) (Dict.empty)
         assertEqual "singleton" (Dict.fromList ("k" := "v" : Nil)) (Dict.singleton "k" "v")

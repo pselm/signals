@@ -43,7 +43,7 @@ add5 a b c d e =
 
 
 tests :: forall e. TestUnit e
-tests = do
+tests = test "Elm.Result\n" do
     test "Result.map" do
         assertEqual "map Ok"  (Ok 3)        (Result.map ((+) 1) (Ok 2))
         assertEqual "map Err" (Err "error") (Result.map ((+) 1) (Err "error"))
