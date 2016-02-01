@@ -8,6 +8,9 @@ import Type.Proxy
 
 import Elm.Int53
 import Control.Monad.Eff.Random
+import Control.Monad.Eff.Class
+import Control.Monad.Eff.Exception (EXCEPTION())
+import Control.Monad.Eff.Console (CONSOLE())
 import Prelude (bind, Eq, negate, not, top, bottom, ($))
 import Elm.Basics ((<|), (==))
 import Data.Maybe
@@ -25,7 +28,7 @@ nothing :: Maybe Int53
 nothing = Nothing
 
 
-tests :: forall e. TestUnit (random :: RANDOM | e)
+tests :: forall e. TestUnit (random :: RANDOM, err :: EXCEPTION, console :: CONSOLE | e)
 tests = test "Elm.Int53\n" do
     test "Int53.truncate" do
         assert "positive" <| fromInt 1 == truncate 1.5
@@ -66,12 +69,13 @@ tests = test "Elm.Int53\n" do
     test "Quickcheck odd" $
         quickCheck quickOdd
 
-    checkSemiring proxyInt53
-    checkBounded proxyInt53
-    checkRing proxyInt53
-    checkModuloSemiring proxyInt53
-    checkEq proxyInt53
-    checkOrd proxyInt53
+    liftEff do
+        checkSemiring proxyInt53
+        checkBounded proxyInt53
+        checkRing proxyInt53
+        checkModuloSemiring proxyInt53
+        checkEq proxyInt53
+        checkOrd proxyInt53
 
 
 proxyInt53 :: Proxy Int53

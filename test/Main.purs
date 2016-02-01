@@ -5,6 +5,8 @@ import Test.Unit
 import Test.Unit.Console
 import Control.Monad.Eff
 import Control.Monad.Eff.Random (RANDOM())
+import Control.Monad.Eff.Exception (EXCEPTION())
+import Control.Monad.Eff.Console (CONSOLE())
 import Control.Monad.Aff.AVar (AVAR())
 
 main :: forall e. Eff
@@ -12,6 +14,8 @@ main :: forall e. Eff
     , avar :: AVAR
     , timer :: TIMER
     , random :: RANDOM
+    , err :: EXCEPTION
+    , console :: CONSOLE
     | e) Unit
 main =
     runTest do
