@@ -6,6 +6,16 @@ module Elm.Result
     ) where
 
 
+-- | This is adapted from https://github.com/purescript/purescript-either/blob/master/src/Data/Either.purs
+-- |
+-- | Normally, my strategy would have been to re-use `Either` instead of doing this.
+-- | However, the problem is that there is no way to alias the data constructors
+-- | `Left` and `Right`. Well, you could have functions to do part of the job,
+-- | but not the pattern-matching part. So, we'll require fewer changes to
+-- | Elm code if we do this instead. And, arguably, `Ok` and `Err` actually
+-- | have some advantages over `Left` and `Right`.
+
+
 -- For re-export
 
 import Prelude (map) as Virtual
