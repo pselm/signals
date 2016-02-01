@@ -22,6 +22,7 @@
     "purescript-maps": "~0.5.4",
     "purescript-math": "~0.2.0",
     "purescript-orders": "~0.1.1",
+    "purescript-quickcheck": "~0.12.2",
     "purescript-sequences": "~0.5.0",
     "purescript-sets": "~0.5.5",
     "purescript-strings": "~0.7.1",
@@ -30,7 +31,6 @@
   "devDependencies": {
     "purescript-console": "~0.1.1",
     "purescript-generics": "~0.7.2",
-    "purescript-quickcheck": "~0.12.2",
     "purescript-test-unit": "~4.1.0"
   }
 }

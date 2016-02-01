@@ -12,13 +12,15 @@ module Elm.Int53
 import Prelude
     ( Semiring, Ring, ModuloSemiring, Eq, Bounded, Ord, BoundedOrd, Show
     , (+), (-), (*), (/), (==), ($), (++), (>), compare, show, top, bottom
-    , negate, (<), (<<<), (/=), (||), id
+    , negate, (<), (<<<), (/=), (||), id, bind, pure
     )
 
 import qualified Math as Math
 import Elm.Basics (Pow, pow)
 import Global (readFloat, isNaN)
 import Data.Maybe
+import Test.QuickCheck.Arbitrary (Arbitrary)
+import Test.QuickCheck.Gen (choose)
 
 
 -- | A JavaScript 53-bit signed integer.
@@ -69,6 +71,18 @@ instance showInt53 :: Show Int53 where
 
 instance powInt53 :: Pow Int53 where
     pow (Int53 a) (Int53 b) = Int53 (pow a b)
+
+
+instance arbitraryInt53 :: Arbitrary Int53 where
+    arbitrary = do
+        -- This obviously isn't the full range of Int53.
+        -- However, arbitraryInt does the same thing, and
+        -- probably for the same reason ... which is to
+        -- avoid quickcheck tests that overflow.
+        -- TODO: Should adjust those tests, and then make
+        -- this range bigger.
+        n <- choose 94906265.0 (-94906265.0)
+        pure $ truncate n
 
 
 {- Clamps to the top and bottom. Unsafe because it assumes that

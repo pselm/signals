@@ -4,6 +4,7 @@ import Test.Unit
 import Test.Unit.Assert
 import Test.Unit.QuickCheck (quickCheck)
 import Test.QuickCheck ((===), Result())
+import Type.Proxy
 
 import Elm.Int53
 import Control.Monad.Eff.Random
@@ -11,6 +12,13 @@ import Prelude (bind, Eq, negate, not, top, bottom, ($))
 import Elm.Basics ((<|), (==))
 import Data.Maybe
 import qualified Data.Int as Int
+
+import Test.QuickCheck.Laws.Data.ModuloSemiring
+import Test.QuickCheck.Laws.Data.Semiring
+import Test.QuickCheck.Laws.Data.Bounded
+import Test.QuickCheck.Laws.Data.Ring
+import Test.QuickCheck.Laws.Data.Eq
+import Test.QuickCheck.Laws.Data.Ord
 
 
 nothing :: Maybe Int53
@@ -57,6 +65,17 @@ tests = test "Elm.Int53\n" do
 
     test "Quickcheck odd" $
         quickCheck quickOdd
+
+    checkSemiring proxyInt53
+    checkBounded proxyInt53
+    checkRing proxyInt53
+    checkModuloSemiring proxyInt53
+    checkEq proxyInt53
+    checkOrd proxyInt53
+
+
+proxyInt53 :: Proxy Int53
+proxyInt53 = Proxy
 
 
 quickEven :: Int -> Result
