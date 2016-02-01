@@ -19,7 +19,8 @@ Bounded Int53
 BoundedOrd Int53
 Show Int53
 Pow Int53
-LikeInt53 Int53
+Arbitrary Int53
+Int53Value Int53
 ```
 
 #### `truncate`
@@ -126,10 +127,10 @@ odd (fromInt 0) == false
 odd (fromInt 1) == true
 ```
 
-#### `LikeInt53`
+#### `Int53Value`
 
 ``` purescript
-class LikeInt53 a where
+class Int53Value a where
   toInt53 :: a -> Int53
   fromInt53 :: Int53 -> a
 ```
@@ -141,8 +142,8 @@ may clamp if necessary, or truncate etc.
 
 ##### Instances
 ``` purescript
-LikeInt53 Int53
-LikeInt53 Int
+Int53Value Int53
+Int53Value Int
 ```
 
 

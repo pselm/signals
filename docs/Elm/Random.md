@@ -9,7 +9,7 @@ bool :: Generator Boolean
 #### `int`
 
 ``` purescript
-int :: forall a. (Ord a, LikeInt53 a) => a -> a -> Generator a
+int :: forall a. (Ord a, Int53Value a) => a -> a -> Generator a
 ```
 
 #### `maxInt`
@@ -75,7 +75,7 @@ generate :: forall a. Generator a -> Seed -> Generated a
 #### `initialSeed`
 
 ``` purescript
-initialSeed :: forall a. (LikeInt53 a) => a -> Seed
+initialSeed :: forall a. (Int53Value a) => a -> Seed
 ```
 
 
