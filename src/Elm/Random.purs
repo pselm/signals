@@ -29,6 +29,7 @@ module. It has a period of roughly 2.30584e18.
 
 import Elm.Apply (map2, map3, map4, map5) as Virtual
 import Elm.Bind (andThen) as Virtual
+import Prelude (map) as Virtual
 
 
 -- Internal
