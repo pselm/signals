@@ -32,6 +32,6 @@
     "purescript-console": "~0.1.1",
     "purescript-generics": "~0.7.2",
     "purescript-test-unit": "~4.1.0",
-    "purescript-quickcheck-laws": "https://github.com/rgrempel/purescript-quickcheck-laws.git#master"
+    "purescript-quickcheck-laws": "~0.1.1"
   }
 }
