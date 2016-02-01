@@ -1,6 +1,6 @@
 module Elm.Int53
     ( Int53()
-    , LikeInt53, toInt53, fromInt53
+    , Int53Value, toInt53, fromInt53
     , fromNumber, toNumber
     , fromInt, toInt
     , fromString
@@ -185,16 +185,16 @@ odd (Int53 a) =
 -- | work with `Int53` internally, and then return whatever type we were
 -- | given. The conversions should do their best ... for instance, they
 -- | may clamp if necessary, or truncate etc.
-class LikeInt53 a where
+class Int53Value a where
     toInt53 :: a -> Int53
     fromInt53 :: Int53 -> a
 
 
-instance int53LikeInt53 :: LikeInt53 Int53 where
+instance int53Int53Value :: Int53Value Int53 where
     toInt53 = id
     fromInt53 = id
 
 
-instance intLikeInt53 :: LikeInt53 Int where
+instance intInt53Value :: Int53Value Int where
     toInt53 = fromInt
     fromInt53 = toInt

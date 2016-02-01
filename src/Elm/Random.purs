@@ -72,7 +72,7 @@ bool =
 Unlike the Elm implementation, this function *cannot* produce values outside of
 the range [[`minInt`](#minInt), [`maxInt`](#maxInt)].
 -}
-int :: forall a. (Ord a, LikeInt53 a) => a -> a -> Generator a
+int :: forall a. (Ord a, Int53Value a) => a -> a -> Generator a
 int a b =
     Generator $ \seed ->
         let
@@ -368,7 +368,7 @@ generate random values. If you use the same seed many times, it will result
 in the same thing every time! A good way to get an unexpected seed is to use
 the current time.
 -}
-initialSeed :: forall a. (LikeInt53 a) => a -> Seed
+initialSeed :: forall a. (Int53Value a) => a -> Seed
 initialSeed n =
     initState (toInt53 n)
 
