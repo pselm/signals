@@ -5,9 +5,17 @@ unqualified. Not that this is recommended, but it is nice to be able to
 support it as much as is reasonable.
 -}
 
+-- Start with the imports which Elm does automatically
 import Elm.Default
 
+-- Then do the Elm-ish typeclasses
+import Elm.Apply
+import Elm.Bind
+
+-- Then Elm.Basics
 import Elm.Basics
+
+-- Then, the rest in alphabetical order
 
 -- `Array` conflicts with `Prim.Array`
 import Elm.Array hiding (Array())
@@ -45,6 +53,13 @@ problem for `truncate`.
 -}
 import Elm.Int53 hiding (fromString, ceil, floor, round, truncate)
 
+-- oneOf conflicts with Elm.Maybe ... perhaps could be unified?
+import Elm.Json.Decode hiding (oneOf)
+
+-- Inevitably conflicts with Elm.Json.Decode ... one will usually need to import
+-- these qualified.
+import Elm.Json.Encode hiding (string, int, float, bool, null, list, array)
+
 {- There are a number of things that could conceivably be unified between
 `Elm.List` and `Elm.Array` ... `length`, `filter`, `foldl`, `indexedMap`,
 `repeat`
@@ -58,7 +73,10 @@ import Elm.List hiding
     )
 
 import Elm.Maybe
-import Elm.Random
+
+-- Conflicts with Elm.Json.Decode and Elm.Json.Encode. I don't suppose there's
+-- a sensible type-class to be had here?
+import Elm.Random hiding (bool, int, float, list)
 
 -- Conflicts with String
 import Elm.Regex hiding (contains, split)
@@ -75,6 +93,9 @@ import Elm.Set hiding
     , foldl, intersect, diff, insert, filter, partition, map
     )
 
+-- Signal's map is a monadic map, so not part of the type class 
+import Elm.Signal hiding (map, map2, map3, map4, map5, filter, filterMap)
+
 import Elm.String hiding
     -- Perhaps these could be unified with ListLike
     ( length, isEmpty, reverse, repeat, concat, slice
@@ -85,6 +106,12 @@ import Elm.String hiding
     -- Won't unify with Elm.Basics
     , toFloat
     )
+
+-- Should make succeed a synonym for pure everywhere
+-- Conflicts with Elm.Json.Decode.
+-- Not sure what to do about `fail`
+-- `toMaybe` and `fromMaybe` conflict with Elm.Result ... is a type-class sensible?
+import Elm.Task hiding (succeed, fail, toMaybe, fromMaybe)
 
 -- Conflicts with Elm.Date
 import Elm.Time hiding (toTime, fromTime, millisecond, second, minute, hour)
