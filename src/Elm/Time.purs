@@ -1,6 +1,6 @@
 module Elm.Time
     ( module Virtual
-    , Time(), toTime, fromTime
+    , Time, toTime, fromTime
     , millisecond, second, minute, hour
     , inMilliseconds, inSeconds, inMinutes, inHours
     --, fps, fpsWhen, every
@@ -11,7 +11,7 @@ module Elm.Time
 -- For re-export
 
 import Data.Time
-    ( TimeValue
+    ( class TimeValue
     ) as Virtual
 
 
@@ -19,7 +19,7 @@ import Data.Time
 
 import Data.Time
     ( Hours(..), Minutes(..), Seconds(..), Milliseconds(..)
-    , TimeValue, toMilliseconds, fromMilliseconds
+    , class TimeValue, toMilliseconds, fromMilliseconds
     )
 
 import Prelude ((/), flip, id, ($), (<<<))
@@ -91,5 +91,3 @@ inMinutes = divBy minute
 inHours :: Time -> Number
 inHours = divBy hour
 
-
--- TODO: Add Signal-related stuff 

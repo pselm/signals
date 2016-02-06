@@ -1,21 +1,20 @@
 module Test.Elm.DictTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Dict as Dict
-import Elm.Dict (Dict())
-import Elm.Basics
-import Prelude (bind, Eq, (<$>))
-import Data.Tuple (Tuple(..))
+import Elm.Dict (Dict)
+import Elm.Basics (Tuple(..), (++), (<|), (==))
+import Prelude (bind, class Eq, (<$>))
 import Elm.List (List(..), (:))
 import Elm.Maybe (Maybe(..))
 
 
-infixl 9 :=
+infixl 9 tuple as :=
 
-(:=) :: forall a b. a -> b -> Tuple a b
-(:=) = Tuple
+tuple :: forall a b. a -> b -> Tuple a b
+tuple = Tuple
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e

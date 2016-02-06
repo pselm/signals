@@ -12,13 +12,19 @@
 module Elm.Basics 
     ( module Virtual
     , Order(..)
-    , Pow, pow, (^)
-    , abs, xor, (//), rem, (%)
-    , Float(), logBase, truncate, ceiling, toFloat
+    , class Pow, pow, (^)
+    , abs, xor
+    , intDiv, (//)
+    , rem, mod, (%)
+    , Float, logBase, truncate, ceiling, toFloat
     , radians, degrees, turns, fromPolar, toPolar
     , toString, isInfinite
-    , identity, always, (<|), (|>), (<<), (>>)
-    , Bool()
+    , identity, always
+    , applyFn, (<|)
+    , applyFnFlipped, (|>)
+    , compose, (<<)
+    , composeFlipped, (>>)
+    , Bool
     ) where
 
 
@@ -45,10 +51,10 @@ import Prelude
     , (*), (/), (+)
     , (>), (>=), (==)
     , (||), (&&)
-    , Ring, negate, not, zero
-    , Show, show
-    , ModuloSemiring, Semiring
-    , Ord, Ordering()
+    , class Ring, negate, not, zero
+    , class Show, show
+    , class ModuloSemiring, class Semiring
+    , class Ord, Ordering
     )
 
 import Math (cos, sqrt, log, pi, sin, atan2)
@@ -111,13 +117,13 @@ toPolar {x, y} =
     }
 
 
-infixl 7 //
+infixl 7 intDiv as //
 
 -- | Integer division. The remainder is discarded.
 -- |
 -- | In Purescript, you can simply use `/`.
-(//) :: forall a. (ModuloSemiring a) => a -> a -> a
-(//) = Prelude.(/)
+intDiv :: forall a. (ModuloSemiring a) => a -> a -> a
+intDiv = Prelude.(/)
 
 
 -- I'd like to do the following, but it looks like it doesn't work.
@@ -134,7 +140,7 @@ rem :: forall a. (ModuloSemiring a) => a -> a -> a
 rem = Prelude.mod
 
 
-infixl 7 %
+infixl 7 mod as %
 
 -- | Perform [modular arithmetic](http://en.wikipedia.org/wiki/Modular_arithmetic).
 -- |
@@ -143,8 +149,8 @@ infixl 7 %
 -- |
 -- | Note that this is not the same as Purescript's `Prelude.mod` --
 -- | for that, see `Basics.rem`.
-(%) :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
-(%) a b =
+mod :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
+mod a b =
     let
         r :: a
         r =
@@ -184,13 +190,7 @@ instance floatFloatPow :: Pow Number where
     pow a b = Math.pow a b
 
 
-infixr 8 ^
-
--- | Exponentiation
--- |
--- |     3^2 == 9
-(^) :: forall a. (Pow a) => a -> a -> a 
-(^) = pow
+infixr 8 pow as ^
 
 
 -- | Take the absolute value of a number.
@@ -272,7 +272,7 @@ toString = show
 -- Function Helpers
 
 
-infixr 9 <<
+infixr 9 compose as <<
 
 -- | Function composition, passing results along in the suggested direction. For
 -- | example, the following code checks if the square root of a number is odd:
@@ -288,11 +288,11 @@ infixr 9 <<
 -- |     \n -> not (isEven (sqrt n))
 -- |
 -- | Equivalent to Purescript's `<<<`.
-(<<) :: forall a b c. (b -> c) -> (a -> b) -> (a -> c)
-(<<) = (<<<)
+compose :: forall a b c. (b -> c) -> (a -> b) -> (a -> c)
+compose = (<<<)
 
 
-infixl 9 >>
+infixl 9 composeFlipped as >>
 
 -- | Function composition, passing results along in the suggested direction. For
 -- | example, the following code checks if the square root of a number is odd:
@@ -303,11 +303,11 @@ infixl 9 >>
 -- | reads nicely in expressions like: `filter (not << isRegistered) students`
 -- |
 -- | Equivalent to Purescript's `>>>`.
-(>>) :: forall a b c. (a -> b) -> (b -> c) -> (a -> c)
-(>>) = (>>>)
+composeFlipped :: forall a b c. (a -> b) -> (b -> c) -> (a -> c)
+composeFlipped = (>>>)
 
 
-infixl 0 |>
+infixl 0 applyFnFlipped as |>
 
 -- | Forward function application `x |> f == f x`. This function is useful
 -- | for avoiding parenthesis and writing code in a more natural way.
@@ -323,11 +323,11 @@ infixl 0 |>
 -- |       |> scale 2
 -- |
 -- | Equivalent to Purescript's `#`.
-(|>) :: forall a b. a -> (a -> b) -> b
-(|>) = (#)
+applyFnFlipped :: forall a b. a -> (a -> b) -> b
+applyFnFlipped = (#)
 
 
-infixr 0 <|
+infixr 0 applyFn as <|
 
 -- | Backward function application `f <| x == f x`. This function is useful for
 -- | avoiding parenthesis. Consider the following code to create a text element:
@@ -339,8 +339,8 @@ infixr 0 <|
 -- |     leftAligned << monospace <| fromString "code"
 -- |
 -- | Equivalent to Purescript's `$`.
-(<|) :: forall a b. (a -> b) -> a -> b
-(<|) = ($)
+applyFn :: forall a b. (a -> b) -> a -> b
+applyFn = ($)
 
 
 -- | Given a value, returns exactly the same value. This is called

@@ -1,22 +1,22 @@
 module Test.Elm.TaskTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (equal)
 
 import Elm.Task
-import Prelude (flip, bind, Eq, Show, ($), (+), (<$>), (++), show, Unit())
+import Prelude (flip, bind, class Eq, class Show, ($), (+), (<$>), (++), show, Unit)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Elm.Result (Result(..))
 import Data.List (List(..), (:))
-import Control.Monad.Eff(Eff())
+import Control.Monad.Eff (Eff)
 import Math (sqrt)
 
 
-infixl 9 ===
+infixl 9 equals as ===
 
-(===) :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
-(===) = flip equal
+equals :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
+equals = flip equal
 
 
 a :: Task String String

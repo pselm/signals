@@ -1,13 +1,12 @@
 module Test.Elm.ListTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, test)
+import Test.Unit.Assert (assert)
 
 import Elm.List
 
 import Elm.Basics (sqrt, (+), compare, (<|), (==), not, (<), (&&))
 import Elm.Maybe (Maybe(..))
-import Data.String ()
 import Data.Int (even)
 import Data.Tuple (Tuple(..))
 import Prelude (bind, Ordering(..))

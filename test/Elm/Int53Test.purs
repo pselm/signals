@@ -1,27 +1,27 @@
 module Test.Elm.Int53Test (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, test)
+import Test.Unit.Assert (assert)
 import Test.Unit.QuickCheck (quickCheck)
-import Test.QuickCheck ((===), Result())
-import Type.Proxy
+import Test.QuickCheck ((===), Result)
+import Type.Proxy (Proxy(..))
 
 import Elm.Int53
-import Control.Monad.Eff.Random
-import Control.Monad.Eff.Class
-import Control.Monad.Eff.Exception (EXCEPTION())
-import Control.Monad.Eff.Console (CONSOLE())
-import Prelude (bind, Eq, negate, not, top, bottom, ($))
+import Control.Monad.Eff.Random (RANDOM)
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Console (CONSOLE)
+import Prelude (bind, negate, not, top, bottom, ($))
 import Elm.Basics ((<|), (==))
-import Data.Maybe
-import qualified Data.Int as Int
+import Data.Maybe (Maybe(..))
+import Data.Int as Int
 
-import Test.QuickCheck.Laws.Data.ModuloSemiring
-import Test.QuickCheck.Laws.Data.Semiring
-import Test.QuickCheck.Laws.Data.Bounded
-import Test.QuickCheck.Laws.Data.Ring
-import Test.QuickCheck.Laws.Data.Eq
-import Test.QuickCheck.Laws.Data.Ord
+import Test.QuickCheck.Laws.Data.ModuloSemiring (checkModuloSemiring)
+import Test.QuickCheck.Laws.Data.Semiring (checkSemiring)
+import Test.QuickCheck.Laws.Data.Bounded (checkBounded)
+import Test.QuickCheck.Laws.Data.Ring (checkRing)
+import Test.QuickCheck.Laws.Data.Eq (checkEq)
+import Test.QuickCheck.Laws.Data.Ord (checkOrd)
 
 
 nothing :: Maybe Int53

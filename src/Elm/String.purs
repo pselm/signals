@@ -30,7 +30,7 @@ import Prelude (append) as Virtual
 
 import Data.String (null, fromCharArray, toCharArray, fromChar, length, take, drop)
 import Elm.Result (Result(..))
-import Elm.Basics (Bool(), Float(), (<|))
+import Elm.Basics (Bool, Float, (<|))
 import Elm.Char (isDigit)
 import Data.List (List())
 import Prelude ((++), (<<<), (>>>), (-), (/))

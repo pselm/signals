@@ -1,11 +1,11 @@
 module Test.Elm.ArrayTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
-import qualified Elm.Array as Array
-import qualified Elm.List as List
-import Prelude (bind, Eq, (-), (==), (*), (+), negate, const)
+import Elm.Array as Array
+import Elm.List as List
+import Prelude (bind, class Eq, (-), (==), (*), (+), negate, const)
 import Data.List (List(..), toList, (..), (:))
 import Data.Maybe (Maybe(..))
 import Elm.Basics ((<|), identity, sqrt, (%), always)

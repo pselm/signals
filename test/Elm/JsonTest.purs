@@ -1,32 +1,34 @@
 module Test.Elm.JsonTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (equal)
 
-import qualified Elm.Json.Encode as JE
-import qualified Elm.Json.Decode as JD
+import Elm.Json.Encode as JE
+import Elm.Json.Decode as JD
 import Elm.Json.Decode ((:=))
-import Prelude (Show, show, bind, Eq, flip, negate, (++), ($), (+))
+import Prelude (class Show, show, bind, class Eq, flip, negate, (++), ($), (+))
 import Data.List (List(..), (:))
 import Data.Foldable (traverse_)
 import Control.Alt ((<|>))
 import Elm.Result (Result(..), toMaybe)
-import Elm.Basics (Float())
-import Data.Tuple
-import Data.Maybe
+import Elm.Basics (Float)
+import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe(..))
 import Math (sqrt)
 import Global (infinity, nan)
-import Data.Generic
+import Data.Generic (class Generic, gEq, gShow)
 
 
-infixl 9 ===
+infixl 9 equals as ===
 
-(===) :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
-(===) = flip equal
+equals :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
+equals = flip equal
 
 
-(==>) :: forall a b. a -> b -> Tuple a b
-(==>) = Tuple
+infixr 0 tuple as ==>
+
+tuple :: forall a b. a -> b -> Tuple a b
+tuple = Tuple
 
 
 check :: forall e a. (Eq a, Show a) => JD.Decoder a -> Tuple String (Maybe a) -> Assertion e

@@ -1,11 +1,11 @@
 module Elm.List 
     ( module Virtual
-    , (:), isEmpty, member
+    , cons, (:), isEmpty, member
     , map2, map3, map4, map5
     , foldl, intersperse, scanl
     , indexedMap, filterMap, partition, unzip
     , repeat, sortBy, sortWith
-    , (..)
+    , range, (..)
     ) where
 
 
@@ -26,29 +26,28 @@ import Prelude (map, append) as Virtual
 -- Internal
 
 import Data.List
-    ( List(..), elemIndex, range, length
+    ( List(..), elemIndex, length
     , toList, fromList, zipWith, mapMaybe, replicate
     )
 
 import Data.List.ZipList (ZipList(..), runZipList)
 import Data.Maybe (Maybe(..))
 import Data.Foldable (foldr)
-import Data.Traversable ()
 import Data.Tuple (Tuple(..))
 import Data.Function (on)
 import Control.Apply (lift3, lift4, lift5)
-import Prelude (Eq, Semiring, Ord, (-), ($), compare, Ordering(), flip, (>))
+import Prelude (class Eq, class Semiring, class Ord, (-), ($), compare, Ordering, flip, (>))
 
 
-infixr 5 :
+infixr 5 cons as :
 
 {-| Add an element to the front of a list. Pronounced *cons*.
 
     1 :: [2,3] == [1,2,3]
     1 :: [] == [1]
 -}
-(:) :: forall a. a -> List a -> List a
-(:) = Data.List.Cons
+cons :: forall a. a -> List a -> List a
+cons = Data.List.Cons
 
 
 {-| Determine if a list is empty.
@@ -243,10 +242,12 @@ sortWith :: forall a. (a -> a -> Ordering) -> List a -> List a
 sortWith = Data.List.sortBy
 
 
+infixl 4 range as ..
+
 {-| The Elm built-in range operator `(..)`. Note that this differs from the
 equivalent in `Data.List` in that it only produces ascending lists. -}
-(..) :: Int -> Int -> List Int
-(..) low high =
+range :: Int -> Int -> List Int
+range low high =
     if low > high
         then Nil
         else Data.List.range low high

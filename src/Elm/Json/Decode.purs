@@ -2,12 +2,12 @@ module Elm.Json.Decode
     ( module Virtual
     , module Elm.Bind
     , module Elm.Apply
-    , Decoder()
+    , Decoder
     , decodeString, decodeValue
     , string, int, float, bool, null
     , list, array
     , tuple1, tuple2, tuple3, tuple4, tuple5, tuple6, tuple7, tuple8
-    , (:=), at
+    , field, (:=), at
     , object1, object2, object3, object4, object5, object6, object7, object8
     , keyValuePairs, dict
     , oneOf, maybe, fail, succeed
@@ -17,29 +17,33 @@ module Elm.Json.Decode
 
 import Prelude (map) as Virtual
 import Elm.Json.Encode (Value()) as Virtual
-import Elm.Bind
-import Elm.Apply
+import Elm.Bind (andThen)
+import Elm.Apply (andMap, map2, map3, map4, map5)
 
-import Data.Foreign
-import Data.Foreign.Class
-import Data.Foreign.Index
+import Data.Foreign (Foreign, ForeignError(..), F, readArray, isNull, isUndefined, typeOf, parseJSON)
+import Data.Foreign.Class (read)
+import Data.Foreign.Index (prop)
 import Data.Traversable (traverse)
 import Data.Foldable (foldl)
 import Elm.Json.Encode (Value())
 import Control.Apply (lift2, lift3, lift4, lift5)
-import Control.Alt (Alt, alt)
+import Control.Alt (class Alt, alt)
 import Control.Bind ((>=>))
 import Data.Either (Either(..))
 import Elm.Result (Result(..), fromMaybe)
-import Elm.Basics (Bool(), Float())
+import Elm.Basics (Bool, Float)
 import Elm.List (List(..), foldr)
-import Elm.Dict (Dict())
-import Data.Tuple
+import Elm.Dict (Dict)
+import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..))
 
 import Prelude
-    ( Functor, Apply, apply, Applicative, pure, Bind, bind, Monad
-    , show, ($), map, (<<<), (>>=), (<$>), (<*>), const, (==), (++)
+    ( class Functor, map
+    , class Apply, apply
+    , class Applicative, pure
+    , class Bind, bind
+    , class Monad, (>>=)
+    , show, ($), (<<<), (<$>), (<*>), const, (==), (++)
     )
 
 
@@ -150,10 +154,12 @@ Fails if the JSON object has no such field.
     optionalProfession =
         maybe ("profession" := string)
 -}
-(:=) :: forall a. String -> Decoder a -> Decoder a
-(:=) field (Decoder decoder) =
+field :: forall a. String -> Decoder a -> Decoder a
+field f (Decoder decoder) =
     Decoder $ \val ->
-        toResult (prop field val) >>= decoder
+        toResult (prop f val) >>= decoder
+
+infixl 4 field as :=
 
 
 {-| Apply a function to a decoder. You can use this function as `map` if you

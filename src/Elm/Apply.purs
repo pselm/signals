@@ -1,9 +1,6 @@
 module Elm.Apply
     ( andMap
-    , map2
-    , map3
-    , map4
-    , map5
+    , map2, map3, map4, map5
     ) where
 
 {-| Elm classes typically use map2 through map5 instead of
@@ -11,8 +8,8 @@ lift2 through lift5. We define those synomyns here generically
 so that we don't have to define the functions multiple times.
 -}
 
-import Control.Apply
-import Prelude
+import Control.Apply (lift2, lift3, lift4, lift5)
+import Prelude (class Apply, apply)
 
 
 -- | Lift a function of two arguments to a function which accepts and returns

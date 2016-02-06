@@ -8,7 +8,7 @@ module Elm.Set
 -- For re-export
 
 import Data.Set
-    ( Set(), empty, singleton, insert
+    ( Set, empty, singleton, insert
     , isEmpty, member, size
     , toList, fromList
     , union
@@ -19,8 +19,8 @@ import Data.Foldable (foldr) as Virtual
 
 -- Internal
 
-import Prelude (Ord, flip, (<<<))
-import Data.Set (Set(), delete, difference, intersection, fromList, toList, insert, empty)
+import Prelude (class Ord, flip, (<<<))
+import Data.Set (Set, delete, difference, intersection, fromList, toList, insert, empty)
 import Data.Foldable (foldr)
 
 

@@ -1,12 +1,12 @@
 module Test.Elm.SetTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
-import qualified Elm.Set as Set
-import Elm.Set (Set())
-import Elm.Basics
-import Prelude (bind, Eq)
+import Elm.Set as Set
+import Elm.Set (Set)
+import Elm.Basics (Bool, (++), (+), (==), (<|), (<=))
+import Prelude (bind, class Eq)
 import Elm.List (List(..), (:), (..))
 
 

@@ -240,17 +240,6 @@ you don't actually have to import it at all, which is unlike Elm. However,
 I've seen some discussion on the mailing list that this might be a warning
 or an error in the future.
 
-In order to import something with an aliased name, you'll normally want
-to add the `qualifed` keyword ... e.g. `import qualified Elm.List as List`.
-
-To import a type, you need to supply the parentheses ... for instance, `import
-Data.List (List())`. If you try it without the parentheses, then Purescript
-thinks you're trying to import a type class, rather than a type. Of course, you
-can import all or some of the constructors, in the usual way -- i.e.
-`import Data.List (..)` or `import Data.List (Cons, Nil)`. Note that this will
-change in Purescript 0.8 -- I belive you'll have to use the `class` keyword to
-import classes, and you'll be able to import types without the parentheses.
-
 If you want to re-export something, you need to re-export a whole module. However,
 it can be an aliased module name, and you can import specific symbols from other
 modules into the the aliased module. So, you can do something like this, which

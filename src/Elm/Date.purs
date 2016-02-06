@@ -6,12 +6,12 @@ module Elm.Date
     ) where
 
 
---| Note that the Purescript `Month` and `DayOfWeek` types
---| spell out the entire word for constructors ... e.g.
---| `January` for `Jan` and `Monday` for `Mon`.
---|
---| Also, the Elm `Day` type is `DayOfWeek`, afnd there are
---| distinct types for `DayOfMonth` and `Year`.
+-- | Note that the Purescript `Month` and `DayOfWeek` types
+-- | spell out the entire word for constructors ... e.g.
+-- | `January` for `Jan` and `Monday` for `Mon`.
+-- |
+-- | Also, the Elm `Day` type is `DayOfWeek`, afnd there are
+-- | distinct types for `DayOfMonth` and `Year`.
 
 
 -- For re-export
@@ -25,15 +25,15 @@ import Data.Date
 -- Internal
 
 import Data.Date
-    ( Date(), DayOfWeek(), DayOfMonth(..), Month(), Year(..)
+    ( Date, DayOfWeek, DayOfMonth(..), Month, Year(..)
     , toEpochMilliseconds, fromEpochMilliseconds
     )
 
 import Data.Time (SecondOfMinute(..), MinuteOfHour(..), MillisecondOfSecond(..), HourOfDay(..))
 
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
-import Elm.Result (Result(), fromMaybe)
-import Elm.Time (Time())
+import Elm.Result (Result, fromMaybe)
+import Elm.Time (Time)
 import Prelude ((<<<), (++), show, ($))
 import Data.Maybe (Maybe(..))
 

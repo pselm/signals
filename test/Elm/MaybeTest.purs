@@ -1,7 +1,7 @@
 module Test.Elm.MaybeTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Maybe
 import Elm.Basics ((+), (<|), (==), sqrt)

@@ -1,11 +1,11 @@
 module Test.Elm.ElmBasicsTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Basics
 import Elm.List (List(..), (:))
-import Prelude (bind, Ordering(..), Eq)
+import Prelude (bind, Ordering(..), class Eq)
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e

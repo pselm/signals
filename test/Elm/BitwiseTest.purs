@@ -1,10 +1,10 @@
 module Test.Elm.BitwiseTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Bitwise as Bitwise
-import Prelude (bind, Eq)
+import Prelude (bind, class Eq)
 import Elm.Basics ((<|), (==), negate)
 
 

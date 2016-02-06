@@ -1,11 +1,11 @@
 module Test.Elm.ResultTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Result as Result
 import Elm.Result (Result(..))
-import Prelude (bind, Eq)
+import Prelude (bind)
 import Elm.Basics ((<|), (==), (+), (%), (++))
 import Elm.Maybe (Maybe(..))
 

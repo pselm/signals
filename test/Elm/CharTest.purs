@@ -1,13 +1,13 @@
 module Test.Elm.CharTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Char 
-import Prelude (bind, Eq)
+import Prelude (bind, class Eq)
 import Elm.Basics ((<|), (==), (|>), (+), (-), flip)
 import Elm.List as List
-import Data.List (List(), (..))
+import Data.List (List, (..))
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e

@@ -1,21 +1,21 @@
 module Test.Elm.RandomTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Random
-import Prelude (bind, Eq, (<), (-), (+), negate, map)
+import Prelude (bind, (<), (-), (+), negate, map)
 import Elm.Basics ((<|), (==), abs)
-import Elm.Int53
+import Elm.Int53 (Int53, fromInt)
 import Data.List (toList)
-import Data.Tuple
+import Data.Tuple (Tuple(..))
 
 
-(~=) :: Number -> Number -> Boolean
-(~=) a b =
+close :: Number -> Number -> Boolean
+close a b =
     abs (a - b) < 0.00000001
 
-infixl 9 ~=
+infixl 9 close as ~=
 
 
 seed1 :: Seed

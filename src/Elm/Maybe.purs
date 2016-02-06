@@ -18,7 +18,6 @@ import Elm.Bind (andThen) as Virtual
 
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.List (List(..))
-import Prelude ()
 
 
 {-| Provide a default value, turning an optional value into a normal

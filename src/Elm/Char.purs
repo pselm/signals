@@ -1,6 +1,6 @@
 module Elm.Char 
     ( module Virtual
-    , KeyCode(), toCode, fromCode
+    , KeyCode, toCode, fromCode
     , isUpper, isLower, isDigit, isOctDigit, isHexDigit
     , toLocaleUpper, toLocaleLower
     ) where
@@ -9,12 +9,12 @@ module Elm.Char
 -- For re-export
 
 import Data.Char (toLower, toUpper) as Virtual
-
+import Prelude ((&&), (||), (>=), (<=))
 
 -- Internal
 
 import Data.Char (toCharCode, fromCharCode)
-import Elm.Basics
+import Elm.Basics (Bool)
 
 
 isBetween :: Char -> Char -> Char -> Bool

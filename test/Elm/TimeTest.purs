@@ -1,11 +1,11 @@
 module Test.Elm.TimeTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
-import qualified Elm.Time as Time
-import qualified Data.Time as DT
-import Prelude (bind, Eq)
+import Elm.Time as Time
+import Data.Time as DT
+import Prelude (bind, class Eq)
 import Elm.Basics ((<|), (==), (*))
 
 

@@ -1,6 +1,6 @@
 module Elm.Int53
-    ( Int53()
-    , Int53Value, toInt53, fromInt53
+    ( Int53
+    , class Int53Value, toInt53, fromInt53
     , fromNumber, toNumber
     , fromInt, toInt
     , fromString
@@ -10,16 +10,17 @@ module Elm.Int53
 
 
 import Prelude
-    ( Semiring, Ring, ModuloSemiring, Eq, Bounded, Ord, BoundedOrd, Show
+    ( class Semiring, class Ring, class ModuloSemiring, class Eq
+    , class Bounded, class Ord, class BoundedOrd, class Show
     , (+), (-), (*), (/), (==), ($), (++), (>), compare, show, top, bottom
     , negate, (<), (<<<), (/=), (||), id, bind, pure
     )
 
-import qualified Math as Math
-import Elm.Basics (Pow, pow)
+import Math as Math
+import Elm.Basics (class Pow, pow)
 import Global (readFloat, isNaN)
-import Data.Maybe
-import Test.QuickCheck.Arbitrary (Arbitrary)
+import Data.Maybe (Maybe(..))
+import Test.QuickCheck.Arbitrary (class Arbitrary)
 import Test.QuickCheck.Gen (choose)
 
 

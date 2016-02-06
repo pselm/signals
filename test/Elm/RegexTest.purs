@@ -1,10 +1,10 @@
 module Test.Elm.RegexTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Regex
-import Prelude (bind, Eq, (&&), not, show, map, (++))
+import Prelude (bind, class Eq, (&&), not, show, map, (++))
 import Elm.Basics ((<|), (==))
 import Data.List (List(..), (:), zipWith)
 import Data.Foldable (and)

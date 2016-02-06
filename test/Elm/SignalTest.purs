@@ -1,22 +1,22 @@
 module Test.Elm.SignalTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (Assertion, test)
+import Test.Unit.Assert (equal)
 
 import Elm.Signal
-import Prelude (flip, bind, Eq, Show, show, ($), (+), (-), (<), (>), (++))
-import Control.Monad.Eff.Class
-import Control.Monad.Aff.Class
+import Prelude (flip, bind, class Eq, class Show, show, ($), (+), (-), (<), (>), (++))
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Aff (later')
 import Data.Array (cons)
 import Data.Maybe (Maybe(..))
 import Data.List ((:), List(..))
 
 
-infixl 9 ===
+infixl 9 equals as ===
 
-(===) :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
-(===) = flip equal
+equals :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
+equals = flip equal
 
 
 tests = test "Elm.Signal\n" do

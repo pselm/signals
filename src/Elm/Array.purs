@@ -1,6 +1,6 @@
 module Elm.Array 
     ( module Virtual
-    , Array(), fromList, toList, toIndexedList
+    , Array, fromList, toList, toIndexedList
     , repeat, foldl, push, get, set
     , slice, indexedMap, initialize
     ) where
@@ -16,19 +16,19 @@ import Prelude (append, map) as Virtual
 -- Internal
 
 import Data.Sequence
-    ( Seq(), toUnfoldable, fromFoldable, empty, replace
+    ( Seq, toUnfoldable, fromFoldable, empty, replace
     , snoc, index, null, take, drop, length
     )
 
 import Data.Tuple (Tuple(..))
-import Prelude (Functor, (<$>), ($), (-), const, flip, (>=), (<=), (+), (<<<))
-import Data.Foldable (Foldable)
-import Data.Unfoldable (Unfoldable)
+import Prelude (class Functor, (<$>), ($), (-), const, flip, (>=), (<=), (+), (<<<))
+import Data.Foldable (class Foldable)
+import Data.Unfoldable (class Unfoldable)
 import Data.List (List(..), (:), reverse)
 import Data.Ord (clamp)
-import Data.Maybe (Maybe())
+import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..), snd)
-import Prim hiding (Array())
+import Prim hiding (Array)
 
 
 type Array = Seq

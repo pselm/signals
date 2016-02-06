@@ -8,7 +8,7 @@ function multiple times. And, we can re-export it (as Elm code expects)
 without producing conflicts, since it's all the same function.
 -}
 
-import Prelude
+import Prelude (class Bind, bind)
 
 
 -- | `andThen` is an alias for `bind`.

@@ -18,7 +18,7 @@ import Elm.Basics
 -- Then, the rest in alphabetical order
 
 -- `Array` conflicts with `Prim.Array`
-import Elm.Array hiding (Array())
+import Elm.Array hiding (Array)
 
 -- `xor` inevitably conflicts with `Elm.Basics.xor`
 import Elm.Bitwise hiding (xor)

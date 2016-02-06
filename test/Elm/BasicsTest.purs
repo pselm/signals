@@ -1,7 +1,7 @@
 module Test.Elm.BasicsTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Basics
 import Elm.List (List(..), (..), (:))

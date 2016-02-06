@@ -1,6 +1,6 @@
 module Elm.Dict 
     ( module Virtual
-    , Dict(), get, remove, update
+    , Dict, get, remove, update
     , intersect, diff, filter, partition
     , map, foldl, foldr
     ) where
@@ -20,10 +20,10 @@ import Data.Map
 
 -- Internal
 
-import Prelude (Ord, flip)
-import Data.Map (Map(), lookup, alter, delete, member, insert, empty, toList, fromList)
-import Elm.Maybe (Maybe())
-import Elm.List (List())
+import Prelude (class Ord, flip)
+import Data.Map (Map, lookup, alter, delete, member, insert, empty, toList, fromList)
+import Elm.Maybe (Maybe)
+import Elm.List (List)
 import Data.Tuple (Tuple(..))
 
 

@@ -1,18 +1,18 @@
 module Test.Elm.StringTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 import Test.Unit.QuickCheck (quickCheck)
 import Test.QuickCheck ((===))
-import qualified Test.QuickCheck as QC
+import Test.QuickCheck as QC
 
 import Elm.String
 import Control.Monad.Eff.Random (RANDOM())
-import Prelude (bind, Eq, not, (&&), ($), (*), (>), (+))
+import Prelude (bind, class Eq, not, (&&), ($), (*), (>), (+))
 import Elm.Basics ((<|), (==), (/=), negate)
 import Elm.Maybe (Maybe(..))
 import Elm.Result (Result(..))
-import qualified Data.List (toList) as List
+import Data.List (toList) as List
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e

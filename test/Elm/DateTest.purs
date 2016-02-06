@@ -1,15 +1,15 @@
 module Test.Elm.DateTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.Date 
-import Prelude (bind, Eq, (<$>))
+import Prelude (bind, class Eq, (<$>))
 import Elm.Basics ((<|), (==))
-import Data.Date (fromEpochMilliseconds, Date())
+import Data.Date (fromEpochMilliseconds)
 import Data.Time (Milliseconds(..))
 import Elm.Result (toMaybe, Result(..))
-import Data.Maybe
+import Data.Maybe (Maybe(..))
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e 

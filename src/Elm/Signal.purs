@@ -1,5 +1,5 @@
 module Elm.Signal
-    ( Signal()
+    ( Signal
     , constant
     , foldp
     , map, map2, map3, map4, map5
@@ -7,16 +7,16 @@ module Elm.Signal
     , filter, filterMap
     , dropRepeats
     , sampleOn
-    , Mailbox(), mailbox
-    , Address(), send, forwardTo
-    , Message(), message
+    , Mailbox, mailbox
+    , Address, send, forwardTo
+    , Message, message
 
     -- Everything below this line is not in the original Elm API.
     -- So, they are subject to experimentation, as I figure out
     -- how best to integrate this all.
     , setup
     , current
-    , DELAY()
+    , DELAY
     ) where
 
 {-| An implmenetation of the Elm `Signal` API.
@@ -26,27 +26,27 @@ TODO: Write notes about usage.
 -}
 
 import Prelude
-    ( Eq, Monad, Unit(), unit, ($), (++), bind, (+)
+    ( class Eq, class Monad, Unit, unit, ($), (++), bind, (+)
     , pure, (==), (/=), (&&), (||), const, (<<<)
     )
 
-import Control.Monad
-import Control.Monad.Eff
-import Control.Monad.Eff.Class
-import Control.Monad.Eff.Console (error, CONSOLE())
-import Control.Monad.Eff.Ref
-import Control.Monad.State.Trans (StateT(), evalStateT)
-import Control.Monad.State.Class
+import Control.Monad (when)
+import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff.Class (class MonadEff, liftEff)
+import Control.Monad.Eff.Console (error, CONSOLE)
+import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef, modifyRef, newRef)
+import Control.Monad.State.Trans (StateT, evalStateT)
+import Control.Monad.State.Class (gets, modify)
 import Data.Array (cons)
 import Elm.List (List(..), reverse)
 import Data.List (foldM)
-import Data.Exists
-import Data.Tuple
+import Data.Exists (Exists, runExists, mkExists)
+import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Date (nowEpochMilliseconds, Now())
-import Data.Time (Milliseconds())
-import Elm.Time (Time(), toTime)
-import Elm.Task (TaskE())
+import Data.Date (Now, nowEpochMilliseconds)
+import Data.Time (Milliseconds)
+import Elm.Time (Time, toTime)
+import Elm.Task (TaskE)
 import Elm.Debug (crash)
 
 
@@ -288,7 +288,7 @@ newtype Signal a = Signal
     -- This represents what to do when we're notified by a parent that a change has
     -- occurred somewhere. Ideally, I'll simplify the method, and then actually
     -- walk the tree from the outside, rather than the inside.
-    , notify :: NotifyKid
+    , notifyKids :: NotifyKid
     }
 
 
@@ -351,7 +351,7 @@ broadcastToKids ts update (Signal node) = do
     kids <- readRef node.kids
     foreachE kids $
         runExists \(Signal kid') ->
-            kid'.notify ts update node.id $ mkExists (Signal kid')
+            kid'.notifyKids ts update node.id $ mkExists (Signal kid')
 
 
 {- Lift some functions, for the sake of convenience. -}
@@ -391,8 +391,8 @@ input name base = do
     let
         -- Note that this actually does not do anything, and we don't expect it to be called.
         -- The values coming in from outside are actually handled in the top-level notify function.
-        notify :: NotifyKid
-        notify ts update parentID kid =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID kid =
             pure unit
 
         node =
@@ -409,7 +409,7 @@ input name base = do
                 , role: Input
                 -- Note that this should never be called ... perhaps could
                 -- redesign to factor it out
-                , notify
+                , notifyKids
                 }
 
     registerInput node
@@ -433,7 +433,7 @@ output name handler (Signal parent) = do
     kids <- newRef []
 
     let
-        notify ts update parentID kid = do
+        notifyKids ts update parentID kid = do
             when update do
                 value <- readRef parent.value
                 handler value
@@ -448,7 +448,7 @@ output name handler (Signal parent) = do
                 -- redesign the type to reflect this.
                 , kids
                 , value: parent.value
-                , notify
+                , notifyKids
                 , role: Output
                 }
 
@@ -489,8 +489,8 @@ foldp func state (Signal parent) = do
     updateInProgress <- getUpdateInProgress
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 when update do
                     parentValue <- readRef parent.value
@@ -508,7 +508,7 @@ foldp func state (Signal parent) = do
                 , updateInProgress
                 , value
                 , role: Transform
-                , notify
+                , notifyKids
                 }
 
     addKidToParent (Signal parent) (mkExists node)
@@ -530,8 +530,8 @@ timestamp (Signal parent) = do
     value <- newRef' $ Tuple (toTime $ programStart) pv
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 when update do
                     parentValue <- readRef parent.value
@@ -545,7 +545,7 @@ timestamp (Signal parent) = do
                 , name: "timestamp"
                 , parents: [mkExists (Signal parent)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , kids
                 , inputs
@@ -609,8 +609,8 @@ filterMap pred base (Signal parent) = do
     value <- newRef' (fromMaybe base (pred pv))
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' ->
                 if update
                     then do
@@ -633,7 +633,7 @@ filterMap pred base (Signal parent) = do
                 , name: "filterMap"
                 , parents: [mkExists (Signal parent)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , kids
                 , inputs
@@ -667,8 +667,8 @@ map func (Signal parent) = do
     value <- newRef' $ func pv
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 when update do
                     parentValue <- readRef parent.value
@@ -682,7 +682,7 @@ map func (Signal parent) = do
                 , name: "map"
                 , parents: [mkExists (Signal parent)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , kids
                 , inputs
@@ -725,8 +725,8 @@ applySignal (Signal funcs) (Signal parent) = do
     funcsUpdated <- newRef' (Nothing :: Maybe Boolean)
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 when (parentID == funcs.id) $
                     writeRef funcsUpdated (Just update)
@@ -765,7 +765,7 @@ applySignal (Signal funcs) (Signal parent) = do
                 , name: "map"
                 , parents: [mkExists (Signal parent), mkExists (Signal funcs)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , kids
                 , inputs
@@ -855,8 +855,8 @@ sampleOn (Signal ticker) (Signal parent) = do
     tickerUpdated <- newRef' (Nothing :: Maybe Boolean)
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 when (parentID == ticker.id) $
                     writeRef tickerUpdated (Just update)
@@ -892,7 +892,7 @@ sampleOn (Signal ticker) (Signal parent) = do
                 , name: "sampleOn"
                 , parents: [mkExists (Signal ticker), mkExists (Signal parent)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , kids
                 , inputs
@@ -931,8 +931,8 @@ dropRepeats (Signal parent) = do
     value <- newRef' pv
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 myValue <- readRef value
                 parentValue <- readRef parent.value
@@ -950,7 +950,7 @@ dropRepeats (Signal parent) = do
                 , name: "dropRepeats"
                 , parents: [mkExists (Signal parent)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , inputs
                 , kids
@@ -1029,8 +1029,8 @@ genericMerge tieBreaker (Signal left) (Signal right) = do
     rightUpdated <- newRef' (Nothing :: Maybe Boolean)
 
     let
-        notify :: NotifyKid
-        notify ts update parentID =
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID =
             runExists \kid' -> do
                 when (parentID == left.id) $
                     writeRef leftUpdated (Just update)
@@ -1080,7 +1080,7 @@ genericMerge tieBreaker (Signal left) (Signal right) = do
                 , name: "merge"
                 , parents: [mkExists (Signal left), mkExists (Signal right)]
                 , role: Transform
-                , notify
+                , notifyKids
                 , value
                 , kids
                 , inputs

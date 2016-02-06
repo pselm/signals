@@ -1,7 +1,7 @@
 module Elm.Regex
-    ( Regex()
+    ( Regex
     , regex, escape, caseInsensitive
-    , HowMany(..), Match()
+    , HowMany(..), Match
     , contains, find, replace, split
     ) where
 
@@ -17,7 +17,7 @@ that I just ported the native code.
 
 import Data.List (List(..), reverse, toList)
 import Data.Maybe (Maybe(..))
-import Prelude (Show, ($))
+import Prelude (class Show, ($))
 
 
 {-| A regular expression, describing a certain set of strings.

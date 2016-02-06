@@ -1,15 +1,14 @@
 module Test.Elm.ElmListTest (tests) where
 
-import Test.Unit
-import Test.Unit.Assert
+import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit.Assert (assert)
 
 import Elm.List
 
 import Elm.Basics ((+), compare, (<|), (|>), (==), (%), (<), (>), (<=), (>=), toString, min, identity)
 import Elm.Maybe (Maybe(..))
-import Data.String ()
 import Data.Tuple (Tuple(..))
-import Prelude (bind, Eq, negate, (*), (/), (++), (-), flip, (&&))
+import Prelude (bind, class Eq, negate, (*), (/), (++), (-), flip, (&&))
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Assertion e

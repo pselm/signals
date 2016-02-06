@@ -1,13 +1,13 @@
 module Elm.Task
     ( module Virtual
-    , Task(), TaskE(), toAff
-    , TaskCallback(), makeTask
+    , Task, TaskE, toAff
+    , TaskCallback, makeTask
     , succeed, fail
     , mapError, onError
     , toMaybe, fromMaybe
     , toResult, fromResult
     , spawn, sleep
-    , ThreadID()
+    , ThreadID
     ) where
 
 
@@ -21,15 +21,15 @@ import Data.Traversable (sequence) as Virtual
 
 -- Internal
 
-import Control.Monad.Aff (Aff(), makeAff, forkAff, later')
-import Control.Monad.Eff (Eff())
-import Control.Monad.Except.Trans
-import Control.Monad.Error.Class
-import Prelude (Unit(), unit, map, pure, (<<<), (>>=), const, ($))
+import Control.Monad.Aff (Aff, makeAff, forkAff, later')
+import Control.Monad.Eff (Eff)
+import Control.Monad.Except.Trans (ExceptT(..), runExceptT, withExceptT)
+import Control.Monad.Error.Class (throwError)
+import Prelude (Unit, unit, map, pure, (<<<), (>>=), const, ($))
 import Data.Either (Either(..), either)
 import Elm.Result (Result(..))
 import Data.Maybe (Maybe(..))
-import Elm.Time (Time())
+import Elm.Time (Time)
 import Data.Int (round)
 
 

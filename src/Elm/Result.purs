@@ -26,14 +26,26 @@ import Elm.Bind (andThen) as Virtual
 -- Internal
 
 import Prelude
-import Control.Alt (Alt)
-import Control.Extend (Extend)
-import Data.Bifoldable (Bifoldable)
-import Data.Bifunctor (Bifunctor, lmap)
-import Data.Bitraversable (Bitraversable)
-import Data.Foldable (Foldable)
+    ( class Functor, (<$>)
+    , class Apply, pure
+    , class Applicative, (<*>)
+    , class Bind, class Monad
+    , class Semiring, (++), one, zero, add
+    , class Semigroup, append, mul
+    , class Bounded, top, bottom
+    , class Show, show
+    , class Eq, (==)
+    , class Ord, Ordering(..), compare
+    )
+
+import Control.Alt (class Alt)
+import Control.Extend (class Extend)
+import Data.Bifoldable (class Bifoldable)
+import Data.Bifunctor (class Bifunctor, lmap)
+import Data.Bitraversable (class Bitraversable)
+import Data.Foldable (class Foldable)
 import Data.Monoid (mempty)
-import Data.Traversable (Traversable)
+import Data.Traversable (class Traversable)
 
 import Elm.Maybe (Maybe (Just, Nothing))
 

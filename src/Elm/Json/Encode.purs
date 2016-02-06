@@ -1,5 +1,5 @@
 module Elm.Json.Encode
-    ( Value()
+    ( Value
     , encode
     , string, int, float, bool, null
     , list, array, jsArray
@@ -12,12 +12,12 @@ module Elm.Json.Encode
 -}
 
 
-import Data.Foreign
-import Data.List (List())
-import Data.Tuple (Tuple(), fst, snd)
-import Elm.Basics (Float())
+import Data.Foreign (Foreign, toForeign)
+import Data.List (List)
+import Data.Tuple (Tuple, fst, snd)
+import Elm.Basics (Float)
 import Prelude ((<<<))
-import qualified Elm.Array as ElmArray
+import Elm.Array as ElmArray
 
 
 {-| Represents a JavaScript value. -}

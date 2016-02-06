@@ -1,6 +1,6 @@
 module Elm.Random
     ( module Virtual
-    , Generator(), Seed()
+    , Generator, Seed
     , bool, int, float
     , list, pair
     , minInt, maxInt
@@ -37,16 +37,16 @@ import Prelude (map) as Virtual
 import Prelude
     ( (==), (/), (*), (-), (+), (<), ($), (++)
     , negate, zero, one
-    , Ord, Functor, Apply, Bind, Semigroup
-    , Applicative, pure
+    , class Ord, class Functor, class Apply, class Bind, class Semigroup
+    , class Applicative, pure
     )
 
 import Elm.Apply (map2)
-import Data.Tuple
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Ord (max)
-import Data.Monoid (Monoid, mempty)
+import Data.Monoid (class Monoid, mempty)
 import Elm.Basics ((%))
-import Elm.Int53
+import Elm.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, toNumber)
 
 
 {-| Create a generator that produces boolean values. The following example
