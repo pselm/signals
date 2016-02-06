@@ -67,6 +67,9 @@ instance eqShape :: Eq Shape where
     eq = gEq
 
 
+-- TODO: The docs for Elm.Json.Encode.float say that infinity and NaN
+-- are encoded as null ... should test that.
+
 tests :: forall e. TestUnit e
 tests = test "Elm.Json\n" do
     test "encode object with scalar types" do
@@ -109,7 +112,7 @@ tests = test "Elm.Json\n" do
             elmArray :: Data.Sequence.Seq JE.Value
             elmArray = Data.Sequence.fromFoldable values
 
-        JE.encode 0 (JE.jsArray values) === """["Joe",37]"""
+        JE.encode 0 (JE.psArray values) === """["Joe",37]"""
         JE.encode 0 (JE.list listOfValues) === """["Joe",37]"""
         JE.encode 0 (JE.array elmArray) === """["Joe",37]"""
 
