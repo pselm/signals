@@ -142,7 +142,7 @@ count (AtMost n) = n
 
 
 maxInt :: Int
-maxInt = 9007199254740991
+maxInt = 2147483647
 
 
 {-| Replace matches. The function from `Match` to `String` lets
