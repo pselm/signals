@@ -1,13 +1,13 @@
 module Test.Main where
 
-import Prelude
-import Test.Unit
-import Test.Unit.Console
-import Control.Monad.Eff
-import Control.Monad.Eff.Random (RANDOM())
-import Control.Monad.Eff.Exception (EXCEPTION())
-import Control.Monad.Eff.Console (CONSOLE())
-import Control.Monad.Aff.AVar (AVAR())
+import Prelude (Unit, bind)
+import Test.Unit (TIMER, runTest)
+import Test.Unit.Console (TESTOUTPUT)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Random (RANDOM)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Console (CONSOLE)
+import Control.Monad.Aff.AVar (AVAR)
 
 main :: forall e. Eff
     ( testOutput :: TESTOUTPUT
