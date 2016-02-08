@@ -35,7 +35,7 @@ Equivalent to Purescript's 'fromMaybe`.
 #### `oneOf`
 
 ``` purescript
-oneOf :: forall a. List (Maybe a) -> Maybe a
+oneOf :: forall f a. (Foldable f) => f (Maybe a) -> Maybe a
 ```
 
 Pick the first `Maybe` that actually has a value. Useful when you want to
@@ -44,6 +44,8 @@ try a couple different things, but there is no default value.
     oneOf [ Nothing, Just 42, Just 71 ] == Just 42
     oneOf [ Nothing, Nothing, Just 71 ] == Just 71
     oneOf [ Nothing, Nothing, Nothing ] == Nothing
+
+The signature uses `Foldable` to work with `List` or `Array`, among others
 
 
 ### Re-exported from Data.Maybe:

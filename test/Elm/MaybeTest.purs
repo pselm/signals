@@ -46,11 +46,19 @@ tests = test "Elm.Maybe\n" do
         assert "fifth Nothing" <| map5 func5 (Just 3) (Just 4) (Just 5)  (Just 7)Nothing == Nothing
 
     test "Maybe.oneOf" do
+        assert "first" <| oneOf ( Just 42 : Just 71 : Nothing : Nil ) == Just 42
         assert "second" <| oneOf ( Nothing : Just 42 : Just 71 : Nil ) == Just 42
         assert "third" <| oneOf ( Nothing : Nothing : Just 71 : Nil ) == Just 71
         assert "none" <| oneOf ( Nothing :: Maybe Int : Nothing : Nothing : Nil ) == (Nothing :: Maybe Int)
         assert "nil" <| oneOf (Nil :: List (Maybe Int)) == (Nothing :: Maybe Int)
 
+    test "Maybe.oneOf with array" do
+        assert "first" <| oneOf [Just 42, Just 71, Nothing] == Just 42
+        assert "second" <| oneOf [Nothing, Just 42, Just 71] == Just 42
+        assert "third" <| oneOf [Nothing, Nothing, Just 71] == Just 71
+        assert "none" <| oneOf [Nothing :: Maybe Int, Nothing,  Nothing] == (Nothing :: Maybe Int)
+        assert "nil" <| oneOf ([] :: Array (Maybe Int)) == (Nothing :: Maybe Int)
+    
     test "Maybe.andThen" do
         assert "just just" <| (Just 42) `andThen` (\x -> Just <| x + 1) == Just 43
         assert "nothing just" <| Nothing `andThen` (\x -> Just <| x + 1) == Nothing :: Maybe Int

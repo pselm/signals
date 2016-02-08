@@ -31,6 +31,7 @@ import Elm.Bind (andThen) as Virtual
 
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.List (List(..))
+import Data.Foldable (class Foldable, foldl)
 
 
 -- | Provide a default value, turning an optional value into a normal
@@ -53,14 +54,13 @@ withDefault = fromMaybe
 -- |     oneOf [ Nothing, Just 42, Just 71 ] == Just 42
 -- |     oneOf [ Nothing, Nothing, Just 71 ] == Just 71
 -- |     oneOf [ Nothing, Nothing, Nothing ] == Nothing
-oneOf :: forall a. List (Maybe a) -> Maybe a
-oneOf maybes =
-    case maybes of
-        Nil ->
-            Nothing
-
-        Cons maybe rest ->
-            case maybe of
-                Nothing -> oneOf rest
-                Just _ -> maybe
-
+-- |
+-- | The signature uses `Foldable` to work with `List` or `Array`, among others
+oneOf :: forall f a. (Foldable f) => f (Maybe a) -> Maybe a
+oneOf =
+    foldl stepOneOf Nothing
+      where
+        stepOneOf memo item =
+            case memo of
+                Nothing -> item
+                Just _ -> memo
