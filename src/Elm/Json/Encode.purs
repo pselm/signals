@@ -83,12 +83,6 @@ object :: forall f. (Foldable f) => f (Tuple String Value) -> Value
 object = toForeign <<< Data.StrMap.fromFoldable 
 
 
-foreign import encodeObject ::
-    (forall a b. Tuple a b -> a) ->
-    (forall a b. Tuple a b -> b) ->
-    Array (Tuple String Value) -> Value
-
-
 -- | Encode Purescript's primitive `Array` type (distinct from Elm's `Array`).
 psArray :: Array Value -> Value
 psArray = toForeign
