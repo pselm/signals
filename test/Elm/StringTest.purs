@@ -57,6 +57,7 @@ tests = test "Elm.String\n" do
         assertEqual "append 3" "butter" (append "" "butter")
         
         assertEqual "concat" "nevertheless" (concat <| List.toList ["never","the","less"])
+        assertEqual "concat (array)" "nevertheless" (concat <| ["never","the","less"])
         
         assertEqual "split commas" (List.toList ["cat","dog","cow"]) (split "," "cat,dog,cow")
         assertEqual "split slashes" (List.toList ["home","steve","Desktop", ""]) (split "/" "home/steve/Desktop/")

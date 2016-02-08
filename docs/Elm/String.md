@@ -30,7 +30,7 @@ Add a character to the beginning of a string.
 #### `concat`
 
 ``` purescript
-concat :: List String -> String
+concat :: forall f. (Foldable f) => f String -> String
 ```
 
 Concatenate many strings into one.
@@ -38,6 +38,9 @@ Concatenate many strings into one.
     concat ["never","the","less"] == "nevertheless"
 
 Equivalent to Purescript's `mconcat`
+
+The signature uses `Foldable` to work with `List` or `Array`,
+among others.
 
 #### `map`
 

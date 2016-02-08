@@ -41,7 +41,7 @@ import Elm.Basics (Bool, Float, (<|))
 import Elm.Char (isDigit)
 import Data.List (List())
 import Prelude ((++), (<<<), (>>>), (-), (/))
-import Data.Foldable (mconcat)
+import Data.Foldable (class Foldable, mconcat)
 
 
 -- | Determine if a string is empty.
@@ -64,7 +64,10 @@ cons c = (++) (fromChar c)
 -- |     concat ["never","the","less"] == "nevertheless"
 -- |
 -- | Equivalent to Purescript's `mconcat`
-concat :: List String -> String
+-- |
+-- | The signature uses `Foldable` to work with `List` or `Array`,
+-- | among others.
+concat :: forall f. (Foldable f) => f String -> String
 concat = mconcat
 
 
