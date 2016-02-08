@@ -1,3 +1,6 @@
+
+-- | Library for working with time
+
 module Elm.Time
     ( module Virtual
     , Time, toTime, fromTime
@@ -25,44 +28,44 @@ import Data.Time
 import Prelude ((/), flip, id, ($), (<<<))
 
 
-{-| Type alias to make it clearer when you are working with time values.
-Using the `Time` constants instead of raw numbers is very highly recommended.
--}
+-- | Type alias to make it clearer when you are working with time values.
+-- | Using the `Time` constants instead of raw numbers is very highly recommended.
+-- |
+-- | Note that Purescript's `Data.Time` class does something similar, but has more detailed
+-- | time values, with separate types for `Hours`, `Minutes`, `Seconds` and `Milliseconds`.
 type Time = Number 
 
 
+-- | Convert any of Purescript's time values to `Time`.
 toTime :: forall a. (TimeValue a) => a -> Time
 toTime tv =
     case toMilliseconds tv of
          Milliseconds n -> n
 
 
+-- | Convert from `Time` to any of Purescript's time values.
 fromTime :: forall a. (TimeValue a) => Time -> a
 fromTime =
     fromMilliseconds <<< Milliseconds
 
 
-{-| Units of time, making it easier to specify things like a half-second
-`(500 * millisecond)` without remembering Elm&rsquo;s underlying units of time.
--}
+-- | Units of time, making it easier to specify things like a half-second
+-- | `(500 * millisecond)` without remembering Elm&rsquo;s underlying units of time.
 millisecond :: Time
 millisecond =
     toTime $ Milliseconds 1.0
 
 
-{-|-}
 second :: Time 
 second =
     toTime $ Seconds 1.0
 
 
-{-|-}
 minute :: Time
 minute =
     toTime $ Minutes 1.0
 
 
-{-|-}
 hour :: Time 
 hour =
     toTime $ Hours 1.0
@@ -72,22 +75,18 @@ divBy :: Number -> Number -> Number
 divBy = flip (/)
 
 
-{-|-}
 inMilliseconds :: Time -> Number
 inMilliseconds = id
 
 
-{-|-}
 inSeconds :: Time -> Number
 inSeconds = divBy second
 
 
-{-|-}
 inMinutes :: Time -> Number
 inMinutes = divBy minute
 
 
-{-|-}
 inHours :: Time -> Number
 inHours = divBy hour
 

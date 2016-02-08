@@ -892,6 +892,7 @@ data Result error value
 ```
 
 A `Result` is either `Ok` meaning the computation succeeded, or it is an
+`Err` meaning that there was some failure.
 
 ##### Instances
 ``` purescript
@@ -924,4 +925,7 @@ newtype Signal a
 ```
 
 A value that changes over time. So a `(Signal Int)` is an integer that is
+varying as time passes, perhaps representing the current window width of the
+browser. Every signal is updated at discrete moments in response to events in
+the world.
 

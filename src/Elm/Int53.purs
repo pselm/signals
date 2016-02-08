@@ -1,3 +1,12 @@
+
+-- | In Purescript, the `Int` type is restricted to 32-bit integers. However,
+-- | the underlying Javascript runtime is capable of working with 53-bit
+-- | integers. So, this module exposes an `Int53` type, for cases where you
+-- | want all 53 bits.
+-- |
+-- | This is needed for some code ported from Elm, since the Elm `Int` type
+-- | can handle 53 bits.
+
 module Elm.Int53
     ( Int53
     , class Int53Value, toInt53, fromInt53
@@ -86,9 +95,8 @@ instance arbitraryInt53 :: Arbitrary Int53 where
         pure $ truncate n
 
 
-{- Clamps to the top and bottom. Unsafe because it assumes that
-something has already been done to remove any fractional part.
--}
+-- Clamps to the top and bottom. Unsafe because it assumes that
+-- something has already been done to remove any fractional part.
 unsafeClamp :: Number -> Int53
 unsafeClamp a =
     if a > topFloat
@@ -176,10 +184,8 @@ toInt (Int53 a) =
 
 -- | Returns whether an `Int53` is an even number.
 -- |
--- | ``` purescript
--- | even (fromInt 0) == true
--- | even (fromInt 1) == false
--- | ```
+-- |     even (fromInt 0) == true
+-- |     even (fromInt 1) == false
 even :: Int53 -> Boolean
 even (Int53 a) =
     Math.(%) a 2.0 == 0.0
@@ -187,10 +193,8 @@ even (Int53 a) =
 
 -- | The negation of `even`.
 -- |
--- | ``` purescript
--- | odd (fromInt 0) == false
--- | odd (fromInt 1) == true
--- | ```
+-- |     odd (fromInt 0) == false
+-- |     odd (fromInt 1) == true
 odd :: Int53 -> Boolean
 odd (Int53 a) =
     Math.(%) a 2.0 /= 0.0

@@ -1,3 +1,14 @@
+
+-- | A `Result` is the result of a computation that may fail.
+-- |
+-- | Normally, I would have wanted to implement this in terms of Purescript's
+-- | `Either` module, since it is essentially equivalent.
+-- | 
+-- | However, the difficulty is that there is no way to alias the data constructors
+-- | `Left` and `Right`, so that you could use Elm's `Ok` and `Err` instead.
+-- | So, in order to require fewer changes to code coming from Elm, I've
+-- | implemented a separate `Result` type here.
+
 module Elm.Result
     ( module Virtual
     , Result(Ok, Err)
@@ -6,14 +17,7 @@ module Elm.Result
     ) where
 
 
--- | This is adapted from https://github.com/purescript/purescript-either/blob/master/src/Data/Either.purs
--- |
--- | Normally, my strategy would have been to re-use `Either` instead of doing this.
--- | However, the problem is that there is no way to alias the data constructors
--- | `Left` and `Right`. Well, you could have functions to do part of the job,
--- | but not the pattern-matching part. So, we'll require fewer changes to
--- | Elm code if we do this instead. And, arguably, `Ok` and `Err` actually
--- | have some advantages over `Left` and `Right`.
+-- This is mostly adapted from https://github.com/purescript/purescript-either/blob/master/src/Data/Either.purs
 
 
 -- For re-export
@@ -50,72 +54,70 @@ import Data.Traversable (class Traversable)
 import Elm.Maybe (Maybe (Just, Nothing))
 
 
-{-| A `Result` is either `Ok` meaning the computation succeeded, or it is an
-`Err` meaning that there was some failure.
--}
+-- | A `Result` is either `Ok` meaning the computation succeeded, or it is an
+-- | `Err` meaning that there was some failure.
 data Result error value
     = Ok value
     | Err error
 
 
-{-| If the result is `Ok` return the value, but if the result is an `Err` then
-return a given default value. The following examples try to parse integers.
-
-    Result.withDefault 0 (String.toInt "123") == 123
-    Result.withDefault 0 (String.toInt "abc") == 0
--}
+-- | If the result is `Ok` return the value, but if the result is an `Err` then
+-- | return a given default value. The following examples try to parse integers.
+-- | 
+-- |     Result.withDefault 0 (String.toInt "123") == 123
+-- |     Result.withDefault 0 (String.toInt "abc") == 0
 withDefault :: forall x a. a -> Result x a -> a
 withDefault _ (Ok a)  = a
 withDefault d (Err _) = d
 
 
-{-| Format the error value of a result. If the result is `Ok`, it stays exactly
-the same, but if the result is an `Err` we will format the error. For example,
-say the errors we get have too much information:
-
-    parseInt : String -> Result ParseError Int
-
-    type ParseError =
-        { message : String
-        , code : Int
-        , position : (Int,Int)
-        }
-
-    formatError .message (parseInt "123") == Ok 123
-    formatError .message (parseInt "abc") == Err "char 'a' is not a number"
--}
+-- | Format the error value of a result. If the result is `Ok`, it stays exactly
+-- | the same, but if the result is an `Err` we will format the error. For example,
+-- | say the errors we get have too much information:
+-- | 
+-- |     parseInt : String -> Result ParseError Int
+-- | 
+-- |     type ParseError =
+-- |         { message : String
+-- |         , code : Int
+-- |         , position : (Int,Int)
+-- |         }
+-- | 
+-- |     formatError .message (parseInt "123") == Ok 123
+-- |     formatError .message (parseInt "abc") == Err "char 'a' is not a number"
+-- |
+-- | Equivalent to Purescript's `lmap`.
 formatError :: forall error error' a. (error -> error') -> Result error a -> Result error' a
 formatError = lmap
 
 
-{-| Convert to a simpler `Maybe` if the actual error message is not needed or
-you need to interact with some code that primarily uses maybes.
-
-    parseInt : String -> Result ParseError Int
-
-    maybeParseInt : String -> Maybe Int
-    maybeParseInt string =
-        toMaybe (parseInt string)
--}
+-- | Convert to a simpler `Maybe` if the actual error message is not needed or
+-- | you need to interact with some code that primarily uses maybes.
+-- | 
+-- |     parseInt : String -> Result ParseError Int
+-- | 
+-- |     maybeParseInt : String -> Maybe Int
+-- |     maybeParseInt string =
+-- |         toMaybe (parseInt string)
 toMaybe :: forall x a. Result x a -> Maybe a
 toMaybe (Ok v)  = Just v
 toMaybe (Err _) = Nothing
 
 
-{-| Convert from a simple `Maybe` to interact with some code that primarily
-uses `Results`.
-
-    parseInt : String -> Maybe Int
-
-    resultParseInt : String -> Result String Int
-    resultParseInt string =
-        fromMaybe ("error parsing string: " ++ toString string) (parseInt string)
--}
+-- | Convert from a simple `Maybe` to interact with some code that primarily
+-- | uses `Results`.
+-- | 
+-- |     parseInt : String -> Maybe Int
+-- | 
+-- |     resultParseInt : String -> Result String Int
+-- |     resultParseInt string =
+-- |         fromMaybe ("error parsing string: " ++ toString string) (parseInt string)
 fromMaybe :: forall x a. x -> Maybe a -> Result x a
 fromMaybe _ (Just v) = Ok v
 fromMaybe err Nothing = Err err
 
 
+-- Like Purescript's `either`.
 result :: forall a b c. (a -> c) -> (b -> c) -> Result a b -> c
 result f _ (Err a) = f a
 result _ g (Ok b)  = g b

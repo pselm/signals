@@ -1,5 +1,13 @@
 ## Module Elm.Int53
 
+In Purescript, the `Int` type is restricted to 32-bit integers. However,
+the underlying Javascript runtime is capable of working with 53-bit
+integers. So, this module exposes an `Int53` type, for cases where you
+want all 53 bits.
+
+This is needed for some code ported from Elm, since the Elm `Int` type
+can handle 53 bits.
+
 #### `Int53`
 
 ``` purescript
@@ -28,6 +36,9 @@ Int53Value Int53
 ``` purescript
 truncate :: Number -> Int53
 ```
+
+Convert a `Number` to an `Int53`, by rounding towards zero.
+Values outside the `Int53` range are clamped.
 
 #### `floor`
 
@@ -109,10 +120,8 @@ even :: Int53 -> Boolean
 
 Returns whether an `Int53` is an even number.
 
-``` purescript
-even (fromInt 0) == true
-even (fromInt 1) == false
-```
+    even (fromInt 0) == true
+    even (fromInt 1) == false
 
 #### `odd`
 
@@ -122,10 +131,8 @@ odd :: Int53 -> Boolean
 
 The negation of `even`.
 
-``` purescript
-odd (fromInt 0) == false
-odd (fromInt 1) == true
-```
+    odd (fromInt 0) == false
+    odd (fromInt 1) == true
 
 #### `Int53Value`
 
