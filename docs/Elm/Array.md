@@ -88,16 +88,6 @@ Apply a function on every element with its index as first argument.
 
     indexedMap (*) (fromList [5,5,5]) == fromList [0,5,10]
 
-#### `foldl`
-
-``` purescript
-foldl :: forall a b. (a -> b -> b) -> b -> Array a -> b
-```
-
-Reduce an array from the left. Read `foldl` as &ldquo;fold from the left&rdquo;.
-
-    foldl (::) [] (fromList [1,2,3]) == [3,2,1]
-
 #### `push`
 
 ``` purescript
@@ -189,6 +179,18 @@ length :: forall a. Seq a -> Int
 ```
 
 O(1). The number of elements in the sequence.
+
+### Re-exported from Elm.Foldable:
+
+#### `foldl`
+
+``` purescript
+foldl :: forall a b f. (Foldable f) => (a -> b -> b) -> b -> f a -> b
+```
+
+Reduce a container from the left.
+
+   foldl (:) [] [1,2,3] == [3,2,1]
 
 ### Re-exported from Prelude:
 

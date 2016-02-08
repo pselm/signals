@@ -1,3 +1,9 @@
+
+-- | A dictionary mapping unique keys to values. The keys can be any type which
+-- | has an instance of the `Ord` class.
+-- |
+-- | This is implemented in terms of Purescript's `Data.Map`.
+
 module Elm.Dict 
     ( module Virtual
     , Dict, get, remove, update
@@ -27,6 +33,7 @@ import Elm.List (List)
 import Data.Tuple (Tuple(..))
 
 
+-- | Elm's `Dict` type is a synonym for Purescript's `Data.Map`.
 type Dict = Map
 
 
@@ -34,48 +41,50 @@ type Dict = Map
 -- of various functions below, perhaps via bifunctor, profunctor or traversable?
 
 
-{-| Get the value associated with a key. If the key is not found, return
-`Nothing`. This is useful when you are not sure if a key will be in the
-dictionary.
-
-    animals = fromList [ ("Tom", Cat), ("Jerry", Mouse) ]
-
-    get "Tom"   animals == Just Cat
-    get "Jerry" animals == Just Mouse
-    get "Spike" animals == Nothing
-
--}
+-- | Get the value associated with a key. If the key is not found, return
+-- | `Nothing`. This is useful when you are not sure if a key will be in the
+-- | dictionary.
+-- | 
+-- |     animals = fromList [ ("Tom", Cat), ("Jerry", Mouse) ]
+-- | 
+-- |     get "Tom"   animals == Just Cat
+-- |     get "Jerry" animals == Just Mouse
+-- |     get "Spike" animals == Nothing
+-- |
+-- | Equivalent to Purescript's `lookup`.
 get :: forall k v. (Ord k) => k -> Dict k v -> Maybe v
 get = lookup
 
 
-{-| Remove a key-value pair from a dictionary. If the key is not found,
-no changes are made. -}
+-- | Remove a key-value pair from a dictionary. If the key is not found,
+-- | no changes are made.
+-- |
+-- | Equivalent to Purescript's `delete`.
 remove :: forall k v. (Ord k) => k -> Dict k v -> Dict k v
 remove = delete
 
 
-{-| Update the value of a dictionary for a specific key with a given function. -}
+-- | Update the value of a dictionary for a specific key with a given function.
+-- |
+-- | Like Purescript's `alter`, but with flipped arguments.
 update :: forall k v. (Ord k) => k -> (Maybe v -> Maybe v) -> Dict k v -> Dict k v
 update = flip alter
 
 
-{-| Keep a key-value pair when its key appears in the second dictionary.
-Preference is given to values in the first dictionary.
--}
+-- | Keep a key-value pair when its key appears in the second dictionary.
+-- | Preference is given to values in the first dictionary.
 intersect :: forall k v. (Ord k) => Dict k v -> Dict k v -> Dict k v
 intersect t1 t2 =
     filter (\k _ -> member k t2) t1
 
 
-{-| Keep a key-value pair when its key does not appear in the second dictionary.
--}
+-- | Keep a key-value pair when its key does not appear in the second dictionary.
 diff :: forall k v. (Ord k) => Dict k v -> Dict k v -> Dict k v
 diff t1 t2 =
     foldl (\k v t -> remove k t) t1 t2
 
 
-{-| Keep a key-value pair when it satisfies a predicate. -}
+-- | Keep a key-value pair when it satisfies a predicate.
 filter :: forall k v. (Ord k) => (k -> v -> Boolean) -> Dict k v -> Dict k v
 filter predicate =
     let
@@ -88,10 +97,12 @@ filter predicate =
         foldl add empty
 
 
-{-| Partition a dictionary according to a predicate. The first dictionary
-contains all key-value pairs which satisfy the predicate, and the second
-contains the rest.
--}
+-- | Partition a dictionary according to a predicate. The first dictionary
+-- | contains all key-value pairs which satisfy the predicate, and the second
+-- | contains the rest.
+-- |
+-- | The result is a record of `{trues, falses}`, which is different from the Elm
+-- | version, which returns a `Tuple`.
 partition :: forall k v. (Ord k) => (k -> v -> Boolean) -> Dict k v -> {trues :: Dict k v, falses :: Dict k v}
 partition predicate dict =
   let
@@ -104,10 +115,10 @@ partition predicate dict =
        foldl add {trues: empty, falses: empty} dict
 
 
-{-| Apply a function to all values in a dictionary. -}
+-- | Apply a function to all values in a dictionary.
 map :: forall k a b. (Ord k) => (k -> a -> b) -> Dict k a -> Dict k b
 map f dict =
-    -- There has got to be a way to do this without constructing an
+    -- TODO: There has got to be a way to do this without constructing an
     -- intermediate list.
     let
         tuples :: List (Tuple k a)
@@ -123,14 +134,13 @@ map f dict =
         fromList mapped
 
 
-{-| Fold over the key-value pairs in a dictionary, in order from lowest
-key to highest key.
--}
+-- | Fold over the key-value pairs in a dictionary, in order from lowest
+-- | key to highest key.
 foldl :: forall k v b. (Ord k) => (k -> v -> b -> b) -> b -> Dict k v -> b
 foldl f acc dict =
-    -- There has got to be a way to do this without constructing an
+    -- TODO: There has got to be a way to do this without constructing an
     -- intermediate list.
-   let
+    let
         tuples :: List (Tuple k v)
         tuples = toList dict
 
@@ -141,12 +151,11 @@ foldl f acc dict =
         Elm.List.foldl folder acc tuples
 
 
-{-| Fold over the key-value pairs in a dictionary, in order from highest
-key to lowest key.
--}
+-- | Fold over the key-value pairs in a dictionary, in order from highest
+-- | key to lowest key.
 foldr :: forall k v b. (Ord k) => (k -> v -> b -> b) -> b -> Dict k v -> b
 foldr f acc dict =
-    -- There has got to be a way to do this without constructing an
+    -- TODO: There has got to be a way to do this without constructing an
     -- intermediate list.
     let
         tuples :: List (Tuple k v)

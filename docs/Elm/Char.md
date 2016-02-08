@@ -1,12 +1,15 @@
 ## Module Elm.Char
 
+Functions for working with characters. Character literals are enclosed in
+`'a'` pair of single quotes.
+
 #### `isUpper`
 
 ``` purescript
 isUpper :: Char -> Bool
 ```
 
-True for upper case letters. 
+True for upper case letters.
 
 #### `isLower`
 
@@ -14,7 +17,7 @@ True for upper case letters.
 isLower :: Char -> Bool
 ```
 
-True for lower case letters. 
+True for lower case letters.
 
 #### `isDigit`
 
@@ -22,7 +25,7 @@ True for lower case letters.
 isDigit :: Char -> Bool
 ```
 
-True for ASCII digits `[0-9]`. 
+True for ASCII digits `[0-9]`.
 
 #### `isOctDigit`
 
@@ -30,7 +33,7 @@ True for ASCII digits `[0-9]`.
 isOctDigit :: Char -> Bool
 ```
 
-True for ASCII octal digits `[0-7]`. 
+True for ASCII octal digits `[0-7]`.
 
 #### `isHexDigit`
 
@@ -38,7 +41,7 @@ True for ASCII octal digits `[0-7]`.
 isHexDigit :: Char -> Bool
 ```
 
-True for ASCII hexadecimal digits `[0-9a-fA-F]`. 
+True for ASCII hexadecimal digits `[0-9a-fA-F]`.
 
 #### `toLocaleUpper`
 
@@ -46,7 +49,7 @@ True for ASCII hexadecimal digits `[0-9a-fA-F]`.
 toLocaleUpper :: Char -> Char
 ```
 
-Convert to upper case, according to any locale-specific case mappings. 
+Convert to upper case, according to any locale-specific case mappings.
 
 #### `toLocaleLower`
 
@@ -54,7 +57,7 @@ Convert to upper case, according to any locale-specific case mappings.
 toLocaleLower :: Char -> Char
 ```
 
-Convert to lower case, according to any locale-specific case mappings. 
+Convert to lower case, according to any locale-specific case mappings.
 
 #### `KeyCode`
 
@@ -62,11 +65,18 @@ Convert to lower case, according to any locale-specific case mappings.
 type KeyCode = Int
 ```
 
+In this library, we use integers to represent the key codes coming from the
+keyboard. You can use [`toCode`](#toCode) and [`fromCode`](#fromCode)
+to convert between key codes and characters.
+
 #### `toCode`
 
 ``` purescript
 toCode :: Char -> KeyCode
 ```
+
+Convert to unicode. Used with the [`Keyboard`](Keyboard) library,
+which expects the input to be uppercase.
 
 #### `fromCode`
 
@@ -74,6 +84,24 @@ toCode :: Char -> KeyCode
 fromCode :: KeyCode -> Char
 ```
 
-Convert from unicode. 
+Convert from unicode.
 
+
+### Re-exported from Data.Char:
+
+#### `toLower`
+
+``` purescript
+toLower :: Char -> Char
+```
+
+Converts a character to lowercase.
+
+#### `toUpper`
+
+``` purescript
+toUpper :: Char -> Char
+```
+
+Converts a character to uppercase.
 

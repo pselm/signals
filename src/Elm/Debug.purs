@@ -1,56 +1,29 @@
+
+-- | This library is for investigating bugs or performance problems.
+
 module Elm.Debug
     ( log, crash
     ) where
 
+-- TODO: Is there anything sensible to do with `watch`, `watchSummary` and `trace`?
 
--- Internal
 
 import Debug.Trace (trace, spy)
 import Prelude ((++))
 
 
-{-| Log a tagged value on the developer console, and then return the value.
-
-    1 + log "number" 1        -- equals 2, logs "number: 1"
-    length (log "start" [])   -- equals 0, logs "start: []"
-
-Notice that `log` is not a pure function! It should *only* be used for
-investigating bugs or performance problems.
--}
+-- | Log a tagged value on the developer console, and then return the value.
+-- | 
+-- |     1 + log "number" 1        -- equals 2, logs "number: 1"
+-- |     length (log "start" [])   -- equals 0, logs "start: []"
+-- | 
+-- | Notice that `log` is not a pure function! It should *only* be used for
+-- | investigating bugs or performance problems.
 log :: forall a. String -> a -> a
 log tag value =
     trace (tag ++ ": ") (\_ -> spy value)
 
 
-{-| Crash the program with an error message. This is an uncatchable error,
-intended for code that is soon-to-be-implemented. For example, if you are
-working with a large ADT and have partially completed a case expression, it may
-make sense to do this:
-
-    data Entity = Ship | Fish | Captain | Seagull
-
-    drawEntity entity =
-        case entity of
-          Ship ->
-              ...
-
-          Fish ->
-              ...
-
-          _ ->
-              Debug.crash "TODO"
-
-The Elm compiler recognizes each `Debug.crash` and when you run into it at
-runtime, the error will point to the corresponding module name and line number.
-For `case` expressions that ends with a wildcard pattern and a crash, it will
-also show the value that snuck through. In our example, that'd be `Captain` or
-`Seagull`.
-
-**Use this if** you want to do some testing while you are partway through
-writing a function.
-
-**Do not use this if** you want to do some typical try-catch exception handling.
-Use the [`Maybe`](Maybe) or [`Result`](Result) libraries instead.
--}
+-- | Crash the program with an error message.
 foreign import crash :: forall a. String -> a
 

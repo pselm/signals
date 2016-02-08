@@ -82,10 +82,16 @@ If you want some more sophisticated handling of complex numbers, see
 #### `(//)`
 
 ``` purescript
-(//) :: forall a. (ModuloSemiring a) => a -> a -> a
+infixl 7 intDiv as //
 ```
 
 _left-associative / precedence 7_
+
+#### `intDiv`
+
+``` purescript
+intDiv :: forall a. (ModuloSemiring a) => a -> a -> a
+```
 
 Integer division. The remainder is discarded.
 
@@ -107,10 +113,16 @@ Equivalent to Purescript's `Prelude.mod`.
 #### `(%)`
 
 ``` purescript
-(%) :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
+infixl 7 mod as %
 ```
 
 _left-associative / precedence 7_
+
+#### `mod`
+
+``` purescript
+mod :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
+```
 
 Perform [modular arithmetic](http://en.wikipedia.org/wiki/Modular_arithmetic).
 
@@ -138,14 +150,10 @@ Pow Number
 #### `(^)`
 
 ``` purescript
-(^) :: forall a. (Pow a) => a -> a -> a
+infixr 8 pow as ^
 ```
 
 _right-associative / precedence 8_
-
-Exponentiation
-
-    3^2 == 9
 
 #### `abs`
 
@@ -249,10 +257,16 @@ Equivalent to Purescript's `show`.
 #### `(<<)`
 
 ``` purescript
-(<<) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
+infixr 9 compose as <<
 ```
 
 _right-associative / precedence 9_
+
+#### `compose`
+
+``` purescript
+compose :: forall a b c. (b -> c) -> (a -> b) -> a -> c
+```
 
 Function composition, passing results along in the suggested direction. For
 example, the following code checks if the square root of a number is odd:
@@ -272,10 +286,16 @@ Equivalent to Purescript's `<<<`.
 #### `(>>)`
 
 ``` purescript
-(>>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
+infixl 9 composeFlipped as >>
 ```
 
 _left-associative / precedence 9_
+
+#### `composeFlipped`
+
+``` purescript
+composeFlipped :: forall a b c. (a -> b) -> (b -> c) -> a -> c
+```
 
 Function composition, passing results along in the suggested direction. For
 example, the following code checks if the square root of a number is odd:
@@ -290,10 +310,16 @@ Equivalent to Purescript's `>>>`.
 #### `(|>)`
 
 ``` purescript
-(|>) :: forall a b. a -> (a -> b) -> b
+infixl 0 applyFnFlipped as |>
 ```
 
 _left-associative / precedence 0_
+
+#### `applyFnFlipped`
+
+``` purescript
+applyFnFlipped :: forall a b. a -> (a -> b) -> b
+```
 
 Forward function application `x |> f == f x`. This function is useful
 for avoiding parenthesis and writing code in a more natural way.
@@ -313,10 +339,16 @@ Equivalent to Purescript's `#`.
 #### `(<|)`
 
 ``` purescript
-(<|) :: forall a b. (a -> b) -> a -> b
+infixr 0 applyFn as <|
 ```
 
 _right-associative / precedence 0_
+
+#### `applyFn`
+
+``` purescript
+applyFn :: forall a b. (a -> b) -> a -> b
+```
 
 Backward function application `f <| x == f x`. This function is useful for
 avoiding parenthesis. Consider the following code to create a text element:
