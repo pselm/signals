@@ -44,7 +44,7 @@ fails, you will get a string message telling you why.
 #### `at`
 
 ``` purescript
-at :: forall a. List String -> Decoder a -> Decoder a
+at :: forall f a. (Foldable f) => f String -> Decoder a -> Decoder a
 ```
 
 Access a nested field, making it easy to dive into big structures. This is
@@ -59,6 +59,9 @@ It is defined as
 
     at fields decoder =
         List.foldr (:=) decoder fields
+
+Note that the signature is defined in terms of `Foldable` so that it will
+work with `Array` or `List` (among others).
 
 #### `field`
 

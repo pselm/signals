@@ -278,10 +278,20 @@ tests = test "Elm.Json\n" do
                     }
             )
 
-    test "Decode.at" do
+    test "Decode.at with List" do
         let
             decoder =
                 JD.at ("target" : "value" : Nil) JD.string
+
+        traverse_ (check decoder)
+            [ """ {"target": {"value": "that"}} """ ==> Just "that"
+            , """ {"target": "this", "value": "that"} """ ==> Nothing
+            ]
+    
+    test "Decode.at with Array" do
+        let
+            decoder =
+                JD.at ["target", "value"] JD.string
 
         traverse_ (check decoder)
             [ """ {"target": {"value": "that"}} """ ==> Just "that"

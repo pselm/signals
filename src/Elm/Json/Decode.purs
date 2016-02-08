@@ -33,8 +33,8 @@ import Data.Foreign (Foreign, ForeignError(..), F, readArray, isNull, isUndefine
 import Data.Foreign.Class (read)
 import Data.Foreign.Index (prop)
 import Data.Traversable (traverse)
-import Data.Foldable (foldl)
-import Elm.Json.Encode (Value())
+import Data.Foldable (class Foldable, foldl)
+import Elm.Json.Encode (Value)
 import Control.Apply (lift2, lift3, lift4, lift5)
 import Control.Alt (class Alt, alt)
 import Control.Bind ((>=>))
@@ -142,7 +142,10 @@ decodeString (Decoder decoder) str =
 -- | 
 -- |     at fields decoder =
 -- |         List.foldr (:=) decoder fields
-at :: forall a. List String -> Decoder a -> Decoder a
+-- |
+-- | Note that the signature is defined in terms of `Foldable` so that it will
+-- | work with `Array` or `List` (among others).
+at :: forall f a. (Foldable f) => f String -> Decoder a -> Decoder a
 at fields decoder =
     foldr (:=) decoder fields
 
