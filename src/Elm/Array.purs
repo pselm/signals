@@ -12,7 +12,7 @@
 module Elm.Array 
     ( module Virtual
     , Array, fromList, toList, toIndexedList
-    , repeat, foldl, push, get, set
+    , repeat, push, get, set
     , slice, indexedMap, initialize
     ) where
 
@@ -22,7 +22,7 @@ module Elm.Array
 import Data.Sequence (filter, empty, length) as Virtual
 import Data.Foldable (foldr) as Virtual
 import Prelude (append, map) as Virtual
-
+import Elm.Foldable (foldl) as Virtual
 
 -- Internal
 
@@ -112,14 +112,6 @@ indexedMap func =
                 Tuple (index + 1) (snoc seq (func index item)) 
 
     
--- | Reduce an array from the left. Read `foldl` as &ldquo;fold from the left&rdquo;.
--- | 
--- |     foldl (::) [] (fromList [1,2,3]) == [3,2,1]
-foldl :: forall a b. (a -> b -> b) -> b -> Array a -> b
-foldl func =
-    Data.Foldable.foldl (flip func)
-
-
 -- | Push an element to the end of an array.
 -- | 
 -- |     push 3 (fromList [1,2]) == fromList [1,2,3]

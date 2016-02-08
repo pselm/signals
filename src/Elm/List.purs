@@ -2,7 +2,7 @@ module Elm.List
     ( module Virtual
     , cons, (:), isEmpty, member
     , map2, map3, map4, map5
-    , foldl, intersperse, scanl
+    , intersperse, scanl
     , indexedMap, filterMap, partition, unzip
     , repeat, sortBy, sortWith
     , range, (..)
@@ -19,6 +19,8 @@ import Data.List
 import Data.Foldable
     ( foldr, all, any, sum, product, maximum, minimum
     ) as Virtual
+
+import Elm.Foldable (foldl) as Virtual
 
 import Prelude (map, append) as Virtual
 
@@ -81,15 +83,6 @@ indexedMap func list =
         where
             r =
                 range 0 (length list - 1)
-
-
-{-| Reduce a list from the left.
-
-    foldl (::) [] [1,2,3] == [3,2,1]
--}
-foldl :: forall a b. (a -> b -> b) -> b -> List a -> b
-foldl func =
-    Data.Foldable.foldl (Prelude.flip func)
 
 
 {-| Reduce a list from the left, building up all of the intermediate results into a list.

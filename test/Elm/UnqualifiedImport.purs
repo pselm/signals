@@ -61,13 +61,13 @@ import Elm.Json.Decode hiding (oneOf)
 import Elm.Json.Encode hiding (string, int, float, bool, null, list, array)
 
 {- There are a number of things that could conceivably be unified between
-`Elm.List` and `Elm.Array` ... `length`, `filter`, `foldl`, `indexedMap`,
+`Elm.List` and `Elm.Array` ... `length`, `filter`, `indexedMap`,
 `repeat`
 
 It should be possible to unify `isEmpty`, `member` as between `Dict` and `List`.
 -}
 import Elm.List hiding
-    ( length, filter, isEmpty, member, foldl, indexedMap, repeat
+    ( length, filter, isEmpty, member, indexedMap, repeat
     -- The mapping functions are not the normal apply in List
     , map2, map3, map4, map5
     )
@@ -90,7 +90,7 @@ TODO: Should be able to unify `map`, unless the `Ord` constraint is a problem.
 -}
 import Elm.Set hiding
     ( union, toList, fromList, size, singleton, member, isEmpty, empty, remove
-    , foldl, intersect, diff, insert, filter, partition, map
+    , intersect, diff, insert, filter, partition, map
     )
 
 -- Signal's map is a monadic map, so not part of the type class 

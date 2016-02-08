@@ -1,6 +1,6 @@
 module Elm.Set 
     ( module Virtual
-    , remove, foldl, intersect, diff
+    , remove, intersect, diff
     , filter, partition, map
     ) where
 
@@ -15,6 +15,7 @@ import Data.Set
     ) as Virtual
 
 import Data.Foldable (foldr) as Virtual
+import Elm.Foldable (foldl) as Virtual
 
 
 -- Internal
@@ -22,6 +23,7 @@ import Data.Foldable (foldr) as Virtual
 import Prelude (class Ord, flip, (<<<))
 import Data.Set (Set, delete, difference, intersection, fromList, toList, insert, empty)
 import Data.Foldable (foldr)
+import Elm.Foldable (foldl)
 
 
 {-| Remove a value from a set. If the value is not found, no changes are made. -}
@@ -45,12 +47,6 @@ diff = difference
 map :: forall a b. (Ord a, Ord b) => (a -> b) -> Set a -> Set b
 map func set =
     foldl (\a memo -> insert (func a) memo) empty set
-
-
-{-| Fold over the values in a set, in order from lowest to highest. -}
-foldl :: forall a b. (Ord a) => (a -> b -> b) -> b -> Set a -> b
-foldl func =
-    Data.Foldable.foldl (flip func)
 
 
 {-| Create a new set consisting only of elements which satisfy a predicate. -}
