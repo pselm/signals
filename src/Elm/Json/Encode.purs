@@ -17,8 +17,9 @@ module Elm.Json.Encode
 
 import Data.Foreign (Foreign, toForeign)
 import Data.List (List)
-import Data.Tuple (Tuple, fst, snd)
+import Data.Tuple (Tuple)
 import Elm.Basics (Float, Bool)
+import Data.Foldable (class Foldable)
 import Prelude ((<<<))
 import Elm.Array as ElmArray
 
@@ -74,11 +75,12 @@ null = encodeNull
 foreign import encodeNull :: Value
 
 
--- TODO: I should make this work with any `Foldable`, so it will work with Array or List
-
 -- | Encode a JSON object.
-object :: List (Tuple String Value) -> Value
-object = encodeObject fst snd <<< Data.List.toUnfoldable
+-- |
+-- | The signature uses `Foldable` in order to work with `List` or
+-- | `Array`, amongst others.
+object :: forall f. (Foldable f) => f (Tuple String Value) -> Value
+object = toForeign <<< Data.StrMap.fromFoldable 
 
 
 foreign import encodeObject ::

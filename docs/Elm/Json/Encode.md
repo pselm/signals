@@ -82,10 +82,13 @@ Encode a null value.
 #### `object`
 
 ``` purescript
-object :: List (Tuple String Value) -> Value
+object :: forall f. (Foldable f) => f (Tuple String Value) -> Value
 ```
 
 Encode a JSON object.
+
+The signature uses `Foldable` in order to work with `List` or
+`Array`, amongst others.
 
 #### `psArray`
 

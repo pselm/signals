@@ -101,6 +101,34 @@ tests = test "Elm.Json\n" do
     "spouse": null
 }"""
 
+    test "encode object with scalar types (array arg)" do
+        let
+            person =
+                JE.object
+                    [ Tuple "name" (JE.string "Tom")
+                    , Tuple "age" (JE.int 42)
+                    , Tuple "height" (JE.float 234.1)
+                    , Tuple "included" (JE.bool true)
+                    , Tuple "member" (JE.bool false)
+                    , Tuple "spouse" JE.null
+                    ]
+
+            compact =
+                JE.encode 0 person
+
+            readable =
+                JE.encode 4 person
+
+        compact === """{"name":"Tom","age":42,"height":234.1,"included":true,"member":false,"spouse":null}"""
+        readable === """{
+    "name": "Tom",
+    "age": 42,
+    "height": 234.1,
+    "included": true,
+    "member": false,
+    "spouse": null
+}"""
+
     test "encode arrays and lists" do
         let
             values :: Array JE.Value
