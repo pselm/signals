@@ -20,6 +20,7 @@ module Elm.Signal
     -- So, they are subject to experimentation, as I figure out
     -- how best to integrate this all.
     , timestamp
+    , output
     , setup
     , current
     , DELAY
@@ -33,7 +34,7 @@ module Elm.Signal
 
 import Prelude
     ( class Eq, class Monad, Unit, unit, ($), (++), bind, (+)
-    , pure, (==), (/=), (&&), (||), const, (<<<)
+    , pure, (==), (/=), (&&), (||), const, (<<<), id
     )
 
 import Control.Monad (when)
@@ -430,18 +431,25 @@ constant :: forall e m a. (MonadEff (ref :: REF | e) m) => a -> GraphState m (Si
 constant = input "constant"
 
 
-{- Note that this isn't actually used so far ... may end up handling it differently.
+output ::
+    forall e1 e2 m a. (MonadEff (ref :: REF | e1) m) => 
+    String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
 
-output :: forall a. String -> (a -> EffSignal Unit) -> Signal a -> EffSignal (Signal a)
 output name handler (Signal parent) = do
-    id <- getGuid parent.graph
-    kids <- newRef []
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    value <- newRef' pv
 
     let
+        notifyKids :: NotifyKid
         notifyKids ts update parentID kid = do
             when update do
-                value <- readRef parent.value
-                handler value
+                parentValue <- readRef parent.value
+                unsafeInterleaveEff $ handler parentValue
             pure unit
 
         node =
@@ -449,17 +457,16 @@ output name handler (Signal parent) = do
                 { id
                 , name: "output-" ++ name
                 , parents: [mkExists (Signal parent)]
-                -- Note that kids and value not really needed ... should
-                -- redesign the type to reflect this.
-                , kids
-                , value: parent.value
-                , notifyKids
                 , role: Output
+                , notifyKids
+                , value
+                , inputs
+                , kids
+                , updateInProgress
                 }
 
     addKidToParent (Signal parent) (mkExists node)
-    pure node
--}
+    pure unit
 
 
 -- | Create a past-dependent signal. Each update from the incoming signal will
@@ -1249,35 +1256,5 @@ runSignal ::
     forall e1 e2 m. (MonadEff (ref :: REF | e1) m) =>
     Signal (Eff e2 Unit) -> GraphState m Unit
 
-runSignal (Signal parent) = do
-    id <- getGuid
-    kids <- newRef' []
-    inputs <- getInputs
-    updateInProgress <- getUpdateInProgress
-
-    pv <- readRef' parent.value
-    value <- newRef' pv
-
-    let
-        notifyKids :: NotifyKid
-        notifyKids ts update parentID kid = do
-            when update do
-                parentValue <- readRef parent.value
-                unsafeInterleaveEff parentValue
-            pure unit
-
-        node =
-            Signal
-                { id
-                , name: "runSignal"
-                , parents: [mkExists (Signal parent)]
-                , role: Output
-                , notifyKids
-                , value
-                , inputs
-                , kids
-                , updateInProgress
-                }
-
-    addKidToParent (Signal parent) (mkExists node)
-    pure unit
+runSignal parent =
+    output "runSignal" id parent
