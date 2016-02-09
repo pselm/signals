@@ -26,7 +26,8 @@
     "purescript-sequences": "~0.5.0",
     "purescript-sets": "~0.5.5",
     "purescript-strings": "~0.7.1",
-    "purescript-tuples": "~0.4.0"
+    "purescript-tuples": "~0.4.0",
+    "purescript-timers": "https://github.com/CapillarySoftware/purescript-timers.git#110dc2dd13cc05a875c533a4fb83219c3c2f84b2"
   },
   "devDependencies": {
     "purescript-console": "~0.1.1",

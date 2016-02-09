@@ -19,9 +19,15 @@ module Elm.Signal
     -- Everything below this line is not in the original Elm API.
     -- So, they are subject to experimentation, as I figure out
     -- how best to integrate this all.
+    , timestamp
     , setup
     , current
     , DELAY
+    , Graph
+    , SignalID
+    , UntypedSignal
+    , GraphState
+    , runSignal
     ) where
 
 
@@ -32,6 +38,7 @@ import Prelude
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (error, CONSOLE)
 import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef, modifyRef, newRef)
@@ -44,8 +51,7 @@ import Data.Exists (Exists, runExists, mkExists)
 import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Date (Now, nowEpochMilliseconds)
-import Data.Time (Milliseconds)
-import Elm.Time (Time, toTime)
+import Data.Time (Milliseconds(..))
 import Elm.Task (TaskE)
 import Elm.Debug (crash)
 
@@ -71,6 +77,10 @@ As a first step, I've used `StateT` to make the `Graph` itself hidden state,
 which essentially matches the Elm API.
 
 -}
+
+
+-- Duplicated from Elm.Time, to avoid circular reference
+type Time = Number
 
 
 {- Time since epoch, used to give timestamps to events. -}
@@ -507,6 +517,10 @@ foldp func state (Signal parent) = do
 
     addKidToParent (Signal parent) (mkExists node)
     pure node
+
+
+toTime :: Milliseconds -> Time
+toTime (Milliseconds millis) = millis
 
 
 timestamp ::
@@ -1228,3 +1242,42 @@ foreign import delay :: forall eff a.
     Int ->
     Eff (delay :: DELAY | eff) a ->
     Eff (delay :: DELAY | eff) Unit
+
+
+-- | Execute each effect as it arrives on a Signal.
+runSignal ::
+    forall e1 e2 m. (MonadEff (ref :: REF | e1) m) =>
+    Signal (Eff e2 Unit) -> GraphState m Unit
+
+runSignal (Signal parent) = do
+    id <- getGuid
+    kids <- newRef' []
+    inputs <- getInputs
+    updateInProgress <- getUpdateInProgress
+
+    pv <- readRef' parent.value
+    value <- newRef' pv
+
+    let
+        notifyKids :: NotifyKid
+        notifyKids ts update parentID kid = do
+            when update do
+                parentValue <- readRef parent.value
+                unsafeInterleaveEff parentValue
+            pure unit
+
+        node =
+            Signal
+                { id
+                , name: "runSignal"
+                , parents: [mkExists (Signal parent)]
+                , role: Output
+                , notifyKids
+                , value
+                , inputs
+                , kids
+                , updateInProgress
+                }
+
+    addKidToParent (Signal parent) (mkExists node)
+    pure unit

@@ -3,7 +3,8 @@
   "scripts": {
     "postinstall": "pulp dep install",
     "build": "pulp build && rimraf docs && pulp docs",
-    "clean": "rimraf output && rimraf .pulp-cache"
+    "clean": "rimraf output && rimraf .pulp-cache",
+    "examples": "pulp build -I examples"
   },
   "devDependencies": {
     "bower": "^1.7.2",
