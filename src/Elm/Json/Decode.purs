@@ -13,6 +13,7 @@ module Elm.Json.Decode
     , module Elm.Apply
     , Decoder
     , decodeString, decodeValue
+    , extractForeign
     , string, int, float, bool, null
     , list, array
     , tuple1, tuple2, tuple3, tuple4, tuple5, tuple6, tuple7, tuple8
@@ -30,7 +31,7 @@ import Elm.Bind (andThen)
 import Elm.Apply (andMap, map2, map3, map4, map5)
 
 import Data.Foreign (Foreign, ForeignError(..), F, readArray, isNull, isUndefined, typeOf, parseJSON)
-import Data.Foreign.Class (read)
+import Data.Foreign.Class (class IsForeign, read)
 import Data.Foreign.Index (prop)
 import Data.Traversable (traverse)
 import Data.Monoid (class Monoid)
@@ -305,6 +306,13 @@ oneOf decoders =
     foldl alt (fail "No decoders provided to oneOf") decoders
 
 
+-- | Extract any value with an `IsForeign` instance.
+-- |
+-- | Note that this is not in the Elm API.
+extractForeign :: forall a. (IsForeign a) => Decoder a
+extractForeign = Decoder $ toResult <<< read
+
+
 -- | Extract a string.
 -- | 
 -- |     -- ["John","Doe"]
@@ -313,7 +321,7 @@ oneOf decoders =
 -- |     name =
 -- |         tuple2 (,) string string
 string :: Decoder String
-string = Decoder $ toResult <<< read
+string = extractForeign
 
 
 -- | Extract a float.
@@ -324,7 +332,7 @@ string = Decoder $ toResult <<< read
 -- |     numbers =
 -- |         list float
 float :: Decoder Float
-float = Decoder $ toResult <<< read
+float = extractForeign
 
 
 -- | Extract an integer.
@@ -335,7 +343,7 @@ float = Decoder $ toResult <<< read
 -- |     age =
 -- |         "age" := int
 int :: Decoder Int
-int = Decoder $ toResult <<< read
+int = extractForeign
 
 
 -- | Extract a boolean.
@@ -346,7 +354,7 @@ int = Decoder $ toResult <<< read
 -- |     checked =
 -- |         "checked" := bool
 bool :: Decoder Bool
-bool = Decoder $ toResult <<< read
+bool = extractForeign
 
 
 -- | Extract a List from a JS array.
