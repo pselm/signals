@@ -32,15 +32,20 @@ import Data.Sequence
     )
 
 import Data.Tuple (Tuple(..))
-import Prelude (class Functor, (<$>), ($), (-), const, flip, (>=), (<=), (+), (<<<))
-import Data.Foldable (class Foldable)
+import Data.Foldable (class Foldable, foldr)
 import Data.Unfoldable (class Unfoldable)
 import Data.List (List(..), (:), reverse)
 import Data.Ord (clamp)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..), snd)
 import Prim hiding (Array)
+import Data.Monoid (class Monoid, mempty)
 
+import Prelude
+    ( class Functor, (<$>)
+    , class Applicative, pure
+    , ($), (-), const, flip, (>=), (<=), (+), (<<<), (<>)
+    )
 
 -- | The `Array` type is synonym for `Data.Sequence.Seq`.
 type Array = Seq
@@ -93,12 +98,15 @@ toList = toUnfoldable
 -- | paired with its index.
 -- |
 -- |     toIndexedList (fromList ["cat","dog"]) == [(0,"cat"), (1,"dog")]
-toIndexedList :: forall a. Array a -> List (Tuple Int a)
-toIndexedList =
-    reverse <<< snd <<< Data.Foldable.foldl step (Tuple 0 Nil)
+-- |
+-- | The container in the return type is defined polymorphically to accommodate
+-- | `List` and Purescript's `Array`, among others.
+toIndexedList :: forall f a. (Applicative f, Monoid (f (Tuple Int a))) => Array a -> f (Tuple Int a)
+toIndexedList arr =
+    snd $ Data.Foldable.foldr step (Tuple ((length arr) - 1) mempty) arr
         where
-            step (Tuple index list) item =
-                Tuple (index + 1) (Tuple index item : list) 
+            step item (Tuple index list) =
+                Tuple (index - 1) ((pure $ Tuple index item) <> list) 
 
 
 -- | Apply a function on every element with its index as first argument.
