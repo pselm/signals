@@ -413,6 +413,23 @@ tests = test "Elm.Json\n" do
             , """ [ {"x": 7, "y": 27}, {"y": "string"}, {"z": 9} ] """
                 ==> Nothing
             ]
+    
+    test "Decode.oneOf with array" do
+        let
+            decoder =
+                JD.oneOf
+                    [ ("x" := JD.int)
+                    , ("y" := JD.int)
+                    , ("z" := JD.int)
+                    ]
+
+        traverse_ (check $ JD.list decoder)
+            [ """ [ {"x": 7, "y": 27}, {"y": 8}, {"z": 9} ] """
+                ==> Just (7 : 8 : 9 : Nil)
+
+            , """ [ {"x": 7, "y": 27}, {"y": "string"}, {"z": 9} ] """
+                ==> Nothing
+            ]
 
     test "Decode.maybe" do
         let

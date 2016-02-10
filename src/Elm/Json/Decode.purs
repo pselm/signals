@@ -297,14 +297,12 @@ dict decoder =
 -- |         [ tuple2 (,) float float
 -- |         , object2 (,) ("x" := float) ("y" := float)
 -- |         ]
-oneOf :: forall a. List (Decoder a) -> Decoder a
+-- |
+-- | The container has a polymorphic type to accommodate `List` or `Array`,
+-- | among others.
+oneOf :: forall f a. (Foldable f) => f (Decoder a) -> Decoder a
 oneOf decoders =
-    case decoders of
-        Nil ->
-            Elm.Debug.crash "oneOf was given an empty list!"
-
-        Cons first rest ->
-            foldl alt first rest
+    foldl alt (fail "No decoders provided to oneOf") decoders
 
 
 -- | Extract a string.
