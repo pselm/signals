@@ -25,8 +25,6 @@ module Elm.Signal
     , current
     , DELAY
     , Graph
-    , SignalID
-    , UntypedSignal
     , GraphState
     , runSignal
     ) where
@@ -150,7 +148,7 @@ something I couldn't figure out. In any event, this way we can provide each `Sig
 the data it needs at runtime, without the `Signal` needing to consult the hidden graph
 state again.
 -}
-type Graph =
+newtype Graph = Graph
     { guid :: SignalID
     , inputs :: Ref (Array UntypedSignal)
     , programStart :: Milliseconds
@@ -185,7 +183,7 @@ setup cb = do
     inputs <- liftEff $ newRef []
     updateInProgress <- liftEff $ newRef false
 
-    evalStateT cb
+    evalStateT cb $ Graph
         { guid: 0
         , inputs
         , programStart
@@ -203,26 +201,26 @@ registerInput node = do
 -- Get the inputs.
 getInputs :: forall m. (Monad m) => GraphState m (Ref (Array UntypedSignal))
 getInputs =
-    gets _.inputs
+    gets \(Graph graph) -> graph.inputs
 
 
 -- Get the programStart
 getProgramStart :: forall m. (Monad m) => GraphState m Milliseconds
 getProgramStart =
-    gets _.programStart
+    gets \(Graph graph) -> graph.programStart
 
 
 -- Get a guid and increment it.
 getGuid :: forall m. (Monad m) => GraphState m SignalID
 getGuid = do
-    modify \graph -> graph {guid = graph.guid + 1}
-    gets _.guid
+    modify \(Graph graph) -> Graph $ graph {guid = graph.guid + 1}
+    gets \(Graph graph) -> graph.guid
 
 
 -- Get whether an update is in progress.
 getUpdateInProgress :: forall m. (Monad m) => GraphState m (Ref Boolean)
 getUpdateInProgress =
-    gets _.updateInProgress
+    gets \(Graph graph) -> graph.updateInProgress
 
 
 -- | A value that changes over time. So a `(Signal Int)` is an integer that is
