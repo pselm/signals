@@ -344,6 +344,22 @@ tests = test "Elm.Json\n" do
                 ==> Nothing
             ]
 
+    test "Decode.keyValuePairs with Array" do
+        let
+            decoder =
+                JD.keyValuePairs JD.int
+
+        traverse_ (check decoder)
+            [ """ {"tom": 89, "sue": 92, "bill": 97} """
+                ==> Just
+                        [ Tuple "tom" 89
+                        , Tuple "sue" 92
+                        , Tuple "bill" 97
+                        ]
+
+            , """ {"tom": 89, "sue": "number", "bill": 97} """
+                ==> Nothing
+            ]
     test "Decode.dict" do
         let
             decoder =

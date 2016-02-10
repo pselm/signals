@@ -33,7 +33,8 @@ import Data.Foreign (Foreign, ForeignError(..), F, readArray, isNull, isUndefine
 import Data.Foreign.Class (read)
 import Data.Foreign.Index (prop)
 import Data.Traversable (traverse)
-import Data.Foldable (class Foldable, foldl)
+import Data.Monoid (class Monoid)
+import Data.Foldable (class Foldable, foldl, foldMap)
 import Elm.Json.Encode (Value)
 import Control.Apply (lift2, lift3, lift4, lift5)
 import Control.Alt (class Alt, alt)
@@ -240,7 +241,9 @@ object8 func a b c d e f g h =
 -- |     grades : Decoder (List (String, Int))
 -- |     grades =
 -- |         keyValuePairs int
-keyValuePairs :: forall a. Decoder a -> Decoder (List (Tuple String a))
+-- |
+-- | The container for the return type is polymorphic in order to accommodate `List` or `Array`, among others.
+keyValuePairs :: forall f a. (Monoid (f (Tuple String a)), Applicative f) => Decoder a -> Decoder (f (Tuple String a))
 keyValuePairs (Decoder decoder) =
     Decoder $ \val -> do
         ks <- keys val
@@ -249,7 +252,7 @@ keyValuePairs (Decoder decoder) =
             d <- decoder p
             pure $ Tuple key d
         ) ks
-        pure $ Data.List.fromFoldable arr
+        pure $ foldMap pure arr
 
 
 -- | Get an array of the keys defined on a foreign value.
