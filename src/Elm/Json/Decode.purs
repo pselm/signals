@@ -303,7 +303,7 @@ dict decoder =
 -- | among others.
 oneOf :: forall f a. (Foldable f) => f (Decoder a) -> Decoder a
 oneOf decoders =
-    foldl alt (fail "No decoders provided to oneOf") decoders
+    foldl alt (fail "Expected one of: ") decoders
 
 
 -- | Extract any value with an `IsForeign` instance.
