@@ -198,6 +198,8 @@ pair genA genB =
 -- |     intPairs : Generator (List (Int, Int))
 -- |     intPairs =
 -- |         list 10 <| pair (int 0 100) (int 0 100)
+-- |
+-- | The return type is polymorphic in order to accommodate `List` or `Array`, among others.
 list :: forall t a. (Monoid (t a), Applicative t) => Int -> Generator a -> Generator (t a)
 list n (Generator gen) =
     Generator $ \seed ->
