@@ -9,6 +9,7 @@ module Elm.Dict
     , Dict, get, remove, update
     , intersect, diff, filter, partition
     , map, foldl, foldr
+    , toUnfoldable
     ) where
 
 
@@ -18,7 +19,7 @@ import Data.Map
     ( empty, isEmpty, size
     , member
     , singleton, insert 
-    , toList, fromList
+    , toList, fromList, fromFoldable
     , keys, values
     , union
     ) as Virtual
@@ -26,10 +27,11 @@ import Data.Map
 
 -- Internal
 
-import Prelude (class Ord, flip)
+import Prelude (class Ord, flip, (>>>))
 import Data.Map (Map, lookup, alter, delete, member, insert, empty, toList, fromList)
-import Elm.Maybe (Maybe)
-import Elm.List (List)
+import Data.Unfoldable (class Unfoldable)
+import Data.Maybe (Maybe)
+import Data.List (List)
 import Data.Tuple (Tuple(..))
 
 
@@ -167,3 +169,13 @@ foldr f acc dict =
     in
         Elm.List.foldr folder acc tuples
 
+
+-- | Produce a `Dict` from any `Unfoldable` container of tuples of keys
+-- | and values. Defined polymorphically to accommodate Purescript `Array`,
+-- | among others.
+-- |
+-- | Note that this is not in the Elm API.
+toUnfoldable :: forall f k v. (Ord k, Unfoldable f) => Dict k v -> f (Tuple k v) 
+toUnfoldable =
+    -- There is probably a more efficient method ...
+    toList >>> Data.List.toUnfoldable

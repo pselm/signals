@@ -52,7 +52,9 @@ tests = test "Elm.Dict\n" do
         assertEqual "update remove" Dict.empty (Dict.update "k" (\v -> Nothing) (Dict.singleton "k" "v"))
         assertEqual "remove" Dict.empty (Dict.remove "k" (Dict.singleton "k" "v"))
         assertEqual "remove not found" (Dict.singleton "k" "v") (Dict.remove "kk" (Dict.singleton "k" "v"))
-    
+        assertEqual "fromFoldable" (Dict.fromList ("k" := "v" : "k2" := "v2" : Nil)) (Dict.fromFoldable ["k" := "v", "k2" := "v2"])
+        assertEqual "toUnfoldable" (Dict.toUnfoldable animals) [Tuple "Jerry" "mouse", Tuple "Tom" "cat"]
+
     test "Dict.query Tests" do
         assertEqual "member 1" true (Dict.member "Tom" animals)
         assertEqual "member 2" false (Dict.member "Spike" animals)
