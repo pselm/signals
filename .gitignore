@@ -5,3 +5,7 @@
 /src/.webpack.js
 *.notyet
 **/.DS_Store
+/.pulp-cache
+/tmp
+/elm-stuff
+/elm-package.json

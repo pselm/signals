@@ -15,7 +15,7 @@ module Elm.Json.Decode
     , decodeString, decodeValue
     , extractForeign
     , string, int, float, bool, null
-    , list, array
+    , list, array, unfoldable
     , tuple1, tuple2, tuple3, tuple4, tuple5, tuple6, tuple7, tuple8
     , field, (:=), at
     , object1, object2, object3, object4, object5, object6, object7, object8
@@ -36,6 +36,7 @@ import Data.Foreign.Index (prop)
 import Data.Traversable (traverse)
 import Data.Monoid (class Monoid)
 import Data.Foldable (class Foldable, foldl, foldMap)
+import Data.Unfoldable (class Unfoldable, unfoldr)
 import Elm.Json.Encode (Value)
 import Control.Apply (lift2, lift3, lift4, lift5)
 import Control.Alt (class Alt, alt)
@@ -47,6 +48,7 @@ import Elm.List (List(..), foldr)
 import Elm.Dict (Dict)
 import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..))
+import Data.Array (uncons)
 
 import Prelude
     ( class Functor, map
@@ -378,11 +380,30 @@ list (Decoder decoder) =
 -- |     numbers : Decoder (Array Int)
 -- |     numbers =
 -- |         array int
-array :: forall a. Decoder a -> Decoder (Elm.Array.Array a)
-array (Decoder decoder) =
+-- |
+-- | The return type is polymorphic to accommodate `Array` and `Elm.Array`,
+-- | among others.
+array :: forall f a. (Unfoldable f) => Decoder a -> Decoder (f a)
+array = unfoldable
+
+
+-- | Extract any `Unfoldable` from a JS array.
+-- |
+-- |     -- [1,2,3,4]
+-- |
+-- |     numbers : Decoder (Array Int)
+-- |     numbers =
+-- |         unfoldable int
+-- |
+-- | Note that this is not part of the Elm API.
+unfoldable :: forall f a. (Unfoldable f) => Decoder a -> Decoder (f a)
+unfoldable (Decoder decoder) =
     Decoder $ \val -> do
         arr <- toResult $ readArray val
-        Data.Sequence.fromFoldable <$> traverse decoder arr
+        decoded <- traverse decoder arr
+        pure $ unfoldr
+            (\a -> map (\b -> Tuple b.head b.tail) (uncons a))
+            decoded
 
 
 -- | Decode null as the value given, and fail otherwise. Primarily useful for
