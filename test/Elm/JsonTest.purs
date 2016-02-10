@@ -6,10 +6,13 @@ import Test.Unit.Assert (equal)
 import Elm.Json.Encode as JE
 import Elm.Json.Decode as JD
 import Elm.Json.Decode ((:=))
-import Prelude (class Show, show, bind, class Eq, flip, negate, (++), ($), (+))
 import Data.List (List(..), (:))
 import Data.Foldable (traverse_)
-import Control.Alt ((<|>))
+import Control.Alt (class Alt, alt, (<|>))
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Random (RANDOM)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Console (CONSOLE)
 import Elm.Result (Result(..), toMaybe)
 import Elm.Basics (Float)
 import Data.Tuple (Tuple(..))
@@ -17,6 +20,24 @@ import Data.Maybe (Maybe(..))
 import Math (sqrt)
 import Global (infinity, nan)
 import Data.Generic (class Generic, gEq, gShow)
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
+import Test.QuickCheck.Laws.Data.Functor (checkFunctor)
+import Test.QuickCheck.Laws.Control.Alt (checkAlt)
+import Test.QuickCheck.Laws.Control.Apply (checkApply)
+import Test.QuickCheck.Laws.Control.Applicative (checkApplicative)
+import Test.QuickCheck.Laws.Control.Bind (checkBind)
+import Test.QuickCheck.Laws.Control.Monad (checkMonad)
+import Type.Proxy (Proxy2(..))
+
+import Prelude
+    ( class Show, show
+    , class Monad, class Bind, bind
+    , class Eq, (==)
+    , class Functor, map
+    , class Apply, apply
+    , class Applicative, pure
+    , flip, negate, (++), ($), (+), (<<<)
+    )
 
 
 infixl 9 equals as ===
@@ -70,7 +91,7 @@ instance eqShape :: Eq Shape where
 -- TODO: The docs for Elm.Json.Encode.float say that infinity and NaN
 -- are encoded as null ... should test that.
 
-tests :: forall e. TestUnit e
+tests :: forall e. TestUnit (random :: RANDOM, err :: EXCEPTION, console :: CONSOLE | e)
 tests = test "Elm.Json\n" do
     test "encode object with scalar types" do
         let
@@ -524,3 +545,69 @@ tests = test "Elm.Json\n" do
             , "{}" ==> Nothing
             , "[17.5, 18]" ==> Nothing
             ]
+
+    liftEff do
+        checkFunctor proxyDecoder
+        checkAlt proxyDecoder
+        checkApply proxyDecoder
+        checkApplicative proxyDecoder
+        checkBind proxyDecoder
+        checkMonad proxyDecoder
+
+
+-- We test the laws via a newtype, in order to avoid making spurious
+-- Eq and Arbitrary instances for JD.Decoder. (And, since we can't
+-- do orphan instances).
+newtype DecoderLaws a = DecoderLaws (JD.Decoder a)
+
+
+instance functorDecoderLaws :: Functor DecoderLaws where
+    map func (DecoderLaws decoder) = DecoderLaws $ map func decoder
+
+
+instance altDecoderLaws :: Alt DecoderLaws where
+    alt (DecoderLaws left) (DecoderLaws right) = DecoderLaws $ alt left right
+
+
+instance applyDecoderLaws :: Apply DecoderLaws where
+    apply (DecoderLaws func) (DecoderLaws decoder) = DecoderLaws $ apply func decoder
+
+
+instance applicativeDecoderLaws :: Applicative DecoderLaws where
+    pure = DecoderLaws <<< pure
+
+
+instance bindDecoderLaws :: Bind DecoderLaws where
+    bind (DecoderLaws decoder) func =
+        DecoderLaws $ bind decoder
+            \a -> case func a of
+                DecoderLaws x -> x
+
+
+instance monadDecoderLaws :: Monad DecoderLaws
+
+
+-- This is even more arbitrary than usual ...
+instance arbitraryDecoderLawsA :: (Arbitrary a) => Arbitrary (DecoderLaws a) where
+    arbitrary = do
+        a <- arbitrary
+        b <- arbitrary
+        c <- arbitrary
+
+        pure $ DecoderLaws
+            if a
+               then JD.succeed b
+               else JD.fail c
+
+
+-- Given that our arbitrary instance doesn't depend on what we're decoding, we
+-- compare decoders by running them on null data. Hopefully this is still
+-- testing something real, since the instances we're testing only depend on
+-- the *composition* of the results.
+instance eqDecoderLawsA :: (Eq a) => Eq (DecoderLaws a) where
+    eq (DecoderLaws a) (DecoderLaws b) =
+        JD.decodeValue a JE.null == JD.decodeValue b JE.null
+
+
+proxyDecoder :: Proxy2 DecoderLaws
+proxyDecoder = Proxy2
