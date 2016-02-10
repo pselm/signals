@@ -161,9 +161,10 @@ tests = test "Elm.Json\n" do
             elmArray :: Data.Sequence.Seq JE.Value
             elmArray = Data.Sequence.fromFoldable values
 
-        JE.encode 0 (JE.psArray values) === """["Joe",37]"""
-        JE.encode 0 (JE.list listOfValues) === """["Joe",37]"""
+        JE.encode 0 (JE.array values) === """["Joe",37]"""
+        JE.encode 0 (JE.array listOfValues) === """["Joe",37]"""
         JE.encode 0 (JE.array elmArray) === """["Joe",37]"""
+        JE.encode 0 (JE.list listOfValues) === """["Joe",37]"""
 
 
     test "decode Int" $

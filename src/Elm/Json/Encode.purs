@@ -10,7 +10,7 @@ module Elm.Json.Encode
     ( Value
     , encode
     , string, int, float, bool, null
-    , list, array, psArray
+    , list, array
     , object
     ) where
 
@@ -19,9 +19,9 @@ import Data.Foreign (Foreign, toForeign)
 import Data.List (List)
 import Data.Tuple (Tuple)
 import Elm.Basics (Float, Bool)
-import Data.Foldable (class Foldable)
-import Prelude ((<<<))
-import Elm.Array as ElmArray
+import Data.Foldable (class Foldable, foldl)
+import Prelude ((<<<), flip)
+import Data.Array (cons, reverse)
 
 
 -- | Represents a JavaScript value.
@@ -88,9 +88,10 @@ psArray :: Array Value -> Value
 psArray = toForeign
 
 
--- | Encode Elm's `Array` type.
-array :: ElmArray.Array Value -> Value
-array = psArray <<< Data.Sequence.toUnfoldable
+-- | Encode an array type. Uses a polymorphic type in order to accommodate
+-- | Purescript `Array` and `Elm.Array`, among others.
+array :: forall f. (Foldable f) => f Value -> Value
+array = psArray <<< reverse <<< foldl (flip cons) []
 
 
 -- | Encode a `List`.
