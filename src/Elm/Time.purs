@@ -7,7 +7,7 @@ module Elm.Time
     , millisecond, second, minute, hour
     , inMilliseconds, inSeconds, inMinutes, inHours
     , fps, fpsWhen, every
-    -- , delay, since
+    , delay --, since
     ) where
 
 
@@ -28,8 +28,8 @@ import Elm.Basics (Float, Bool)
 import Data.Int (round)
 import Data.Maybe (Maybe(..))
 import Data.Date (Now, nowEpochMilliseconds)
-import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=))
-import Control.Monad.Eff.Timer (TIMER, Interval, interval, clearInterval)
+import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=), void)
+import Control.Monad.Eff.Timer (TIMER, Interval, interval, clearInterval, timeout)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
@@ -198,3 +198,25 @@ every t = do
 
     pure mbox.signal
 
+
+-- | Delay a signal by a certain amount of time. So `(delay second Mouse.clicks)`
+-- | will update one second later than any mouse click.
+delay :: 
+    forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) =>
+    Time -> Signal a -> GraphState m (Signal a)
+
+delay period signal = do
+    current <- liftEff $ current signal 
+    mbox <- mailbox current
+
+    let
+        millis =
+            round period
+
+        react a =
+            void $ timeout millis do
+                send mbox.address a
+
+    output "delay" react signal
+
+    pure mbox.signal
