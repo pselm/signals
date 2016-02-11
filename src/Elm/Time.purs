@@ -7,7 +7,7 @@ module Elm.Time
     , millisecond, second, minute, hour
     , inMilliseconds, inSeconds, inMinutes, inHours
     , fps, fpsWhen, every
-    , delay --, since
+    , delay, since
     ) where
 
 
@@ -28,12 +28,12 @@ import Elm.Basics (Float, Bool)
 import Data.Int (round)
 import Data.Maybe (Maybe(..))
 import Data.Date (Now, nowEpochMilliseconds)
-import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=), void)
+import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=), void, const, negate, (+), (/=))
 import Control.Monad.Eff.Timer (TIMER, Interval, interval, clearInterval, timeout)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
-import Elm.Signal (Signal, dropRepeats, send, mailbox, constant, current, output, DELAY, GraphState)
+import Elm.Signal (Signal, dropRepeats, send, mailbox, constant, current, output, foldp, merge, DELAY, GraphState)
 
 
 -- | Type alias to make it clearer when you are working with time values.
@@ -220,3 +220,18 @@ delay period signal = do
     output "delay" react signal
 
     pure mbox.signal
+
+
+-- | Takes a time `t` and any signal. The resulting boolean signal is true for
+-- | time `t` after every event on the input signal. So ``(second `since`
+-- | Mouse.clicks)`` would result in a signal that is true for one second after
+-- | each mouse click and false otherwise.
+since ::
+    forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) =>
+    Time -> Signal a -> GraphState m (Signal Bool)
+
+since time signal = do
+    start <- Elm.Signal.map (const 1) signal
+    stop <- (delay time signal) >>= Elm.Signal.map (const (-1))
+    delaydiff <- merge start stop >>= foldp (+) 0 
+    Elm.Signal.map ((/=) 0) delaydiff
