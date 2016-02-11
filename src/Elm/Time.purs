@@ -6,8 +6,7 @@ module Elm.Time
     , Time, toTime, fromTime
     , millisecond, second, minute, hour
     , inMilliseconds, inSeconds, inMinutes, inHours
-    , every
-    --, fps, fpsWhen, every
+    , fps, fpsWhen, every
     --, timestamp, delay, since
     ) where
 
@@ -26,14 +25,16 @@ import Data.Time
     , class TimeValue, toMilliseconds, fromMilliseconds
     )
 
+import Elm.Basics (Float, Bool)
 import Data.Int (round)
+import Data.Maybe (Maybe(..))
 import Data.Date (Now, nowEpochMilliseconds)
-import Prelude ((/), flip, id, ($), (<<<), bind, pure)
-import Control.Monad.Eff.Timer (TIMER, interval)
-import Control.Monad.Eff.Ref (REF)
+import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=))
+import Control.Monad.Eff.Timer (TIMER, Interval, interval, clearInterval)
+import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
-import Elm.Signal (Signal, send, mailbox, DELAY, GraphState)
+import Elm.Signal (Signal, dropRepeats, send, mailbox, constant, current, output, DELAY, GraphState)
 
 
 -- | Type alias to make it clearer when you are working with time values.
@@ -97,6 +98,89 @@ inMinutes = divBy minute
 
 inHours :: Time -> Number
 inHours = divBy hour
+
+
+-- | Takes desired number of frames per second (FPS). The resulting signal
+-- | gives a sequence of time deltas as quickly as possible until it reaches
+-- | the desired FPS. A time delta is the time between the last frame and the
+-- | current frame.
+fps ::
+    forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) m) =>
+    Float -> GraphState m (Signal Time)
+
+fps targetFrames =
+    constant true >>= fpsWhen targetFrames
+
+
+-- | Same as the `fps` function, but you can turn it on and off. Allows you
+-- | to do brief animations based on user input without major inefficiencies.
+-- | The first time delta after a pause is always zero, no matter how long
+-- | the pause was. This way summing the deltas will actually give the amount
+-- | of time that the output signal has been running.
+fpsWhen ::
+    forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) m) =>
+    Float -> Signal Bool -> GraphState m (Signal Time)
+
+fpsWhen desiredFPS isOn = do
+    -- TODO: This is not particularly elegant.
+    now <- liftEff nowEpochMilliseconds
+    mbox <- mailbox 0.0
+    changes <- dropRepeats isOn
+
+
+    -- The initial state
+    state <- liftEff $ newRef
+        { lastTriggered: now
+        , interval: Nothing :: Maybe Interval
+        }
+
+    let
+        -- TODO: We could keep a fractional component and adjust ...
+        msPerFrame =
+            round $ 1000.0 / desiredFPS
+
+        -- This will be called when an interval triggers
+        onInterval = do
+            currentTime <- nowEpochMilliseconds
+            s <- readRef state
+            send mbox.address $ toTime (currentTime - s.lastTriggered)
+            writeRef state $ s {lastTriggered = currentTime}
+
+        -- This will be called once at startup, at then whenever isOn changes,
+        -- with the value of isOn
+        onChange = \on -> do
+            currentTime <- nowEpochMilliseconds
+            s <- readRef state
+
+            if on
+                then do
+                    -- We always start up again with 0.0
+                    send mbox.address 0.0
+
+                    i <- interval msPerFrame onInterval 
+                    writeRef state
+                        { lastTriggered : currentTime
+                        , interval : Just i
+                        }
+
+                else do
+                    case s.interval of
+                        Just i ->
+                            clearInterval i
+
+                        Nothing ->
+                            pure unit
+
+                    writeRef state $ s {interval = Nothing}
+
+    -- Hook up our handler
+    handleChanges <- output "fpsWhenChanges" onChange changes 
+
+    -- Kick off the first "change"
+    liftEff $ current isOn >>= onChange
+
+    -- And return the signal
+    pure mbox.signal
 
 
 -- | Takes a time interval `t`. The resulting signal is the current time, updated

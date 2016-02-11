@@ -1,8 +1,8 @@
-module Examples.TimeExample where
+module Examples.Time.FPS where
 
 
 import Elm.Signal (DELAY, setup, runSignal)
-import Elm.Time (every)
+import Elm.Time (fps)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (log)
 import Control.Monad.Eff.Ref (REF)
@@ -19,7 +19,7 @@ main =
             logger time =
                 log (show time)
 
-        timer <- every 5000.0
+        timer <- fps 1.0 
         runner <- Elm.Signal.map logger timer
         runSignal runner
 
