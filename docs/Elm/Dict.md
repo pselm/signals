@@ -116,6 +116,18 @@ foldr :: forall k v b. (Ord k) => (k -> v -> b -> b) -> b -> Dict k v -> b
 Fold over the key-value pairs in a dictionary, in order from highest
 key to lowest key.
 
+#### `toUnfoldable`
+
+``` purescript
+toUnfoldable :: forall f k v. (Ord k, Unfoldable f) => Dict k v -> f (Tuple k v)
+```
+
+Produce a `Dict` from any `Unfoldable` container of tuples of keys
+and values. Defined polymorphically to accommodate Purescript `Array`,
+among others.
+
+Note that this is not in the Elm API.
+
 
 ### Re-exported from Data.Map:
 
@@ -126,6 +138,15 @@ empty :: forall k v. Map k v
 ```
 
 An empty map
+
+#### `fromFoldable`
+
+``` purescript
+fromFoldable :: forall f k v. (Ord k, Foldable f) => f (Tuple k v) -> Map k v
+```
+
+Convert any foldable collection of key/value pairs to a map.
+On key collision, later values take precedence over earlier ones.
 
 #### `fromList`
 

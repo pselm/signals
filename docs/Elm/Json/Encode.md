@@ -90,21 +90,14 @@ Encode a JSON object.
 The signature uses `Foldable` in order to work with `List` or
 `Array`, amongst others.
 
-#### `psArray`
-
-``` purescript
-psArray :: Array Value -> Value
-```
-
-Encode Purescript's primitive `Array` type (distinct from Elm's `Array`).
-
 #### `array`
 
 ``` purescript
-array :: Array Value -> Value
+array :: forall f. (Foldable f) => f Value -> Value
 ```
 
-Encode Elm's `Array` type.
+Encode an array type. Uses a polymorphic type in order to accommodate
+Purescript `Array` and `Elm.Array`, among others.
 
 #### `list`
 

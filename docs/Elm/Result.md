@@ -41,6 +41,8 @@ Traversable (Result a)
 Bitraversable Result
 (Semiring b) => Semiring (Result a b)
 (Semigroup b) => Semigroup (Result a b)
+(Arbitrary a, Arbitrary b) => Arbitrary (Result a b)
+(Coarbitrary a, Coarbitrary b) => Coarbitrary (Result a b)
 ```
 
 #### `withDefault`

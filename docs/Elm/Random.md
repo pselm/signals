@@ -114,6 +114,8 @@ Create a list of random values.
     intPairs =
         list 10 <| pair (int 0 100) (int 0 100)
 
+The return type is polymorphic in order to accommodate `List` or `Array`, among others.
+
 #### `Generator`
 
 ``` purescript

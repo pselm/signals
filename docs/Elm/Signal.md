@@ -4,6 +4,22 @@ A *signal* is a value that changes over time.
 
 TODO: Notes about usage.
 
+#### `Graph`
+
+``` purescript
+newtype Graph
+```
+
+A representation of the entirety of the signal graph. Among other things,
+
+#### `GraphState`
+
+``` purescript
+type GraphState m a = StateT Graph m a
+```
+
+A computational context that tracks the state of the signal graph
+
 #### `setup`
 
 ``` purescript
@@ -48,6 +64,12 @@ to pass a combination of signals and normal values to a function:
 
     map3 view Window.dimensions Mouse.position (constant initialModel)
 
+#### `output`
+
+``` purescript
+output :: forall e1 e2 m a. (MonadEff (ref :: REF | e1) m) => String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
+```
+
 #### `foldp`
 
 ``` purescript
@@ -73,6 +95,20 @@ Note: The behavior of the outgoing signal is not influenced at all by
 the initial value of the incoming signal, only by updates occurring on
 the latter. So the initial value of `sig` is completely ignored in
 `foldp f s sig`.
+
+#### `timestamp`
+
+``` purescript
+timestamp :: forall e m a. (MonadEff (ref :: REF | e) m) => Signal a -> GraphState m (Signal (Tuple Time a))
+```
+
+Add a timestamp to any signal. Timestamps increase monotonically. When you
+create `(timestamp Mouse.x)`, an initial timestamp is produced. The timestamp
+updates whenever `Mouse.x` updates.
+
+Timestamp updates are tied to individual events, so `(timestamp Mouse.x)` and
+`(timestamp Mouse.y)` will always have the same timestamp because they rely on
+the same underlying event (`Mouse.position`).
 
 #### `filter`
 
@@ -356,5 +392,13 @@ delay applying `current` in some cases to get the results you expect.
 ``` purescript
 data DELAY :: !
 ```
+
+#### `runSignal`
+
+``` purescript
+runSignal :: forall e1 e2 m. (MonadEff (ref :: REF | e1) m) => Signal (Eff e2 Unit) -> GraphState m Unit
+```
+
+Execute each effect as it arrives on a Signal.
 
 

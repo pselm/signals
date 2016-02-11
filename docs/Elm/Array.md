@@ -70,13 +70,16 @@ Note that this actually works with any type that is both a
 #### `toIndexedList`
 
 ``` purescript
-toIndexedList :: forall a. Array a -> List (Tuple Int a)
+toIndexedList :: forall f a. (Applicative f, Monoid (f (Tuple Int a))) => Array a -> f (Tuple Int a)
 ```
 
 Create an indexed list from an array. Each element of the array will be
 paired with its index.
 
     toIndexedList (fromList ["cat","dog"]) == [(0,"cat"), (1,"dog")]
+
+The container in the return type is defined polymorphically to accommodate
+`List` and Purescript's `Array`, among others.
 
 #### `indexedMap`
 

@@ -177,7 +177,7 @@ object8 :: forall a b c d e f g h value. (a -> b -> c -> d -> e -> f -> g -> h -
 #### `keyValuePairs`
 
 ``` purescript
-keyValuePairs :: forall a. Decoder a -> Decoder (List (Tuple String a))
+keyValuePairs :: forall f a. (Monoid (f (Tuple String a)), Applicative f) => Decoder a -> Decoder (f (Tuple String a))
 ```
 
 Turn any object into a list of key-value pairs, including inherited enumerable properties. Fails if _any_ value can't be
@@ -187,6 +187,8 @@ decoded with the given decoder.
     grades : Decoder (List (String, Int))
     grades =
         keyValuePairs int
+
+The container for the return type is polymorphic in order to accommodate `List` or `Array`, among others.
 
 #### `dict`
 
@@ -205,7 +207,7 @@ decoded with the given decoder.
 #### `oneOf`
 
 ``` purescript
-oneOf :: forall a. List (Decoder a) -> Decoder a
+oneOf :: forall f a. (Foldable f) => f (Decoder a) -> Decoder a
 ```
 
 Try out multiple different decoders. This is helpful when you are dealing
@@ -224,6 +226,19 @@ narrow things down so you can be more targeted.
         [ tuple2 (,) float float
         , object2 (,) ("x" := float) ("y" := float)
         ]
+
+The container has a polymorphic type to accommodate `List` or `Array`,
+among others.
+
+#### `extractForeign`
+
+``` purescript
+extractForeign :: forall a. (IsForeign a) => Decoder a
+```
+
+Extract any value with an `IsForeign` instance.
+
+Note that this is not in the Elm API.
 
 #### `string`
 
@@ -298,7 +313,7 @@ Extract a List from a JS array.
 #### `array`
 
 ``` purescript
-array :: forall a. Decoder a -> Decoder (Array a)
+array :: forall f a. (Unfoldable f) => Decoder a -> Decoder (f a)
 ```
 
 Extract an Array from a JS array.
@@ -308,6 +323,25 @@ Extract an Array from a JS array.
     numbers : Decoder (Array Int)
     numbers =
         array int
+
+The return type is polymorphic to accommodate `Array` and `Elm.Array`,
+among others.
+
+#### `unfoldable`
+
+``` purescript
+unfoldable :: forall f a. (Unfoldable f) => Decoder a -> Decoder (f a)
+```
+
+Extract any `Unfoldable` from a JS array.
+
+    -- [1,2,3,4]
+
+    numbers : Decoder (Array Int)
+    numbers =
+        unfoldable int
+
+Note that this is not part of the Elm API.
 
 #### `null`
 
