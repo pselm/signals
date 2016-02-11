@@ -33,7 +33,7 @@ import Prelude
     ( class Functor, (<$>)
     , class Apply, pure
     , class Applicative, (<*>)
-    , class Bind, class Monad
+    , class Bind, class Monad, bind
     , class Semiring, (++), one, zero, add
     , class Semigroup, append, mul
     , class Bounded, top, bottom
@@ -50,7 +50,7 @@ import Data.Bitraversable (class Bitraversable)
 import Data.Foldable (class Foldable)
 import Data.Monoid (mempty)
 import Data.Traversable (class Traversable)
-
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
 import Elm.Maybe (Maybe (Just, Nothing))
 
 
@@ -206,3 +206,14 @@ instance semiringResult :: (Semiring b) => Semiring (Result a b) where
 
 instance semigroupResult :: (Semigroup b) => Semigroup (Result a b) where
     append x y = append <$> x <*> y
+
+instance arbitraryResult :: (Arbitrary a, Arbitrary b) => Arbitrary (Result a b) where
+    arbitrary = do
+        b <- arbitrary
+        if b
+            then Err <$> arbitrary
+            else Ok <$> arbitrary
+
+instance coarbitraryResult :: (Coarbitrary a, Coarbitrary b) => Coarbitrary (Result a b) where
+    coarbitrary (Err a) = coarbitrary a
+    coarbitrary (Ok b) = coarbitrary b

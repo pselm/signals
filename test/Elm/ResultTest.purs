@@ -9,6 +9,25 @@ import Prelude (bind)
 import Elm.Basics ((<|), (==), (+), (%), (++))
 import Elm.Maybe (Maybe(..))
 
+import Control.Monad.Eff.Random (RANDOM)
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Console (CONSOLE)
+
+import Test.QuickCheck.Laws.Data.Functor (checkFunctor)
+import Test.QuickCheck.Laws.Control.Apply (checkApply)
+import Test.QuickCheck.Laws.Control.Applicative (checkApplicative)
+import Test.QuickCheck.Laws.Control.Alt (checkAlt)
+import Test.QuickCheck.Laws.Control.Bind (checkBind)
+import Test.QuickCheck.Laws.Control.Monad (checkMonad)
+import Test.QuickCheck.Laws.Control.Extend(checkExtend)
+import Test.QuickCheck.Laws.Data.Eq (checkEq)
+import Test.QuickCheck.Laws.Data.Ord (checkOrd)
+import Test.QuickCheck.Laws.Data.Bounded (checkBounded)
+import Test.QuickCheck.Laws.Data.Semigroup (checkSemigroup)
+import Test.QuickCheck.Laws (A, B, C)
+import Type.Proxy (Proxy(..), Proxy2(..))
+
 
 assertEqual :: forall e. String -> Result String Int -> Result String Int -> Assertion e
 assertEqual name expected actual =
@@ -42,7 +61,7 @@ add5 a b c d e =
     a + b + c + d + e
 
 
-tests :: forall e. TestUnit e
+tests :: forall e. TestUnit (random :: RANDOM, err :: EXCEPTION, console :: CONSOLE | e)
 tests = test "Elm.Result\n" do
     test "Result.map" do
         assertEqual "map Ok"  (Ok 3)        (Result.map ((+) 1) (Ok 2))
@@ -87,3 +106,23 @@ tests = test "Elm.Result\n" do
     test "Result.fromMaybe" do
         assertEqual "Ok"  (Result.fromMaybe "bad" (Just 27)) (Ok 27)
         assertEqual "Err" (Result.fromMaybe "bad" (Nothing)) (Err "bad")
+
+    liftEff do
+        checkFunctor prx2Result
+        checkApply prx2Result
+        checkApplicative prx2Result
+        checkAlt prx2Result
+        checkBind prx2Result
+        checkMonad prx2Result
+        checkExtend prx2Result
+        checkEq prxResult
+        checkOrd prxResult
+        checkBounded prxResult
+        checkSemigroup prxResult
+
+
+prxResult :: Proxy (Result A B)
+prxResult = Proxy
+
+prx2Result :: Proxy2 (Result C)
+prx2Result = Proxy2
