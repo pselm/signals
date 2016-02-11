@@ -32,14 +32,14 @@ module Elm.Signal
 
 import Prelude
     ( class Eq, class Monad, Unit, unit, ($), (++), bind, (+)
-    , pure, (==), (/=), (&&), (||), const, (<<<), id
+    , pure, (==), (/=), (&&), (||), const, id
     )
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
-import Control.Monad.Eff.Console (error, CONSOLE)
+import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef, modifyRef, newRef)
 import Control.Monad.State.Trans (StateT, evalStateT)
 import Control.Monad.State.Class (gets, modify)
@@ -1121,30 +1121,30 @@ newtype Address a =
 {- Updates the current value of the specified input `Signal`, and then broadcasts the
 update throughout the signal graph.
 -}
-notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: Now, console :: CONSOLE | e) Unit
+notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: Now, console :: CONSOLE, delay :: DELAY | e) Unit
 notify (Signal signal) value = do
-    -- Check for synchronous calls .... I suppose we could
-    -- short-circuit and retry on the next tick?
     updateInProgress <- readRef signal.updateInProgress
-    when updateInProgress $ error "The notify function has been called synchronously!"
+    
+    if updateInProgress
+        then delay 0 $ notify (Signal signal) value 
+        else do
+            -- Indicate we're in progress
+            writeRef signal.updateInProgress true
 
-    -- Indicate we're in progress
-    writeRef signal.updateInProgress true
+            -- Actually update the target signal's value
+            writeRef signal.value value
 
-    -- Actually update the target signal's value
-    writeRef signal.value value
+            -- Notify all the inputs
+            timestep <- nowEpochMilliseconds
+            inputs <- readRef signal.inputs
 
-    -- Notify all the inputs
-    timestep <- nowEpochMilliseconds
-    inputs <- readRef signal.inputs
+            foreachE inputs (
+                runExists \(Signal node') ->
+                    broadcastToKids timestep (signal.id == node'.id) (Signal node')
+            )
 
-    foreachE inputs (
-        runExists \(Signal node') ->
-            broadcastToKids timestep (signal.id == node'.id) (Signal node')
-    )
-
-    -- Stop checking for synchronous calls
-    writeRef signal.updateInProgress false
+            -- Stop checking for synchronous calls
+            writeRef signal.updateInProgress false
 
 
 -- | Create a mailbox you can send messages to. The primary use case is
@@ -1159,7 +1159,7 @@ mailbox base = do
 
     pure
         { signal: signal
-        , address: Address (delay 0 <<< notify signal)
+        , address: Address (notify signal)
         }
 
 
