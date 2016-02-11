@@ -528,6 +528,13 @@ toTime :: Milliseconds -> Time
 toTime (Milliseconds millis) = millis
 
 
+-- | Add a timestamp to any signal. Timestamps increase monotonically. When you
+-- | create `(timestamp Mouse.x)`, an initial timestamp is produced. The timestamp
+-- | updates whenever `Mouse.x` updates.
+-- |
+-- | Timestamp updates are tied to individual events, so `(timestamp Mouse.x)` and
+-- | `(timestamp Mouse.y)` will always have the same timestamp because they rely on
+-- | the same underlying event (`Mouse.position`).
 timestamp ::
     forall e m a. (MonadEff (ref :: REF | e) m) =>
     Signal a -> GraphState m (Signal (Tuple Time a))

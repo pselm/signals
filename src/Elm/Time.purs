@@ -7,15 +7,14 @@ module Elm.Time
     , millisecond, second, minute, hour
     , inMilliseconds, inSeconds, inMinutes, inHours
     , fps, fpsWhen, every
-    --, timestamp, delay, since
+    -- , delay, since
     ) where
 
 
 -- For re-export
 
-import Data.Time
-    ( class TimeValue
-    ) as Virtual
+import Data.Time (class TimeValue) as Virtual
+import Elm.Signal (timestamp) as Virtual
 
 
 -- Internal
