@@ -53,8 +53,9 @@ import Prelude
     , (||), (&&)
     , class Ring, negate, not, zero
     , class Show, show
-    , class ModuloSemiring, class Semiring
+    , class ModuloSemiring
     , class Ord, Ordering
+    , class BooleanAlgebra
     )
 
 import Math (cos, sqrt, log, pi, sin, atan2)
@@ -149,7 +150,7 @@ infixl 7 mod as %
 -- |
 -- | Note that this is not the same as Purescript's `Prelude.mod` --
 -- | for that, see `Basics.rem`.
-mod :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
+mod :: forall a. (Ord a, ModuloSemiring a, Ring a) => a -> a -> a
 mod a b =
     let
         r :: a
@@ -218,7 +219,7 @@ type Order = Ordering
 
 
 -- | The exclusive-or operator. `True` if exactly one input is `True`.
-xor :: forall a. (Prelude.BooleanAlgebra a) => a -> a -> a
+xor :: forall a. (BooleanAlgebra a) => a -> a -> a
 xor a b =
     (a && not b) || (not a && b)
 
@@ -252,7 +253,7 @@ toFloat = Data.Int.toNumber
 -- | `not (isInfinite n || isNaN n)` evaluates to `True`.
 -- | 
 -- | Note that this is not equivalent to the negation of Javascript's `isFinite()`.
-isInfinite :: Float -> Boolean
+isInfinite :: Float -> Bool
 isInfinite n = 
     n == Global.infinity || n == (-Global.infinity)
 

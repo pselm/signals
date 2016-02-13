@@ -30,8 +30,9 @@ import Data.Map
 import Prelude (class Ord, flip, (>>>))
 import Data.Map (Map, lookup, alter, delete, member, insert, empty, toList, fromList)
 import Data.Unfoldable (class Unfoldable)
-import Data.Maybe (Maybe)
-import Data.List (List)
+import Elm.Maybe (Maybe)
+import Elm.List (List)
+import Elm.Basics (Bool)
 import Data.Tuple (Tuple(..))
 
 
@@ -87,7 +88,7 @@ diff t1 t2 =
 
 
 -- | Keep a key-value pair when it satisfies a predicate.
-filter :: forall k v. (Ord k) => (k -> v -> Boolean) -> Dict k v -> Dict k v
+filter :: forall k v. (Ord k) => (k -> v -> Bool) -> Dict k v -> Dict k v
 filter predicate =
     let
         add key value dict =
@@ -105,7 +106,7 @@ filter predicate =
 -- |
 -- | The result is a record of `{trues, falses}`, which is different from the Elm
 -- | version, which returns a `Tuple`.
-partition :: forall k v. (Ord k) => (k -> v -> Boolean) -> Dict k v -> {trues :: Dict k v, falses :: Dict k v}
+partition :: forall k v. (Ord k) => (k -> v -> Bool) -> Dict k v -> {trues :: Dict k v, falses :: Dict k v}
 partition predicate dict =
   let
       add key value pair =

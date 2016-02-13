@@ -36,7 +36,7 @@ import Control.Monad.Error.Class (throwError)
 import Prelude (Unit, unit, map, pure, (<<<), (>>=), const, ($))
 import Data.Either (Either(..), either)
 import Elm.Result (Result(..))
-import Data.Maybe (Maybe(..))
+import Elm.Maybe (Maybe(..))
 import Data.Int (round)
 
 

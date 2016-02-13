@@ -30,7 +30,6 @@ import Elm.Bind (andThen) as Virtual
 -- Internal
 
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.List (List(..))
 import Data.Foldable (class Foldable, foldl)
 
 

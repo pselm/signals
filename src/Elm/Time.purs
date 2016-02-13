@@ -26,7 +26,7 @@ import Data.Time
 
 import Elm.Basics (Float, Bool)
 import Data.Int (round)
-import Data.Maybe (Maybe(..))
+import Elm.Maybe (Maybe(..))
 import Data.Date (Now, nowEpochMilliseconds)
 import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=), void, const, negate, (+), (/=))
 import Control.Monad.Eff.Timer (TIMER, Interval, interval, clearInterval, timeout)
@@ -83,19 +83,19 @@ divBy :: Number -> Number -> Number
 divBy = flip (/)
 
 
-inMilliseconds :: Time -> Number
+inMilliseconds :: Time -> Float
 inMilliseconds = id
 
 
-inSeconds :: Time -> Number
+inSeconds :: Time -> Float
 inSeconds = divBy second
 
 
-inMinutes :: Time -> Number
+inMinutes :: Time -> Float
 inMinutes = divBy minute
 
 
-inHours :: Time -> Number
+inHours :: Time -> Float
 inHours = divBy hour
 
 

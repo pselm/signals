@@ -50,7 +50,7 @@ import Elm.Apply (map2)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Ord (max)
 import Data.Monoid (class Monoid, mempty)
-import Elm.Basics ((%))
+import Elm.Basics ((%), Bool, Float)
 import Elm.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, toNumber)
 
 
@@ -62,7 +62,7 @@ import Elm.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, toNumber
 -- |     coinFlip : Generator Flip
 -- |     coinFlip =
 -- |         map (\b -> if b then Heads else Tails) bool
-bool :: Generator Boolean
+bool :: Generator Bool
 bool =
     map ((==) 1) (int 0 1)
 
@@ -147,7 +147,7 @@ minInt = fromInt (-2147483648)
 -- |     probability : Generator Float
 -- |     probability =
 -- |         float 0 1
-float :: Number -> Number -> Generator Number
+float :: Float -> Float -> Generator Float
 float a b =
     Generator $ \seed ->
         let

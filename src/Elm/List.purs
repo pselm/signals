@@ -40,12 +40,13 @@ import Data.List
     )
 
 import Data.List.ZipList (ZipList(..), runZipList)
-import Data.Maybe (Maybe(..))
+import Elm.Maybe (Maybe(..))
 import Data.Foldable (foldr)
 import Data.Tuple (Tuple(..))
 import Data.Function (on)
 import Control.Apply (lift3, lift4, lift5)
-import Prelude (class Eq, class Semiring, class Ord, (-), ($), compare, Ordering, flip, (>))
+import Prelude (class Eq, class Semiring, class Ord, (-), ($), compare, flip, (>))
+import Elm.Basics (Order, Bool)
 
 
 infixr 5 cons as :
@@ -63,7 +64,7 @@ cons = Data.List.Cons
 -- |    isEmpty [] == True
 -- |
 -- | Equivalent to Purescript's `null`.
-isEmpty :: forall a. List a -> Boolean
+isEmpty :: forall a. List a -> Bool
 isEmpty = Data.List.null
 
 
@@ -71,7 +72,7 @@ isEmpty = Data.List.null
 -- | 
 -- |     member 9 [1,2,3,4] == False
 -- |     member 4 [1,2,3,4] == True
-member :: forall a. (Eq a) => a -> List a -> Boolean
+member :: forall a. (Eq a) => a -> List a -> Bool
 member x xs =
     case elemIndex x xs of
          Just _ -> true
@@ -122,7 +123,7 @@ filterMap = mapMaybe
 -- |
 -- | Note that the result is a record of `{trues, falses}`, whereas in Elm the result
 -- | was a `Tuple`.
-partition :: forall a. (a -> Boolean) -> List a -> { trues :: List a, falses :: List a }
+partition :: forall a. (a -> Bool) -> List a -> { trues :: List a, falses :: List a }
 partition pred list =
     foldr step { trues: Nil, falses: Nil } list 
         where
@@ -237,7 +238,7 @@ sortBy func =
 -- | to define any other: `sort == sortWith compare`
 -- |
 -- | Equivalent to Purescript's `sortBy`.
-sortWith :: forall a. (a -> a -> Ordering) -> List a -> List a
+sortWith :: forall a. (a -> a -> Order) -> List a -> List a
 sortWith = Data.List.sortBy
 
 

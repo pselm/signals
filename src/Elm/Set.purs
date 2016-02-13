@@ -31,6 +31,7 @@ import Prelude (class Ord, flip, (<<<))
 import Data.Set (Set, delete, difference, intersection, fromList, toList, insert, empty)
 import Data.Foldable (foldr)
 import Elm.Foldable (foldl)
+import Elm.Basics (Bool)
 
 
 -- | Remove a value from a set. If the value is not found, no changes are made.
@@ -62,7 +63,7 @@ map func set =
 
 
 -- | Create a new set consisting only of elements which satisfy a predicate.
-filter :: forall a. (Ord a) => (a -> Boolean) -> Set a -> Set a
+filter :: forall a. (Ord a) => (a -> Bool) -> Set a -> Set a
 filter func =
     fromList <<< Data.List.filter func <<< toList 
 
@@ -71,7 +72,7 @@ filter func =
 -- | predicate, the second consisting of elements which do not.
 -- |
 -- | Note that the result is a record of `{trues, falses}`, rather than a `Tuple`.
-partition :: forall a. (Ord a) => (a -> Boolean) -> Set a -> {trues :: Set a, falses :: Set a}
+partition :: forall a. (Ord a) => (a -> Bool) -> Set a -> {trues :: Set a, falses :: Set a}
 partition pred set =
     foldr step { trues: empty, falses: empty } set 
         where

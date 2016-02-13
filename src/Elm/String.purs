@@ -37,10 +37,10 @@ import Prelude (append) as Virtual
 
 import Data.String (null, fromCharArray, toCharArray, fromChar, length, take, drop)
 import Elm.Result (Result(..))
-import Elm.Basics (Bool, Float, (<|))
+import Elm.Basics (Bool, Float)
 import Elm.Char (isDigit)
-import Data.List (List())
-import Prelude ((++), (<<<), (>>>), (-), (/))
+import Elm.List (List)
+import Prelude ((++), (<<<), (>>>), (-), (/), ($))
 import Data.Foldable (class Foldable, mconcat)
 
 
@@ -76,7 +76,7 @@ concat = mconcat
 -- |     map (\c -> if c == '/' then '.' else c) "a/b/c" == "a.b.c"
 map :: (Char -> Char) -> String -> String
 map func string =
-    fromCharArray <|
+    fromCharArray $
         Prelude.map func (toCharArray string)
         
 
@@ -85,7 +85,7 @@ map func string =
 -- |     filter isDigit "R2-D2" == "22"
 filter :: (Char -> Bool) -> String -> String
 filter func string =
-    fromCharArray <|
+    fromCharArray $
         Data.Array.filter func (toCharArray string)
 
 
@@ -95,7 +95,7 @@ filter func string =
 reverse :: String -> String
 reverse string =
     -- It feels as though there should be a better way to do this
-    fromCharArray <|
+    fromCharArray $
         Data.Array.reverse (toCharArray string)
 
 
@@ -119,7 +119,7 @@ foreign import foldr :: forall b. (Char -> b -> b) -> b -> String -> b
 -- | Use [`Regex.split`](Regex#split) if you need something more flexible.
 split :: String -> String -> List String
 split sep s =
-    Data.List.toList <|
+    Data.List.toList $
         Data.String.split sep s 
 
 
@@ -301,7 +301,7 @@ foreign import endsWith :: String -> String -> Bool
 -- |     indexes "needle" "haystack" == []
 indexes :: String -> String -> List Int
 indexes little big =
-    Data.List.toList <|
+    Data.List.toList $
         _indexes little big 
 
 

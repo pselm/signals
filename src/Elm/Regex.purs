@@ -15,8 +15,10 @@ module Elm.Regex
     ) where
 
 
-import Data.List (List(..), reverse, toList)
-import Data.Maybe (Maybe(..))
+import Elm.Basics (Bool)
+import Elm.List (List(..))
+import Data.List (reverse, toList)
+import Elm.Maybe (Maybe(..))
 import Prelude (class Show, ($))
 
 
@@ -59,7 +61,7 @@ foreign import caseInsensitive :: Regex -> Regex
 -- | 
 -- |     contains (regex "789") "12345" == False
 -- |     contains (regex "z+") "aabbcc" == False
-foreign import contains :: Regex -> String -> Boolean
+foreign import contains :: Regex -> String -> Bool
 
 
 -- | A `Match` represents all of the details about a particular match in a string.

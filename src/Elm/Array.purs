@@ -31,12 +31,14 @@ import Data.Sequence
     , snoc, index, null, take, drop, length
     )
 
+import Elm.Basics (Bool)
+import Elm.List (List(..))
+import Data.List ((:), reverse)
 import Data.Tuple (Tuple(..))
 import Data.Foldable (class Foldable, foldr)
 import Data.Unfoldable (class Unfoldable)
-import Data.List (List(..), (:), reverse)
 import Data.Ord (clamp)
-import Data.Maybe (Maybe)
+import Elm.Maybe (Maybe)
 import Data.Tuple (Tuple(..), snd)
 import Prim hiding (Array)
 import Data.Monoid (class Monoid, mempty)
@@ -188,5 +190,5 @@ slice start end array =
 -- | Determine if an array is empty.
 -- | 
 -- |     isEmpty empty == True
-isEmpty :: forall a. Array a -> Boolean
+isEmpty :: forall a. Array a -> Bool
 isEmpty = null
