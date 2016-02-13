@@ -13,12 +13,12 @@ import Elm.Result (Result)
 
 tryList :: Array Int -> Result String (List Int)
 tryList input =
-    JD.decodeValue (JD.list JD.int) (JE.psArray $ JE.int <$> input) 
+    JD.decodeValue (JD.list JD.int) (JE.array $ JE.int <$> input)
 
 
 tryUnfoldable :: Array Int -> Result String (List Int)
 tryUnfoldable input =
-    JD.decodeValue (JD.unfoldable JD.int) (JE.psArray $ JE.int <$> input)
+    JD.decodeValue (JD.unfoldable JD.int) (JE.array $ JE.int <$> input)
 
 
 benchLists :: Benchmark
