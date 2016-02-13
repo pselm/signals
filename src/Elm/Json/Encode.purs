@@ -16,7 +16,7 @@ module Elm.Json.Encode
 
 
 import Data.Foreign (Foreign, toForeign)
-import Data.List (List)
+import Elm.List (List)
 import Data.Tuple (Tuple)
 import Elm.Basics (Float, Bool)
 import Data.Foldable (class Foldable, foldl)

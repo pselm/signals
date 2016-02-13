@@ -47,7 +47,7 @@ import Elm.Basics (Bool, Float)
 import Elm.List (List(..), foldr)
 import Elm.Dict (Dict)
 import Data.Tuple (Tuple(..))
-import Data.Maybe (Maybe(..))
+import Elm.Maybe (Maybe(..))
 import Data.Array (uncons)
 
 import Prelude
