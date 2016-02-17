@@ -2,6 +2,7 @@ var gulp = require("gulp");
 var purescript = require("gulp-purescript");
 var fork = require('child_process').fork;
 var spawn = require('child_process').spawn;
+var exec = require('child_process').exec;
 
 var sources = [
     "src/**/*.purs",
@@ -19,7 +20,7 @@ var foreigns = [
     "examples/**/*.js"
 ];
 
-var bundles = [
+var nodeBundles = [
     "Examples.Time.Delay",
     "Examples.Time.Every",
     "Examples.Time.FPS",
@@ -29,11 +30,25 @@ var bundles = [
     "Test.Main"
 ];
 
+var htmlBundles = [{
+    ps: "Examples.Keyboard.Console",
+    html: "examples/Keyboard/Console.html"
+}];
+
+var allBundles =
+    nodeBundles.concat(
+        htmlBundles.map(
+            function (bundle) {
+                return bundle.ps
+            }
+        )
+    );
+
 function output (module) {
     return "build/" + module.split(".").join("/") + ".js";
 }
 
-bundles.map(function (bundle) {
+nodeBundles.map(function (bundle) {
     gulp.task("bundle-" + bundle, ["make"], function () {
         return purescript.pscBundle({
             src: "output/**/*.js",
@@ -48,7 +63,23 @@ bundles.map(function (bundle) {
     });
 });
 
-gulp.task("bundle", bundles.map(function (bundle) {
+htmlBundles.map(function (bundle) {
+    gulp.task("bundle-" + bundle.ps, ["make"], function () {
+        return purescript.pscBundle({
+            src: "output/**/*.js",
+            output: output(bundle.ps),
+            module: bundle.ps,
+            main: bundle.ps
+        });
+    });
+
+    gulp.task(bundle.ps, ["bundle-" + bundle.ps], function (cb) {
+        exec("open " + bundle.html);
+        cb();
+    });
+});
+
+gulp.task("bundle", allBundles.map(function (bundle) {
     return "bundle-" + bundle;
 }));
 
