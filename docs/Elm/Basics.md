@@ -121,7 +121,7 @@ _left-associative / precedence 7_
 #### `mod`
 
 ``` purescript
-mod :: forall a. (Semiring a, Ring a, Ord a, ModuloSemiring a) => a -> a -> a
+mod :: forall a. (Ord a, ModuloSemiring a, Ring a) => a -> a -> a
 ```
 
 Perform [modular arithmetic](http://en.wikipedia.org/wiki/Modular_arithmetic).
@@ -224,7 +224,7 @@ Equivalent to Purescript's `toNumber`.
 #### `isInfinite`
 
 ``` purescript
-isInfinite :: Float -> Boolean
+isInfinite :: Float -> Bool
 ```
 
 Determine whether a float is positive or negative infinity.

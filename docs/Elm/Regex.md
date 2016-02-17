@@ -58,7 +58,7 @@ Make a regex case insensitive.
 #### `contains`
 
 ``` purescript
-contains :: Regex -> String -> Boolean
+contains :: Regex -> String -> Bool
 ```
 
 Check to see if a Regex is contained in a string.

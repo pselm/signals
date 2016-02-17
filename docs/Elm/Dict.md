@@ -72,7 +72,7 @@ Keep a key-value pair when its key does not appear in the second dictionary.
 #### `filter`
 
 ``` purescript
-filter :: forall k v. (Ord k) => (k -> v -> Boolean) -> Dict k v -> Dict k v
+filter :: forall k v. (Ord k) => (k -> v -> Bool) -> Dict k v -> Dict k v
 ```
 
 Keep a key-value pair when it satisfies a predicate.
@@ -80,7 +80,7 @@ Keep a key-value pair when it satisfies a predicate.
 #### `partition`
 
 ``` purescript
-partition :: forall k v. (Ord k) => (k -> v -> Boolean) -> Dict k v -> { trues :: Dict k v, falses :: Dict k v }
+partition :: forall k v. (Ord k) => (k -> v -> Bool) -> Dict k v -> { trues :: Dict k v, falses :: Dict k v }
 ```
 
 Partition a dictionary according to a predicate. The first dictionary

@@ -23,7 +23,7 @@ the purescript-quickcheck library.
 #### `bool`
 
 ``` purescript
-bool :: Generator Boolean
+bool :: Generator Bool
 ```
 
 Create a generator that produces boolean values. The following example
@@ -70,7 +70,7 @@ The minimum value for randomly generated 32-bit ints.
 #### `float`
 
 ``` purescript
-float :: Number -> Number -> Generator Number
+float :: Float -> Float -> Generator Float
 ```
 
 Generate floats in a given range. The following example is a generator

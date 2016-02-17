@@ -60,25 +60,25 @@ hour :: Time
 #### `inMilliseconds`
 
 ``` purescript
-inMilliseconds :: Time -> Number
+inMilliseconds :: Time -> Float
 ```
 
 #### `inSeconds`
 
 ``` purescript
-inSeconds :: Time -> Number
+inSeconds :: Time -> Float
 ```
 
 #### `inMinutes`
 
 ``` purescript
-inMinutes :: Time -> Number
+inMinutes :: Time -> Float
 ```
 
 #### `inHours`
 
 ``` purescript
-inHours :: Time -> Number
+inHours :: Time -> Float
 ```
 
 #### `fps`

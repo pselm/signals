@@ -28,7 +28,7 @@ Add an element to the front of a list.
 #### `isEmpty`
 
 ``` purescript
-isEmpty :: forall a. List a -> Boolean
+isEmpty :: forall a. List a -> Bool
 ```
 
 Determine if a list is empty.
@@ -40,7 +40,7 @@ Equivalent to Purescript's `null`.
 #### `member`
 
 ``` purescript
-member :: forall a. (Eq a) => a -> List a -> Boolean
+member :: forall a. (Eq a) => a -> List a -> Bool
 ```
 
 Figure out whether a list contains a value.
@@ -90,7 +90,7 @@ Equivalent to Purescript's `mapMaybe`.
 #### `partition`
 
 ``` purescript
-partition :: forall a. (a -> Boolean) -> List a -> { trues :: List a, falses :: List a }
+partition :: forall a. (a -> Bool) -> List a -> { trues :: List a, falses :: List a }
 ```
 
 Partition a list based on a predicate. The first list contains all values
@@ -195,7 +195,7 @@ like Elm's `sortWith`.
 #### `sortWith`
 
 ``` purescript
-sortWith :: forall a. (a -> a -> Ordering) -> List a -> List a
+sortWith :: forall a. (a -> a -> Order) -> List a -> List a
 ```
 
 Sort values with a custom comparison function.

@@ -48,7 +48,7 @@ Map a function onto a set, creating a new set with no duplicates.
 #### `filter`
 
 ``` purescript
-filter :: forall a. (Ord a) => (a -> Boolean) -> Set a -> Set a
+filter :: forall a. (Ord a) => (a -> Bool) -> Set a -> Set a
 ```
 
 Create a new set consisting only of elements which satisfy a predicate.
@@ -56,7 +56,7 @@ Create a new set consisting only of elements which satisfy a predicate.
 #### `partition`
 
 ``` purescript
-partition :: forall a. (Ord a) => (a -> Boolean) -> Set a -> { trues :: Set a, falses :: Set a }
+partition :: forall a. (Ord a) => (a -> Bool) -> Set a -> { trues :: Set a, falses :: Set a }
 ```
 
 Create two new sets; the first consisting of elements which satisfy a
