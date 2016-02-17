@@ -9,6 +9,8 @@
   "devDependencies": {
     "benchmark": "^2.1.0",
     "bower": "^1.7.2",
+    "gulp": "^3.9.1",
+    "gulp-purescript": "^0.8.0",
     "pulp": "^8.0.0",
     "rimraf": "^2.5.0"
   }
