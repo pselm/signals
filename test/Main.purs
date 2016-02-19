@@ -19,6 +19,7 @@ main :: forall e. Eff
     | e) Unit
 main =
     runTest do
+        Test.Elm.ColorTest.tests
         Test.Elm.MaybeTest.tests
         Test.Elm.ListTest.tests
         Test.Elm.ElmListTest.tests
