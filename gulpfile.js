@@ -39,6 +39,12 @@ var htmlBundles = [{
 },{
     ps: "Examples.Mouse.Embed",
     html: "examples/Mouse/Embed.html"
+},{
+    ps: "Examples.Window.FullScreen",
+    html: "examples/Window/FullScreen.html"
+},{
+    ps: "Examples.Window.Embed",
+    html: "examples/Window/Embed.html"
 }];
 
 var allBundles =

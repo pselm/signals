@@ -393,6 +393,12 @@ delay applying `current` in some cases to get the results you expect.
 data DELAY :: !
 ```
 
+#### `delay`
+
+``` purescript
+delay :: forall eff a. Int -> Eff (delay :: DELAY | eff) a -> Eff (delay :: DELAY | eff) Unit
+```
+
 #### `runSignal`
 
 ``` purescript

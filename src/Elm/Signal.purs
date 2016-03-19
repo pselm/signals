@@ -23,7 +23,7 @@ module Elm.Signal
     , output
     , setup
     , current
-    , DELAY
+    , DELAY, delay
     , Graph
     , GraphState
     , runSignal
