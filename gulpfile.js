@@ -33,6 +33,12 @@ var nodeBundles = [
 var htmlBundles = [{
     ps: "Examples.Keyboard.Console",
     html: "examples/Keyboard/Console.html"
+},{
+    ps: "Examples.Mouse.FullScreen",
+    html: "examples/Mouse/FullScreen.html"
+},{
+    ps: "Examples.Mouse.Embed",
+    html: "examples/Mouse/Embed.html"
 }];
 
 var allBundles =
