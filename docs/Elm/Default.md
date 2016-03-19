@@ -824,6 +824,8 @@ crash :: forall a. String -> a
 
 Crash the program with an error message.
 
+Equivalent to Purescript's `Partial.Unsafe.unsafeCrashWith`
+
 #### `log`
 
 ``` purescript

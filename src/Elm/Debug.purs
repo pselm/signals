@@ -10,6 +10,7 @@ module Elm.Debug
 
 import Debug.Trace (trace, spy)
 import Prelude ((++))
+import Partial.Unsafe (unsafeCrashWith)
 
 
 -- | Log a tagged value on the developer console, and then return the value.
@@ -25,5 +26,7 @@ log tag value =
 
 
 -- | Crash the program with an error message.
-foreign import crash :: forall a. String -> a
-
+-- |
+-- | Equivalent to Purescript's `Partial.Unsafe.unsafeCrashWith`
+crash :: forall a. String -> a
+crash = unsafeCrashWith
