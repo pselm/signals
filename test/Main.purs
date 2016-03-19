@@ -40,3 +40,4 @@ main =
         Test.Elm.TaskTest.tests
         Test.Elm.SignalTest.tests
         Test.Elm.JsonTest.tests
+        Test.Elm.TrampolineTest.tests
