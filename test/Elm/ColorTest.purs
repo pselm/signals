@@ -119,4 +119,7 @@ tests =
         test "complement" do
             complement (rgb 10 20 30) === rgb 30 20 10
 
+        test "toCss" do
+            toCss (hsl 0.8 0.6 0.4) === "hsl(45.84, 60.0%, 40.0%)"
+            toCss (hsla 0.8 0.6 0.4 0.2) === "hsla(45.84, 60.0%, 40.0%, 0.2)"
 

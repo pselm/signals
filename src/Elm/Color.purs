@@ -11,7 +11,7 @@ module Elm.Color
     ( module Virtual
     , hsl, hsla
     , greyscale, grayscale, complement
-    , toRgb, toHsl
+    , toRgb, toHsl, toCss
     , Gradient, linear, radial
 
     , red, orange, yellow, green, blue, purple, brown
@@ -28,7 +28,7 @@ import Color (Color, rgb, rgba) as Virtual
 
 -- For internal use
 
-import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary)
+import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
 import Prelude (($), (*), (/))
 import Data.Tuple (Tuple(..))
 import Elm.Basics (Float)
@@ -109,6 +109,11 @@ toRgb color =
         , blue: parts.b
         , alpha: parts.a
         }
+
+
+-- | A CSS representation of the color in the form hsl(..) or hsla(...).
+toCss :: Color -> String
+toCss = cssStringHSLA
 
 
 -- | Abstract representation of a color gradient.

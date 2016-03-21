@@ -83,6 +83,14 @@ toRgb :: Color -> { red :: Int, green :: Int, blue :: Int, alpha :: Float }
 
 Extract the components of a color in the RGB format.
 
+#### `toCss`
+
+``` purescript
+toCss :: Color -> String
+```
+
+A CSS representation of the color in the form hsl(..) or hsla(...).
+
 #### `Gradient`
 
 ``` purescript
