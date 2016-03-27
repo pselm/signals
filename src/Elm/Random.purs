@@ -138,7 +138,7 @@ maxInt = fromInt 2147483647
 
 -- | The minimum value for randomly generated 32-bit ints.
 minInt :: Int53
-minInt = fromInt (-2147483648)
+minInt = fromInt (-2147483647)
 
 
 -- | Generate floats in a given range. The following example is a generator
