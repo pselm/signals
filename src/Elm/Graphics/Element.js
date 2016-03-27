@@ -52,11 +52,9 @@ exports.same = function (a) {
 };
 
 exports.nullableDocument = function () {
-    return function () {
-        if (window || window.document) {
-            return window.document;
-        } else {
-            return null;
-        }
-    };
+    if (window && window.document) {
+        return window.document;
+    } else {
+        return null;
+    }
 };

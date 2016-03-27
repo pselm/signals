@@ -31,6 +31,9 @@ var nodeBundles = [
 ];
 
 var htmlBundles = [{
+    ps: "Examples.Graphics.StaticElement",
+    html: "examples/Graphics/StaticElement.html"
+},{
     ps: "Examples.Keyboard.Console",
     html: "examples/Keyboard/Console.html"
 },{

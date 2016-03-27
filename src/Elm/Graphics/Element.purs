@@ -17,6 +17,11 @@ module Elm.Graphics.Element
     , Pos, Position
     , absolute, relative, middleAt, midTopAt, midBottomAt, midLeftAt
     , midRightAt, topLeftAt, topRightAt, bottomLeftAt, bottomRightAt
+    -- The following aren't exposed by Elm, since the runtime accesses them
+    -- magically. Ultimately, we'll probably create a class which would be
+    -- implemented here, so that we can swap in Graphics.Element or
+    -- a VirtualDOM etc.
+    , updateAndReplace, render
     ) where
 
 

@@ -469,4 +469,16 @@ inward :: Direction
 outward :: Direction
 ```
 
+#### `render`
+
+``` purescript
+render :: forall e. Element -> Eff (dom :: DOM | e) Element
+```
+
+#### `updateAndReplace`
+
+``` purescript
+updateAndReplace :: forall e. Element -> Element -> Element -> Eff (dom :: DOM | e) Element
+```
+
 
