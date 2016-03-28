@@ -46,11 +46,13 @@ import DOM.HTML.Document (body)
 import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToNode)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
+import DOM.Node.Types (elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
 import DOM.Node.Element (setId, setAttribute, tagName)
 import DOM.Node.Node (appendChild, removeChild, parentNode, parentElement, replaceChild)
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
+import DOM.Event.EventTarget (addEventListener, eventListener)
+import DOM.Event.EventTypes (load)
 import Control.Monad.Eff (Eff, forE)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad (when, unless)
@@ -78,6 +80,12 @@ foreign import setInnerHtml :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM |
 
 -- Dimensions
 foreign import getDimensions :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) {width :: Int, height :: Int}
+
+-- Image width
+foreign import getImageWidth :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Int
+
+-- Image height
+foreign import getImageHeight :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Int
 
 -- Unsafe document
 foreign import nullableDocument :: ∀ e. Eff (dom :: DOM | e) (Nullable HTMLDocument)
@@ -826,7 +834,7 @@ makeImage props imageStyle imageWidth imageHeight src =
 
         Fitted -> do
             div <- createNode "div"
-            let s = "url(" <> src <> "') no-repeat center"
+            let s = "url('" <> src <> "') no-repeat center"
             setStyle "background" s div
             setStyle "webkitBackgroundSize" "cover" div
             setStyle "MozBackgroundSize" "cover" div
@@ -840,21 +848,43 @@ makeImage props imageStyle imageWidth imageHeight src =
 
             img <- createNode "img"
 
+            let
+                listener =
+                    eventListener \event -> do
+                        intrinsicWidth <- toNumber <$> getImageWidth img
+                        intrinsicHeight <- toNumber <$> getImageHeight img
+
+                        let
+                            sw =
+                                toNumber props.width / toNumber imageWidth
+
+                            sh =
+                                toNumber props.height / toNumber imageHeight
+
+                            newWidth =
+                                Prelude.show (truncate (intrinsicWidth * sw)) <> "px"
+
+                            newHeight =
+                                Prelude.show (truncate (intrinsicHeight * sh)) <> "px"
+
+                            marginLeft =
+                                Prelude.show (truncate (toNumber (-pos.left) * sw)) <> "px"
+
+                            marginTop =
+                                Prelude.show (truncate (toNumber (-pos.top) * sh)) <> "px"
+
+                        setStyle "width" newWidth img
+                        setStyle "height" newHeight img
+                        setStyle "marginLeft" marginLeft img
+                        setStyle "marginTop" marginTop img
+
+                        pure unit
+
+            addEventListener load listener false (elementToEventTarget img)
             setAttribute "src" src img
             setAttribute "name" src img
             appendChild (elementToNode img) (elementToNode e)
             pure e
-
-            -- TODO
-            {-
-                img.onload = function() {
-                    var sw = w / elem._1, sh = h / elem._2;
-                    img.style.width = ((this.width * sw) | 0) + 'px';
-                    img.style.height = ((this.height * sh) | 0) + 'px';
-                    img.style.marginLeft = ((- pos._0 * sw) | 0) + 'px';
-                    img.style.marginTop = ((- pos._1 * sh) | 0) + 'px';
-		        };
-            -}
 
         Tiled -> do
             div <- createNode "div"
