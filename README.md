@@ -1,22 +1,71 @@
 # purescript-elm
 
-Elm is a programming language that is similar to Purescript in some respects,
-but takes a different approach to a variety of questions.
+Having done some [Elm](http://elm-lang.org) programming, I wanted to give
+[Purescript](http://purescript.org) a try. I thought I would port one of my Elm
+apps to Purescript, but quickly realized that there were a variety of little
+differences between the Elm core libraries and their Purescript equivalents.
+One possible approach would have been to modify my app.  However, it seemed to
+me that it might be more interesting to port the Elm libraries to Purescript --
+at least as a first step. I could then change the app to use more idiomatic
+Purescript at my leisure.
 
-Having done some Elm programming, I wanted to give Purescript a try. I thought
-I would port one of my Elm apps to Purescript, but quickly realized that there
-were a variety of little differences between the Elm core libraries and their
-Purescript equivalents. One possible approach would have been to modify my app.
-However, it seemed to me that it might be more interesting to port the Elm
-libraries to Purescript -- at least as a first step. I could then change the app
-to use more idiomatic Purescript at my leisure.
+Having started down that rabbit hole, I basically just became fascinated by how
+Purescript does things -- and also fascinated by some of the inner workings of
+Elm. So, I have continued to work away at it, with my original goals receding
+far into the distance.
 
-So, this is a work in progress to do just that.
+At this point, I would put this project in the "alpha" stage ... that is, it's
+incomplete. However, some people could find parts of it useful, or at least
+interesting.
+
+The main things remaining to do are:
+
+* The Graphics libraries (I've made a start on Elm.Graphics.Element)
+
+* The virtual-dom and elm-html libraries.
+
+* Making the initial setup of an Elm-like program as nice as possible.
+  (That is, the construction of the signal graph, hooking up "ports", the
+  graphics etc. -- the kind of thing which the Elm run-time facilitates).
+
+Note that I'm targeting Elm version 0.16, or version 3.0.0 of the core
+Elm libraries. Once Elm version 0.17 comes out, I'll have to assess whether
+it's easier to switch targets in-flight, or whether it would be easier to
+complete work on Elm 0.16 and then work on the changes.
+
+
+## Philosophy
+
+In porting the Elm libraries to Purescript, I have followed the following
+principles, roughly in order of priority.
+
+1. Produce as much actual Purescript code as possible, with minimal use of
+   Javascript. To this end, I've eliminated a fair bit of Elm's use of
+   Javascript.
+
+2. Don't change the Elm function signatures, if it can be avoided. Porting Elm
+   code should be as mechanical as possible.
+
+3. Try to write idiomatic Purescript, re-using existing Purescript libraries
+   where possible, and making use of Purescript idioms.
+
+
+## Practical Matters
 
 Each of the Elm libraries is prefixed by the `Elm.` namespace. So, to modify your
 existing Elm code, you would simply add `Elm.` to the imports. And, of course,
 you can always import `as` something to maintain any internal fully-qualified
 references.
+
+Eventually, I'll have some examples of porting existing Elm code. For the moment,
+you can consult the test code, and the existing examples. They don't yet
+support porting a full Elm program as well as I intend to in the future ...
+it's just that you have to start somewhere. The idea is to make it as simple as
+possible at the end of the day. This will require exposing some things which
+the Elm run-time takes care of.
+
+
+## Learning Purescript if you're familiar with Elm
 
 For a general reference to the Purescript language, this page is very helpful:
 
@@ -26,9 +75,10 @@ Here are a few notes on issues I ran into when performing the port, and how I
 handled them. You may find some of this helpful if you are porting Elm code
 to Purescript.
 
-## The Type System
 
-This is a big topic, of course -- I'll just focus on some of the mechanical
+### The Type System
+
+This is a big topic, of course -- I'll start with some of the mechanical
 changes required.
 
 Purescript uses `::` for type annotations (rather than Elm's `:`), and uses
@@ -48,7 +98,53 @@ always : a -> b -> a
 always :: forall a b. a -> b -> a
 ```
 
-## Tuples
+Or, you can actually use the unicode for-all character, which I've started doing
+just because it looks nice:
+
+```purescript
+always :: ∀ a b. a -> b -> a
+```
+
+
+### Fancy Types
+
+Purescript has what Elm folks sometimes refer to as "fancy types" -- that is,
+things like type-classes, higher kinded types, rank-n polymorphism, and
+probably others that I'm forgetting. I won't describe all of those things here,
+but I do have a few opinions to offer.
+
+1. Fancy types are great. Along with an elegant foreign function interface,
+   they are among the best reasons to try Purescript.
+
+2. However, they are genuinely tricky. If you remember how lost you initially
+   felt when learning Elm (supposing it was your first intrduction to
+   functional programming) -- well, that's how lost I felt again when starting
+   with fancy types. The feeling goes away eventually, just like it did when
+   you learned Elm, but it's a similar level of effort (at least, that's how it
+   seemed to me).
+
+3. You'll miss the Elm compiler's error messages. It's not that Purescript has
+   bad error messages -- they are more-or-less typical in quality. But Elm's
+   are so amazingly good -- you'll notice the difference. This is especially
+   true when dealing with fancy types, as the fanciness does make constructing
+   helpful error messages harder. Eventually, you do get the hang of what the
+   messages probably signify.
+
+4. The fancy types, once available, do tend to become a focus of the language.
+   This is especially true when writing libraries for others to use. For
+   instance, if you're writing an app for your own use, you can just pick (say)
+   `List` for a data structure, and run with it. However, if you're writing a
+   library, do you want to force your users to choose `List`? It's tempting to
+   write your function signatures in terms of type-classes instead. And, of
+   course, this is mostly a good thing -- after all, it's nice to be able to
+   use a library without having to convert data. But, it does mean that once
+   type-classes are in a language, they do tend to become a focus of library
+   development. So, if you think you might have a better idea than
+   type-classes, then it's easy to see why you might not want to start down
+   that road.
+
+
+### Tuples
 
 Purescript does not have a literal syntax for Tuples. So, in places where
 you used Tuples, there are two alternatives.
@@ -81,15 +177,18 @@ you used Tuples, there are two alternatives.
   which makes using them in this way pretty nice, actually.
   
   The only disadvantage is that Purescript doesn't auto-derive an `Eq` instance
-  for records (perhaps I just don't know how), so comparing them isn't as easy
-  as it might be.
+  for records, so comparing them isn't as easy as it might be. In fact, you
+  can't make an `Eq` instance for records at all ... you would have to construct
+  a `newtype` to do that, in which case accessing the fields becomes somewhat
+  more awkward (as you have to wrap and unwrap the newtype) ... anyway, it's
+  a bit of a disadvantage.
 
 In doing the conversion, I've sometimes used the `Tuple` type, and sometimes
 converted to using records instead. In either case, you'll need to make some
 modifications to your own code that uses Tuples.
 
 
-## Booleans
+### Booleans
 
 The Purescript type is `Boolean`, rather than the Elm `Bool`. I've put a type
 alias in `Elm.Basics` to cover that.
@@ -97,12 +196,13 @@ alias in `Elm.Basics` to cover that.
 The Boolean literals are `true` and `false`, rather than Elm's `True` and `False`.
 
 
-## Records
+### Records
 
 Purescript records are broadly similar to Elm records, with some differences
 in syntax. 
 
-### Initialization
+
+#### Initialization
 
 Initialization is via a `:` rather than `=`, e.g.
 
@@ -120,7 +220,11 @@ with wildcards, e.g.:
 { x: _, y: _} == \x y -> {x: x, y: y}
 ```
 
-### Access and accesor function
+Generally speaking, Purescript gets a vast amount of use out of the lowly
+underscore.
+
+
+#### Access and accesor function
 
 Acces is via the expected `record.x`.
 
@@ -135,7 +239,8 @@ forall a b. { x :: a | b } -> a
 `x` of type `a`, and possibly other fields, returns something of type `a`
 (which is, of course, the value of whatever was in field `x`).
 
-### Update and updater functions
+
+#### Update and updater functions
 
 Update looks like this, which is a little different than Elm, but basically
 similar:
@@ -157,7 +262,8 @@ So, this is just like the literal syntax for record updates, but with wildcards
 that become the parameters to the function. Isn't that nice? And, you can
 fill in one of the wildcards if you like, to get a partially applied function.
 
-### Punning
+
+#### Punning
 
 Another thing I particularly like is record "punning". You can destructure a record
 by mentioning the keys, and the keys get used as names. So, you can do
@@ -176,7 +282,7 @@ you can refer to. This makes substituting a record for a tuple relatively
 painless.
 
 
-## Unit
+### Unit
 
 Elm uses a Tuple0 -- that is, `()` -- as a type (and value) when a value is
 required but there is no natural value to supply.
@@ -185,7 +291,7 @@ Purescript has a `Unit` type for this purpose, which is inhabited by a `unit`
 value.
 
 
-## Numbers
+### Numbers
 
 Purescript uses `Number` for what Elm calls a `Float`. I've put a type alias
 in `Elm.Basics` to cover that.
@@ -226,7 +332,7 @@ that work on multiple types -- essentially, you can treat `Int53` as a
 reasonably first-class alternative to `Int`, when you need the extra bits.
 This is, for instance, the case in the `Elm.Random` module.
 
-## Imports
+### Imports
 
 Purescript doesn't import anything by default. So, if you want something, you
 have to import it manually. For instance, if you want `Elm.Basics`, you need
@@ -260,7 +366,7 @@ import Data.Int (round, floor) as Virtual
 ... and all of the individually imported names will be re-exported.
 
 
-## List
+### List
 
 I've used Purescript's `Data.List` for lists. Purescript's compiler doesn't have a literal
 syntax for lists, so instead of this:
@@ -288,7 +394,7 @@ import Elm.List (List(..))
 ... or, there would be a way to do it with `do` notation.
 
 
-## Array
+### Array
 
 There is a literal syntax for Array, e.g. `[1, 2, 3]`. However, the `Array` type in Purescript
 is actually a Javascript array, which is typically not what you want (unless you're getting
