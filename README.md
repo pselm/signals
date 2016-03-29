@@ -27,7 +27,9 @@ The main things remaining to do are:
 * Making the initial setup of an Elm-like program as nice as possible.
   (That is, the construction of the signal graph, hooking up "ports", the
   graphics etc. -- the kind of thing which the Elm run-time facilitates).
-  I have jotted down some [intial thoughts](src/elm/Signal.md) about this.
+  I have jotted down some
+  [intial thoughts](https://github.com/rgrempel/purescript-elm/blob/master/src/Elm/Signal.md)
+  about this.
 
 Note that I'm targeting Elm version 0.16, or version 3.0.0 of the core
 Elm libraries. Once Elm version 0.17 comes out, I'll have to assess whether
