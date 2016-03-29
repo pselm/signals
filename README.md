@@ -27,6 +27,7 @@ The main things remaining to do are:
 * Making the initial setup of an Elm-like program as nice as possible.
   (That is, the construction of the signal graph, hooking up "ports", the
   graphics etc. -- the kind of thing which the Elm run-time facilitates).
+  I have jotted down some [intial thoughts](src/elm/Signal.md) about this.
 
 Note that I'm targeting Elm version 0.16, or version 3.0.0 of the core
 Elm libraries. Once Elm version 0.17 comes out, I'll have to assess whether
@@ -40,8 +41,8 @@ In porting the Elm libraries to Purescript, I have followed the following
 principles, roughly in order of priority.
 
 1. Produce as much actual Purescript code as possible, with minimal use of
-   Javascript. To this end, I've eliminated a fair bit of Elm's use of
-   Javascript.
+   custom Javascript. To this end, I've eliminated a fair bit of Elm's use of
+   custom Javascript to implement core libraries.
 
 2. Don't change the Elm function signatures, if it can be avoided. Porting Elm
    code should be as mechanical as possible.
