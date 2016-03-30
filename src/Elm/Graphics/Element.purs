@@ -95,6 +95,9 @@ foreign import nullableDocument :: ∀ e. Eff (dom :: DOM | e) (Nullable HTMLDoc
 -- types for one reason or another.
 foreign import same :: ∀ a b. a -> b -> Boolean
 
+-- This should probably be in DOM.Node.Element ... remember to suggest that.
+foreign import removeAttribute :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
+
 
 -- PRIMITIVES
 
@@ -1272,7 +1275,9 @@ updateProps node (Element curr) (Element next) = do
             Nothing -> removeStyle "backgroundColor" node
 
     when (nextProps.tag /= currProps.tag) $
-        setId (ElementId nextProps.tag) node
+        if nextProps.tag == ""
+            then removeAttribute "id" node
+            else setId (ElementId nextProps.tag) node
 
     when (nextProps.href /= currProps.href) $
         if currProps.href == ""

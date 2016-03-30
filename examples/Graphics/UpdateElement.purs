@@ -58,7 +58,10 @@ main = do
 scenes :: List Element
 scenes =
     ( scene1 : scene2 : scene3 : scene4 : scene5 : scene6
-    : scene7 : scene8 : scene9 : Nil )
+    : scene7 : scene8 : scene9 : scene10 : scene11 : scene12
+    : scene13 : scene14 : scene15 : scene16 : scene17
+    : Nil
+    )
 
 
 scene1 :: Element
@@ -126,6 +129,78 @@ scene9 :: Element
 scene9 =
     flow down
         ( title "Ha! I didn't actually change any properties this time. Fooled you!"
+        : blueBox
+        : Nil
+        )
+
+
+scene10 :: Element
+scene10 =
+    flow down
+        ( title "This time I made it wider."
+        : width 50 blueBox
+        : Nil
+        )
+
+
+scene11 :: Element
+scene11 =
+    flow down
+        ( title "Now I made it taller."
+        : height 50 blueBox
+        : Nil
+        )
+
+
+scene12 :: Element
+scene12 =
+    flow down
+        ( title "Now, reduced opacity."
+        : opacity 0.5 blueBox
+        : Nil
+        )
+
+
+scene13 :: Element
+scene13 =
+    flow down
+        ( title "And different color."
+        : color Elm.Color.red blueBox
+        : Nil
+        )
+
+
+scene14 :: Element
+scene14 =
+    flow down
+        ( title "Give it an ID"
+        : tag "blueBox" blueBox
+        : Nil
+        )
+
+
+scene15 :: Element
+scene15 =
+    flow down
+        ( title "Make it a link to apple.com"
+        : link "http://apple.com" blueBox
+        : Nil
+        )
+
+
+scene16 :: Element
+scene16 =
+    flow down
+        ( title "Change the link to purescript.org"
+        : link "http://purescript.org" blueBox
+        : Nil
+        )
+
+
+scene17 :: Element
+scene17 =
+    flow down
+        ( title "And just a blue box again"
         : blueBox
         : Nil
         )

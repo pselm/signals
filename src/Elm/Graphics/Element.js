@@ -70,3 +70,11 @@ exports.nullableDocument = function () {
         return null;
     }
 };
+
+exports.removeAttribute = function (attr) {
+    return function (element) {
+        return function () {
+            element.removeAttribute(attr);
+        };
+    };
+};
