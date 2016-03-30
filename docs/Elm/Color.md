@@ -325,9 +325,14 @@ data Color
 
 The representation of a color.
 
-Note: the `Eq` instance compares two `Color`s by comparing their (integer)
-RGB values. This is different from comparing the HSL values (the HSL
-colorspace is bigger than the RGB colorspace).
+Note:
+- The `Eq` instance compares two `Color`s by comparing their (integer) RGB
+  values. This is different from comparing the HSL values (for example,
+  HSL has many different representations of black (arbitrary hue and
+  saturation values).
+- Colors outside the sRGB gamut which cannot be displayed on a typical
+  computer screen can not be represented by `Color`.
+
 
 ##### Instances
 ``` purescript
