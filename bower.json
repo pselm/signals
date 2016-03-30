@@ -36,6 +36,7 @@
   "devDependencies": {
     "purescript-console": "~0.1.1",
     "purescript-generics": "~0.7.2",
+    "purescript-list-zipper": "https://github.com/rgrempel/purescript-list-zipper.git#275407b01431fa40bc990bcefa2835ea851f3969",
     "purescript-test-unit": "~4.1.0",
     "purescript-quickcheck-laws": "~0.1.1",
     "purescript-benchotron": "~3.0.4"

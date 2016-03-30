@@ -20,6 +20,11 @@ import Prelude (bind, Unit, unit, (>>=), ($), (>>>), pure)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
+import Data.Either (Either(..))
+import Data.Foreign (toForeign)
+import Data.Foreign.Class (readProp)
+import Data.List.Zipper (Zipper(..), up, down, beginning) as Zipper
+import Control.Comonad (extract)
 
 
 main :: ∀ e. Eff (dom :: DOM, ref :: REF | e) Unit
@@ -31,57 +36,71 @@ main = do
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
     for_ (toMaybe nullableContainer) \container -> do
-        element <- render scene1
+        zippedScenes <- newRef scenes
+
+        -- Render the first scene
+        element <- render $ extract $ Zipper.beginning scenes
         appendChild (elementToNode element) (elementToNode container)
 
-        remainingScenes <- newRef scenes
-
         let
+            move current maybeNext =
+                for_ maybeNext \next -> do
+                    -- We have to get the first child every time, as it will change!
+                    nullableChild <-
+                        ParentNode.firstElementChild (elementToParentNode container)
+
+                    for_ (toMaybe nullableChild) \child -> do
+                        updateAndReplace child (extract current) (extract next)
+                        writeRef zippedScenes next
+
             listener =
                 eventListener \event -> do
-                    s <- readRef remainingScenes
+                    current <- readRef zippedScenes
 
-                    -- We have to get the first child every time, as it will change!
-                    nullableChild <- ParentNode.firstElementChild (elementToParentNode container)
-                    for_ (toMaybe nullableChild) \child ->
-                        case s of
-                            Cons old (Cons next rest) -> do
-                                updateAndReplace child old next
-                                writeRef remainingScenes (Cons next rest)
+                    case readProp "keyCode" (toForeign event) of
+                        -- left key
+                        Right 37 ->
+                            move current (Zipper.up current)
 
-                            _ ->
-                                pure unit
+                        -- right key
+                        Right 39 ->
+                            move current (Zipper.down current)
+
+                        _ ->
+                            pure unit
 
         addEventListener keydown listener false (htmlDocumentToEventTarget doc)
 
 
-scenes :: List Element
+scenes :: Zipper.Zipper Element
 scenes =
-    ( scene1 : scene2 : scene3 : scene4 : scene5 : scene6
-    : scene7 : scene8 : scene9 : scene10 : scene11 : scene12
-    : scene13 : scene14 : scene15 : scene16 : scene17
-    : Nil
-    )
+    Zipper.Zipper
+        Nil
+        scene1
+        ( scene2 : scene3 : scene4 : scene5 : scene6
+        : scene7 : scene8 : scene9 : scene10 : scene11 : scene12
+        : scene13 : scene14 : scene15 : scene16 : scene17 : scene18
+        : scene19
+        : Nil
+        )
 
 
 scene1 :: Element
 scene1 =
     title
-        """This is scene 1, a simple element to start us off.
-        Press any key to move to the next scene."""
+        """This is scene 1, a simple element to start us off."""
 
 
 scene2 :: Element
 scene2 =
     title
-        """Hopefully we have transitioned to scene 2. How did that go?
-        Keep pressing a key to move to the next scene."""
+        """Hopefully we have transitioned to scene 2. How did that go?"""
 
 
 scene3 :: Element
 scene3 =
     title
-        """This is scene 3 and scene 4. So, when you hit a key the first time,
+        """This is scene 3 and scene 4. So, when you go forward the first time,
         you shouldn't notice any change. The second time, you should transition
         to scene 5."""
 
@@ -111,6 +130,11 @@ scene7 =
 blueBox :: Element
 blueBox =
     color Elm.Color.blue (spacer 20 20)
+
+
+redBox :: Element
+redBox =
+    color Elm.Color.red (spacer 30 40)
 
 
 title :: String -> Element
@@ -202,5 +226,22 @@ scene17 =
     flow down
         ( title "And just a blue box again"
         : blueBox
+        : Nil
+        )
+
+
+scene18 :: Element
+scene18 =
+    flow down
+        ( title "So, now we'll test some element transitions. First, spacer -> spacer ... here's a red box"
+        : redBox
+        : Nil
+        )
+
+scene19 :: Element
+scene19 =
+    flow down
+        ( title "Now, spacer to text ... here's some text"
+        : leftAligned (fromString "Some text.")
         : Nil
         )
