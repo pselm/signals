@@ -10,7 +10,8 @@ import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode)
 import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
-import DOM.Node.Types (elementToNode, ElementId(..))
+import DOM.Node.ParentNode (firstElementChild) as ParentNode
+import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
 import DOM.Node.Node (appendChild)
 import DOM.Event.EventTarget (eventListener, addEventListener)
 import DOM.Event.EventTypes (keydown)
@@ -40,13 +41,16 @@ main = do
                 eventListener \event -> do
                     s <- readRef remainingScenes
 
-                    case s of
-                        Cons old (Cons next rest) -> do
-                            updateAndReplace element old next
-                            writeRef remainingScenes (Cons next rest)
+                    -- We have to get the first child every time, as it will change!
+                    nullableChild <- ParentNode.firstElementChild (elementToParentNode container)
+                    for_ (toMaybe nullableChild) \child ->
+                        case s of
+                            Cons old (Cons next rest) -> do
+                                updateAndReplace child old next
+                                writeRef remainingScenes (Cons next rest)
 
-                        _ ->
-                            pure unit
+                            _ ->
+                                pure unit
 
         addEventListener keydown listener false (htmlDocumentToEventTarget doc)
 
@@ -118,7 +122,6 @@ scene8 =
         : Nil
         )
 
--- Something is going wrong here.
 scene9 :: Element
 scene9 =
     flow down
