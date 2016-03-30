@@ -1,10 +1,11 @@
 {
   "private": true,
   "scripts": {
-    "postinstall": "pulp dep install",
-    "build": "pulp build && rimraf docs && pulp docs",
-    "clean": "rimraf output && rimraf .pulp-cache",
-    "examples": "pulp build -I examples"
+    "postinstall": "bower install",
+    "build": "gulp",
+    "clean": "rimraf output && rimraf .pulp-cache && rimraf build",
+    "examples": "gulp bundle",
+    "test": "gulp test"
   },
   "devDependencies": {
     "benchmark": "^2.1.0",
@@ -12,7 +13,7 @@
     "gulp": "^3.9.1",
     "gulp-purescript": "^0.8.0",
     "pulp": "^8.0.0",
-    "purescript": "^0.8.2",
+    "purescript": "^0.8.3",
     "rimraf": "^2.5.0"
   }
 }
