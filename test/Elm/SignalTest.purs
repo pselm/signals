@@ -1,13 +1,18 @@
 module Test.Elm.SignalTest (tests) where
 
-import Test.Unit (Assertion, test)
+import Test.Unit (TIMER, Assertion, test)
+import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Assert (equal)
 
 import Elm.Signal
-import Prelude (flip, bind, class Eq, class Show, show, ($), (+), (-), (<), (>), (++))
+import Prelude (Unit, flip, bind, class Eq, class Show, show, ($), (+), (-), (<), (>), (++))
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Aff (later')
+import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Aff (Aff, later')
+import Control.Monad.Eff.Ref (REF)
+import Control.Monad.Eff.Console (CONSOLE)
+import Data.Date (Now)
 import Data.Array (cons)
 import Data.Maybe (Maybe(..))
 import Data.List ((:), List(..))
@@ -18,6 +23,15 @@ infixl 9 equals as ===
 equals :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
 equals = flip equal
 
+tests :: ∀ e. Aff
+    ( ref :: REF
+    , delay :: DELAY
+    , console :: CONSOLE
+    , now :: Now
+    , timer :: TIMER
+    , avar :: AVAR
+    , testOutput :: TESTOUTPUT
+    | e) Unit
 
 tests = test "Elm.Signal\n" do
     test "Signal.constant" do
@@ -252,7 +266,7 @@ tests = test "Elm.Signal\n" do
             sig2 <- foldp (++) "" sig1
 
             -- This one depends on sig1
-            sig3 <- map (++ "1") sig1
+            sig3 <- map (_ ++ "1") sig1
 
             -- Now, let's merge sig3 with sig1. Because they both
             -- update on the same pulse, which update gets kept should

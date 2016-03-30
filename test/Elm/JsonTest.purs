@@ -286,7 +286,7 @@ tests = test "Elm.Json\n" do
             ]
 
     test "Decode.map" $
-        traverse_ (check (JD.map (++ " Banana") JD.string))
+        traverse_ (check (JD.map (_ ++ " Banana") JD.string))
             [ "\"Joe\"" ==> Just "Joe Banana"
             , "17" ==> Nothing
             ]
