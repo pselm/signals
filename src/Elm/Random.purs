@@ -51,7 +51,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.Ord (max)
 import Data.Monoid (class Monoid, mempty)
 import Elm.Basics ((%), Bool, Float)
-import Elm.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, toNumber)
+import Elm.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, round, toNumber)
 
 
 -- | Create a generator that produces boolean values. The following example
@@ -138,7 +138,7 @@ maxInt = fromInt 2147483647
 
 -- | The minimum value for randomly generated 32-bit ints.
 minInt :: Int53
-minInt = fromInt (-2147483647)
+minInt = round (-2147483648.0)
 
 
 -- | Generate floats in a given range. The following example is a generator
