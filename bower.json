@@ -30,7 +30,8 @@
     "purescript-timers": "https://github.com/CapillarySoftware/purescript-timers.git#110dc2dd13cc05a875c533a4fb83219c3c2f84b2",
     "purescript-colors": "~0.4.0",
     "purescript-partial": "~1.1.0",
-    "purescript-format": "~0.1.0"
+    "purescript-format": "~0.1.0",
+    "purescript-refs": "~0.2.0"
   },
   "devDependencies": {
     "purescript-console": "~0.1.1",
