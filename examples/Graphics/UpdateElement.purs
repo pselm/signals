@@ -80,7 +80,7 @@ scenes =
         ( scene2 : scene3 : scene4 : scene5 : scene6
         : scene7 : scene8 : scene9 : scene10 : scene11 : scene12
         : scene13 : scene14 : scene15 : scene16 : scene17 : scene18
-        : scene19
+        : scene19 : scene20 : scene21 : scene22 : scene23 : scene24
         : Nil
         )
 
@@ -243,5 +243,50 @@ scene19 =
     flow down
         ( title "Now, spacer to text ... here's some text"
         : leftAligned (fromString "Some text.")
+        : Nil
+        )
+
+
+scene20 :: Element
+scene20 =
+    flow down
+        ( title "So, we'll just change the text."
+        : leftAligned (fromString "Changed text.")
+        : Nil
+        )
+
+
+scene21 :: Element
+scene21 =
+    flow down
+        ( title "This time, we'll change a prop, to color blue"
+        : color Elm.Color.blue (leftAligned (fromString "Changed text."))
+        : Nil
+        )
+
+
+scene22 :: Element
+scene22 =
+    flow down
+        ( title "Now, let's show a picture of a grotesque head."
+        : image 200 150 "head.png"
+        : Nil
+        )
+
+
+scene23 :: Element
+scene23 =
+    flow down
+        ( title "Change the src='' to a library."
+        : image 200 150 "library.png"
+        : Nil
+        )
+
+
+scene24 :: Element
+scene24 =
+    flow down
+        ( title "Change the image size."
+        : image 400 300 "library.png"
         : Nil
         )
