@@ -18,6 +18,7 @@
     "purescript-functions": "~0.1.0",
     "purescript-globals": "~0.2.2",
     "purescript-integers": "~0.2.1",
+    "purescript-int-53": "~0.0.0",
     "purescript-lists": "~0.7.7",
     "purescript-maps": "~0.5.4",
     "purescript-math": "~0.2.0",

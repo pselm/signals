@@ -51,7 +51,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.Ord (max)
 import Data.Monoid (class Monoid, mempty)
 import Elm.Basics ((%), Bool, Float)
-import Elm.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, round, toNumber)
+import Data.Int53 (class Int53Value, Int53, fromInt, fromInt53, toInt53, round, toNumber)
 
 
 -- | Create a generator that produces boolean values. The following example

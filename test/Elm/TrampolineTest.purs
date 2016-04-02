@@ -7,7 +7,7 @@ import Elm.Trampoline
 import Prelude (class Show, class Eq, map, ($), bind, (+), (-), flip, zero, one, (==))
 import Data.Foldable (sequence_)
 import Elm.List ((..))
-import Elm.Int53 (Int53, truncate, fromInt)
+import Data.Int53 (Int53, truncate, fromInt)
 
 
 infixl 9 equals as ===

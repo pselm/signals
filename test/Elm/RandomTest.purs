@@ -6,7 +6,7 @@ import Test.Unit.Assert (assert)
 import Elm.Random
 import Prelude (bind, (<), (-), (+), negate, map)
 import Elm.Basics ((<|), (==), abs)
-import Elm.Int53 (Int53, fromInt)
+import Data.Int53 (Int53, fromInt)
 import Data.List (toList)
 import Data.Tuple (Tuple(..))
 

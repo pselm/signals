@@ -44,15 +44,6 @@ poison.
 -}
 import Elm.Dict hiding (toList, fromList, empty, get, filter, map, foldl, foldr, partition)
 
-{- `fromString` here is a `Maybe`, whereas in `Elm.Date` it is a `Result`.
-
-`ceil`, `floor` and `round` conflict with `Data.Int`. Now, I do have a
-`LikeInt53` class already ... perhaps I should locate these there? I suppose
-the problem would be if one then tried to import `Data.Int`. That wouldn't be a
-problem for `truncate`. 
--}
-import Elm.Int53 hiding (fromString, ceil, floor, round, truncate)
-
 -- oneOf conflicts with Elm.Maybe ... perhaps could be unified?
 import Elm.Json.Decode hiding (oneOf)
 

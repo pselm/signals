@@ -43,7 +43,6 @@ main =
         Test.Elm.DateTest.tests
         Test.Elm.TimeTest.tests
         Test.Elm.RandomTest.tests
-        Test.Elm.Int53Test.tests
         Test.Elm.RegexTest.tests
         Test.Elm.TaskTest.tests
         Test.Elm.SignalTest.tests
