@@ -280,7 +280,7 @@ andThen :: forall m a b. (Bind m) => m a -> (a -> m b) -> m b
 
 Given some computation, chain its result with another computation.
 
-`andThen` is equivalent to Purescript's `bind`.
+Equivalent to Purescript's `bind`.
 
 ### Re-exported from Prelude:
 

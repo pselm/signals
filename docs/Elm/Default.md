@@ -186,7 +186,7 @@ avoiding parenthesis. Consider the following code to create a text element:
 
 This can also be written as:
 
-    leftAligned << monospace <| fromString "code"
+    leftAligned <| monospace <| fromString "code"
 
 Equivalent to Purescript's `$`.
 
@@ -368,6 +368,7 @@ fromPolar :: { r :: Float, theta :: Float } -> { x :: Float, y :: Float }
 Convert polar coordinates `{r, theta}` to Cartesian coordinates `{x, y}`.
 
 Note that the Elm version uses tuples ... it seemed like this was a good
+candidate for records instead. (Since Purescript does not have tuple
 literals, Elm code using Tuples nees some modification in any event).
 
 If you want some more sophisticated handling of complex numbers, see
@@ -410,13 +411,13 @@ isInfinite :: Float -> Bool
 
 Determine whether a float is positive or negative infinity.
 
-    isInfinite (0/0)     == False
-    isInfinite (sqrt -1) == False
-    isInfinite (1/0)     == True
-    isInfinite 1         == False
+    isInfinite (0.0 / 0.0)   == false
+    isInfinite (sqrt (-1.0)) == false
+    isInfinite (1.0 / 0.0)   == true
+    isInfinite 1.0           == false
 
 Notice that NaN is not infinite! For float `n` to be finite implies that
-`not (isInfinite n || isNaN n)` evaluates to `True`.
+`not (isInfinite n || isNaN n)` evaluates to `true`.
 
 Note that this is not equivalent to the negation of Javascript's `isFinite()`.
 
@@ -436,8 +437,8 @@ logBase :: Float -> Float -> Float
 
 Calculate the logarithm of a number with a given base.
 
-    logBase 10 100 == 2
-    logBase 2 256 == 8
+    logBase 10.0 100.0 == 2.0
+    logBase 2.0 256.0 == 8.0
 
 #### `max`
 
@@ -465,8 +466,8 @@ mod :: forall a. (Ord a, ModuloSemiring a, Ring a) => a -> a -> a
 
 Perform [modular arithmetic](http://en.wikipedia.org/wiki/Modular_arithmetic).
 
-     7 % 2 == 1
-    -1 % 4 == 3
+       7 % 2 == 1
+    (-1) % 4 == 3
 
 Note that this is not the same as Purescript's `Prelude.mod` --
 for that, see `Basics.rem`.
@@ -574,6 +575,7 @@ toPolar :: { x :: Float, y :: Float } -> { r :: Float, theta :: Float }
 Convert Cartesian coordinates `{x, y}` to polar coordinates `{r, theta}`.
 
 Note that the Elm version uses tuples ... it seemed like this was a good
+candidate for records instead. (Since Purescript does not have tuple
 literals, Elm code using Tuples nees some modification in any event).
 
 If you want some more sophisticated handling of complex numbers, see
@@ -585,8 +587,7 @@ If you want some more sophisticated handling of complex numbers, see
 toString :: forall a. (Show a) => a -> String
 ```
 
-Turn any kind of value into a string. When you view the resulting string
-with `Text.fromString` it should look just like the value it came from.
+Turn any kind of value into a string.
 
     toString 42 == "42"
     toString [1,2] == "[1,2]"
@@ -625,7 +626,7 @@ Turn a function of two arguments into a function that expects a tuple.
 xor :: forall a. (BooleanAlgebra a) => a -> a -> a
 ```
 
-The exclusive-or operator. `True` if exactly one input is `True`.
+The exclusive-or operator. `true` if exactly one input is `true`.
 
 #### `(%)`
 
@@ -916,8 +917,6 @@ Traversable (Result a)
 Bitraversable Result
 (Semiring b) => Semiring (Result a b)
 (Semigroup b) => Semigroup (Result a b)
-(Arbitrary a, Arbitrary b) => Arbitrary (Result a b)
-(Coarbitrary a, Coarbitrary b) => Coarbitrary (Result a b)
 ```
 
 ### Re-exported from Elm.Signal:

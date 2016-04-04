@@ -11,35 +11,18 @@
     "output"
   ],
   "dependencies": {
-    "purescript-datetime": "~0.9.1",
-    "purescript-debug": "~0.1.3",
-    "purescript-dom": "~0.2.15",
-    "purescript-exists": "~0.2.0",
-    "purescript-functions": "~0.1.0",
-    "purescript-globals": "~0.2.2",
-    "purescript-integers": "~0.2.1",
-    "purescript-int-53": "~0.0.0",
-    "purescript-lists": "~0.7.7",
-    "purescript-maps": "~0.5.4",
-    "purescript-math": "~0.2.0",
-    "purescript-orders": "~0.1.1",
-    "purescript-quickcheck": "~0.12.2",
-    "purescript-sequences": "~0.5.0",
-    "purescript-sets": "~0.5.5",
-    "purescript-strings": "~0.7.1",
-    "purescript-tuples": "~0.4.0",
     "purescript-timers": "https://github.com/CapillarySoftware/purescript-timers.git#110dc2dd13cc05a875c533a4fb83219c3c2f84b2",
-    "purescript-colors": "~0.4.0",
-    "purescript-partial": "~1.1.0",
-    "purescript-format": "~0.1.0",
-    "purescript-refs": "~0.2.0"
+    "purescript-prelude": "~0.1.5",
+    "purescript-colors": "~0.4.3",
+    "purescript-elm-compat": "~0.0.0",
+    "purescript-nullable": "~0.2.1",
+    "purescript-refs": "~0.2.0",
+    "purescript-dom": "~0.2.19",
+    "purescript-exists": "~0.2.0",
+    "purescript-format": "~0.1.0"
   },
   "devDependencies": {
-    "purescript-console": "~0.1.1",
-    "purescript-generics": "~0.7.2",
-    "purescript-list-zipper": "https://github.com/rgrempel/purescript-list-zipper.git#275407b01431fa40bc990bcefa2835ea851f3969",
     "purescript-test-unit": "~4.1.0",
-    "purescript-quickcheck-laws": "~0.1.1",
-    "purescript-benchotron": "~3.0.4"
+    "purescript-list-zipper": "~0.1.0"
   }
 }

@@ -8,7 +8,6 @@ var sources = [
     "src/**/*.purs",
     "bower_components/purescript-*/src/**/*.purs",
     "test/**/*.purs",
-    "benchmark/**/*.purs",
     "examples/**/*.purs"
 ];
 
@@ -16,7 +15,6 @@ var foreigns = [
     "src/**/*.js",
     "bower_components/purescript-*/src/**/*.js",
     "test/**/*.js",
-    "benchmark/**/*.js",
     "examples/**/*.js"
 ];
 
@@ -116,34 +114,13 @@ gulp.task("docs", ["make"], function () {
         format: "markdown",
         docgen: {
             "Elm.Graphics.Element": "docs/Elm/Graphics/Element.md",
-            "Elm.Json.Decode": "docs/Elm/Json/Decode.md",
-            "Elm.Json.Encode": "docs/Elm/Json/Encode.md",
-            "Elm.Apply": "docs/Elm/Apply.md",
-            "Elm.Array": "docs/Elm/Array.md",
-            "Elm.Basics": "docs/Elm/Basics.md",
-            "Elm.Bind": "docs/Elm/Bind.md",
-            "Elm.Bitwise": "docs/Elm/Bitwise.md",
-            "Elm.Char": "docs/Elm/Char.md",
             "Elm.Color": "docs/Elm/Color.md",
-            "Elm.Date": "docs/Elm/Date.md",
-            "Elm.Debug": "docs/Elm/Debug.md",
             "Elm.Default": "docs/Elm/Default.md",
-            "Elm.Dict": "docs/Elm/Dict.md",
-            "Elm.Foldable": "docs/Elm/Foldable.md",
-            "Elm.Int53": "docs/Elm/Int53.md",
             "Elm.Keyboard": "docs/Elm/Keyboard.md",
-            "Elm.List": "docs/Elm/List.md",
-            "Elm.Maybe": "docs/Elm/Maybe.md",
             "Elm.Mouse": "docs/Elm/Mouse.md",
-            "Elm.Random": "docs/Elm/Random.md",
-            "Elm.Regex": "docs/Elm/Regex.md",
-            "Elm.Result": "docs/Elm/Result.md",
-            "Elm.Set": "docs/Elm/Set.md",
             "Elm.Signal": "docs/Elm/Signal.md",
-            "Elm.String": "docs/Elm/String.md",
             "Elm.Task": "docs/Elm/Task.md",
             "Elm.Time": "docs/Elm/Time.md",
-            "Elm.Trampoline": "docs/Elm/Trampoline.md",
             "Elm.Window": "docs/Elm/Window.md"
         }
     });
