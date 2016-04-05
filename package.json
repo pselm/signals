@@ -13,7 +13,7 @@
     "gulp": "^3.9.1",
     "gulp-purescript": "^0.8.0",
     "pulp": "^8.0.0",
-    "purescript": "^0.8.3",
+    "purescript": "0.8.2",
     "purescript-psa": "^0.3.5",
     "rimraf": "^2.5.0"
   }
