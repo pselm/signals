@@ -109,6 +109,10 @@ newtype Element = Element
     , element :: ElementPrim
     }
 
+instance eqElement :: Eq Element where
+    eq (Element a) (Element b) =
+        (eqProperties a.props b.props) && a.element == b.element
+
 
 -- I've removed the `id :: Int` because it's essentially effectful to add an id.
 -- It seems to be used (indirectly) to determine whether two ElementPrim's are
@@ -125,6 +129,15 @@ type Properties =
     -- , click :: Unit
     }
 
+eqProperties :: Properties -> Properties -> Boolean
+eqProperties a b =
+    a.width == b.width &&
+    a.height == b.height &&
+    a.opacity == b.opacity &&
+    a.color == b.color &&
+    a.href == b.href &&
+    a.tag == b.tag
+
 
 data ElementPrim
     = Image ImageStyle Int Int String
@@ -134,13 +147,32 @@ data ElementPrim
     | RawHtml String String -- html align
     | Custom -- for custom Elements implemented in JS, see collage for example
 
+instance eqElementPrim :: Eq ElementPrim where
+    eq (Image style1 width1 height1 src1) (Image style2 width2 height2 src2) =
+        style1 == style2 && width1 == width2 && height1 == height2 && src1 == src2
+
+    eq (Container pos1 elem1) (Container pos2 elem2) =
+        (eqRawPosition pos1 pos2) && elem1 == elem2
+
+    eq (Flow dir1 list1) (Flow dir2 list2) =
+        dir1 == dir2 && list1 == list2
+
+    eq Spacer Spacer = true
+
+    eq (RawHtml html1 align1) (RawHtml html2 align2) =
+        align1 == align2 && html1 == html2
+
+    -- For now ... revisit later!
+    eq Custom Custom = true
+
+    eq _ _ = false
+
 
 data ImageStyle
     = Plain
     | Fitted
     | Cropped {top :: Int, left :: Int}
     | Tiled
-
 
 instance eqImageStyle :: Eq ImageStyle where
     eq Plain Plain = true
@@ -154,6 +186,9 @@ instance eqImageStyle :: Eq ImageStyle where
 -- | left corner”.
 newtype Position = Position RawPosition
 
+instance eqPosition :: Eq Position where
+    eq (Position a) (Position b) = eqRawPosition a b
+
 
 -- | Specifies a distance from a particular location within a `container`, like
 -- | “20 pixels right and up from the center”. You can use `absolute` or `relative`
@@ -162,8 +197,19 @@ data Pos
     = Absolute Int
     | Relative Float
 
+instance eqPos :: Eq Pos where
+    eq (Absolute a) (Absolute b) = a == b
+    eq (Relative a) (Relative b) = a == b
+    eq _ _ = false
+
 
 data Three = P | Z | N
+
+instance eqThree :: Eq Three where
+    eq P P = true
+    eq Z Z = true
+    eq N N = true
+    eq _ _ = false
 
 
 type RawPosition =
@@ -172,6 +218,10 @@ type RawPosition =
     , x :: Pos
     , y :: Pos
     }
+
+eqRawPosition :: RawPosition -> RawPosition -> Boolean
+eqRawPosition a b =
+    a.horizontal == b.horizontal && a.vertical == b.vertical && a.x == b. x && a.y == b.y 
 
 
 -- | Represents a `flow` direction for a list of elements.
@@ -182,7 +232,6 @@ data Direction
     | DRight
     | DIn
     | DOut
-
 
 instance eqDirection :: Eq Direction where
     eq DUp DUp = true

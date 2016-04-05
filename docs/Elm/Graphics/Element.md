@@ -14,6 +14,11 @@ A graphical element that can be rendered on screen. Every element is a
 rectangle with a known width and height, so they can be composed and stacked
 easily.
 
+##### Instances
+``` purescript
+Eq Element
+```
+
 #### `Position`
 
 ``` purescript
@@ -22,6 +27,11 @@ newtype Position
 
 Specifies a position for an element within a `container`, like “the top
 left corner”.
+
+##### Instances
+``` purescript
+Eq Position
+```
 
 #### `Pos`
 
@@ -32,6 +42,11 @@ data Pos
 Specifies a distance from a particular location within a `container`, like
 “20 pixels right and up from the center”. You can use `absolute` or `relative`
 to specify a `Pos` in pixels or as a percentage of the container.
+
+##### Instances
+``` purescript
+Eq Pos
+```
 
 #### `Direction`
 
