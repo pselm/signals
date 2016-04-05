@@ -1,8 +1,13 @@
 {
-  "name": "elm",
-  "version": "0.0.1",
-  "moduleType": [
-    "node"
+  "name": "purescript-elm",
+  "homepage": "https://github.com/rgrempel/purescript-elm",
+  "authors": [
+    "Ryan Rempel <rgrempel@gmail.com>"
+  ],
+  "description": "Elm libraries in Purescript",
+  "license": "MIT",
+  "keywords": [
+    "purescript"
   ],
   "ignore": [
     "**/.*",
@@ -24,5 +29,9 @@
   "devDependencies": {
     "purescript-test-unit": "~4.1.0",
     "purescript-list-zipper": "~0.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/rgrempel/purescript-elm.git"
   }
 }
