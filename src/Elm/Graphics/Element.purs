@@ -1157,8 +1157,11 @@ update outerNode (Element curr) (Element next) = do
                 Image imageStyle imageWidth imageHeight src ->
                     case currE of
                         Image oldImageStyle oldImageWidth oldImageHeight oldSrc ->
-                            case imageStyle of
-                                Plain -> do
+                            case {imageStyle, oldImageStyle} of
+                                -- If we're transitioning from plain to plain, then we just
+                                -- have to update the src if necessary, and the props. At
+                                -- least, that's how Elm does it.
+                                {imageStyle: Plain, oldImageStyle: Plain} -> do
                                     when (oldSrc /= src) $
                                         setAttribute "src" src innerNode
 
