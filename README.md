@@ -1,3 +1,6 @@
+[![Dependency Status](https://www.versioneye.com/user/projects/57031192fcd19a00415b00c3/badge.svg?style=flat)](https://www.versioneye.com/user/projects/57031192fcd19a00415b00c3)
+[![Dependency Status](https://www.versioneye.com/user/projects/57031197fcd19a004543f935/badge.svg?style=flat)](https://www.versioneye.com/user/projects/57031197fcd19a004543f935)
+
 # purescript-elm
 
 Having done some [Elm](http://elm-lang.org) programming, I wanted to give
