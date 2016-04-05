@@ -81,6 +81,7 @@ scenes =
         : scene7 : scene8 : scene9 : scene10 : scene11 : scene12
         : scene13 : scene14 : scene15 : scene16 : scene17 : scene18
         : scene19 : scene20 : scene21 : scene22 : scene23 : scene24
+        : scene25 : scene26 : scene27 : scene28
         : Nil
         )
 
@@ -287,6 +288,41 @@ scene24 :: Element
 scene24 =
     flow down
         ( title "Change the image size."
-        : image 400 300 "library.png"
+        : image 400 200 "library.png"
+        : Nil
+        )
+
+scene25 :: Element
+scene25 =
+    flow down
+        ( title "Change to a fitted image"
+        : fittedImage 400 200 "library.png"
+        : Nil
+        )
+
+
+scene26 :: Element
+scene26 =
+    flow down
+        ( title "Change to a cropped image"
+        : croppedImage {top: 100, left: 50} 75 50 "library.png"
+        : Nil
+        )
+
+
+scene27 :: Element
+scene27 =
+    flow down
+        ( title "Change the cropping"
+        : croppedImage {top: 50, left: 100} 75 50 "library.png"
+        : Nil
+        )
+
+
+scene28 :: Element
+scene28 =
+    flow down
+        ( title "Change to tiled image"
+        : tiledImage 400 200 "library.png"
         : Nil
         )
