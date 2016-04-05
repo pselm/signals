@@ -1130,112 +1130,112 @@ update outerNode (Element curr) (Element next) = do
             updateProps innerNode (Element curr) (Element next)
             pure outerNode
 
-        else do
+        else
             -- Otherwise, it depends on what the old and new element are
-            case nextE of
-                Spacer ->
-                    case currE of
-                        Spacer -> do
+            case { nextE, currE } of
+
+                -- Both spacers
+                { nextE: Spacer
+                , currE: Spacer
+                } -> do
+                    updateProps innerNode (Element curr) (Element next)
+                    pure outerNode
+
+                -- Both RawHtml
+                { nextE: RawHtml html _
+                , currE: RawHtml oldHtml _
+                } -> do
+                    when (html /= oldHtml) $
+                        setInnerHtml html innerNode
+
+                    updateProps innerNode (Element curr) (Element next)
+                    pure outerNode
+
+                -- Both Images
+                { nextE: Image imageStyle imageWidth imageHeight src
+                , currE: Image oldImageStyle oldImageWidth oldImageHeight oldSrc
+                } ->
+                    case { imageStyle, oldImageStyle } of
+                        -- If we're transitioning from plain to plain, then we just
+                        -- have to update the src if necessary, and the props. At
+                        -- least, that's how Elm does it.
+                        { imageStyle: Plain
+                        , oldImageStyle: Plain
+                        } -> do
+                            when (oldSrc /= src) $
+                                setAttribute "src" src innerNode
+
                             updateProps innerNode (Element curr) (Element next)
                             pure outerNode
 
+                        -- In any other case, check if anything changed ...
                         _ ->
-                            render (Element next)
+                            if next.props.width /= curr.props.width
+                               || next.props.height /= curr.props.height
+                               || oldImageStyle /= imageStyle
+                               || oldImageHeight /= imageHeight
+                               || oldSrc /= src
 
-                RawHtml html _ -> do
-                    case currE of
-                        RawHtml oldHtml _ -> do
-                            when (html /= oldHtml) $
-                                setInnerHtml html innerNode
+                                    then render (Element next)
+                                    else do
+                                        updateProps innerNode (Element curr) (Element next)
+                                        pure outerNode
 
-                            updateProps innerNode (Element curr) (Element next)
-                            pure outerNode
+                -- Both flows
+                { nextE: Flow dir list
+                , currE: Flow oldDir oldList
+                } -> do
+                    if dir /= oldDir
+                        then render (Element next)
+                        else do
+                            kids <- ParentNode.children (elementToParentNode innerNode)
+                            len <- HTMLCollection.length kids
 
-                        _ ->
-                            render (Element next)
+                            if len /= length list || len /= length oldList
+                                then render (Element next)
+                                else do
+                                    let
+                                        reversal = needsReversal dir
+                                        goDir = directionTable dir
 
-                Image imageStyle imageWidth imageHeight src ->
-                    case currE of
-                        Image oldImageStyle oldImageWidth oldImageHeight oldSrc ->
-                            case {imageStyle, oldImageStyle} of
-                                -- If we're transitioning from plain to plain, then we just
-                                -- have to update the src if necessary, and the props. At
-                                -- least, that's how Elm does it.
-                                {imageStyle: Plain, oldImageStyle: Plain} -> do
-                                    when (oldSrc /= src) $
-                                        setAttribute "src" src innerNode
+                                    -- Why doesn't forE take an Int?
+                                    forE 0.0 (toNumber len) \num -> do
+                                        let
+                                            i = truncate num
+
+                                            kidIndex =
+                                                if reversal
+                                                    then len - (i + 1)
+                                                    else i
+
+                                        kid <- toMaybe <$> HTMLCollection.item kidIndex kids
+                                        innerOld <- pure $ index oldList i
+                                        innerNext <- pure $ index list i
+
+                                        for_ kid \k ->
+                                            for_ innerOld \old ->
+                                                for_ innerNext \next ->
+                                                    updateAndReplace k old next >>= goDir
 
                                     updateProps innerNode (Element curr) (Element next)
                                     pure outerNode
 
-                                _ ->
-                                    if next.props.width /= curr.props.width || next.props.height /= curr.props.height
-                                        || oldImageStyle /= imageStyle || oldImageHeight /= imageHeight || oldSrc /= src
-                                        then render (Element next)
-                                        else do
-                                            updateProps innerNode (Element curr) (Element next)
-                                            pure outerNode
+                -- Both containers
+                { nextE: Container rawPos elem
+                , currE: Container oldRawPos oldElem
+                } -> do
+                    nullableSubnode <- ParentNode.firstElementChild (elementToParentNode innerNode)
+                    for_ (toMaybe nullableSubnode) \subnode -> do
+                        newSubNode <- updateAndReplace subnode oldElem elem
+                        setPos rawPos elem newSubNode
 
-                        _ ->
-                            render (Element next)
+                    updateProps innerNode (Element curr) (Element next)
+                    pure outerNode
 
-
-                Flow dir list ->
-                    case currE of
-                        Flow oldDir oldList -> do
-                            if dir /= oldDir
-                                then render (Element next)
-                                else do
-                                    kids <- ParentNode.children (elementToParentNode innerNode)
-                                    len <- HTMLCollection.length kids
-
-                                    if len /= length list || len /= length oldList
-                                        then render (Element next)
-                                        else do
-                                            let
-                                                reversal = needsReversal dir
-                                                goDir = directionTable dir
-
-                                            -- Why doesn't forE take an Int?
-                                            forE 0.0 (toNumber len) \num -> do
-                                                let
-                                                    i = truncate num
-
-                                                    kidIndex =
-                                                        if reversal
-                                                            then len - (i + 1)
-                                                            else i
-
-                                                kid <- toMaybe <$> HTMLCollection.item kidIndex kids
-                                                innerOld <- pure $ index oldList i
-                                                innerNext <- pure $ index list i
-
-                                                for_ kid \k ->
-                                                    for_ innerOld \old ->
-                                                        for_ innerNext \next ->
-                                                            updateAndReplace k old next >>= goDir
-
-                                            updateProps innerNode (Element curr) (Element next)
-                                            pure outerNode
-
-                        _ ->
-                            render (Element next)
-
-                Container rawPos elem ->
-                    case currE of
-                        Container oldRawPos oldElem -> do
-                            nullableSubnode <- ParentNode.firstElementChild (elementToParentNode innerNode)
-                            for_ (toMaybe nullableSubnode) \subnode -> do
-                                newSubNode <- updateAndReplace subnode oldElem elem
-                                setPos rawPos elem newSubNode
-
-                            updateProps innerNode (Element curr) (Element next)
-                            pure outerNode
-
-                        _ ->
-                            render (Element next)
-
-                Custom ->
+                -- Both custom
+                { nextE: Custom
+                , currE: Custom
+                } ->
                     render (Element next)
                     -- TODO
                     {-
@@ -1246,6 +1246,10 @@ update outerNode (Element curr) (Element next) = do
                             return updatedNode;
                         }
                     -}
+
+                -- Different element constructors
+                _ ->
+                    render (Element next)
 
 
 updateProps :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) Unit
