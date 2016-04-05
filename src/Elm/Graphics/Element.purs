@@ -1217,14 +1217,12 @@ update outerNode (Element curr) (Element next) = do
                             updateProps innerNode (Element curr) (Element next)
                             pure outerNode
 
-                        -- In any other case, check if anything changed ...
                         _ ->
-                            if next.props.width /= curr.props.width
-                               || next.props.height /= curr.props.height
-                               || oldImageStyle /= imageStyle
-                               || oldImageHeight /= imageHeight
-                               || oldSrc /= src
-
+                            -- Width and height changes appear to need a re-render ...
+                            -- Normally just an update props would be required.
+                            if next.props.width /= curr.props.width ||
+                               next.props.height /= curr.props.height ||
+                               nextE /= currE
                                     then render (Element next)
                                     else do
                                         updateProps innerNode (Element curr) (Element next)
