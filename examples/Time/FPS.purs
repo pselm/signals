@@ -7,12 +7,12 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (log)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Timer (TIMER)
+import DOM.Timer (Timer)
 import Data.Date (Now)
 import Prelude (show, bind, Unit)
 
 
-main :: forall e. Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) Unit
+main :: forall e. Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer | e) Unit
 main =
     setup do
         let

@@ -29,7 +29,7 @@ import Data.Int (round)
 import Elm.Maybe (Maybe(..))
 import Data.Date (Now, nowEpochMilliseconds)
 import Prelude ((/), flip, id, ($), (<<<), bind, pure, (-), (<$>), unit, (>>=), void, const, negate, (+), (/=))
-import Control.Monad.Eff.Timer (TIMER, Interval, interval, clearInterval, timeout)
+import DOM.Timer (Timer, Interval, interval, clearInterval, timeout)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
@@ -104,7 +104,7 @@ inHours = divBy hour
 -- | the desired FPS. A time delta is the time between the last frame and the
 -- | current frame.
 fps ::
-    forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) m) =>
+    forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer | e) m) =>
     Float -> GraphState m (Signal Time)
 
 fps targetFrames =
@@ -117,7 +117,7 @@ fps targetFrames =
 -- | the pause was. This way summing the deltas will actually give the amount
 -- | of time that the output signal has been running.
 fpsWhen ::
-    forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) m) =>
+    forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer | e) m) =>
     Float -> Signal Bool -> GraphState m (Signal Time)
 
 fpsWhen desiredFPS isOn = do
@@ -185,7 +185,7 @@ fpsWhen desiredFPS isOn = do
 -- | Takes a time interval `t`. The resulting signal is the current time, updated
 -- | every `t`.
 every ::
-    forall e m. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) =>
+    forall e m. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: Timer, console :: CONSOLE | e) m) =>
     Time -> GraphState m (Signal Time)
 
 every t = do
@@ -202,7 +202,7 @@ every t = do
 -- | Delay a signal by a certain amount of time. So `(delay second Mouse.clicks)`
 -- | will update one second later than any mouse click.
 delay :: 
-    forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) =>
+    forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: Timer, console :: CONSOLE | e) m) =>
     Time -> Signal a -> GraphState m (Signal a)
 
 delay period signal = do
@@ -227,7 +227,7 @@ delay period signal = do
 -- | Mouse.clicks)`` would result in a signal that is true for one second after
 -- | each mouse click and false otherwise.
 since ::
-    forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) =>
+    forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: Timer, console :: CONSOLE | e) m) =>
     Time -> Signal a -> GraphState m (Signal Bool)
 
 since time signal = do

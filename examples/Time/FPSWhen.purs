@@ -8,12 +8,12 @@ import Control.Monad.Eff.Console (log)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Timer (TIMER, interval)
+import DOM.Timer (Timer, interval)
 import Data.Date (Now)
 import Prelude (show, bind, Unit, not, ($))
 
 
-main :: forall e. Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) Unit
+main :: forall e. Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer | e) Unit
 main =
     setup do
         let

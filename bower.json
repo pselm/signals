@@ -16,7 +16,6 @@
     "output"
   ],
   "dependencies": {
-    "purescript-timers": "https://github.com/CapillarySoftware/purescript-timers.git#110dc2dd13cc05a875c533a4fb83219c3c2f84b2",
     "purescript-prelude": "~0.1.5",
     "purescript-colors": "~0.4.3",
     "purescript-elm-compat": "~0.0.0",
@@ -25,6 +24,7 @@
     "purescript-dom": "~0.2.19",
     "purescript-exists": "~0.2.0",
     "purescript-format": "~0.1.0"
+    "purescript-timers": "~1.0.0"
   },
   "devDependencies": {
     "purescript-test-unit": "~4.1.0",

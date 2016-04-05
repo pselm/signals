@@ -84,7 +84,7 @@ inHours :: Time -> Float
 #### `fps`
 
 ``` purescript
-fps :: forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) m) => Float -> GraphState m (Signal Time)
+fps :: forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer | e) m) => Float -> GraphState m (Signal Time)
 ```
 
 Takes desired number of frames per second (FPS). The resulting signal
@@ -95,7 +95,7 @@ current frame.
 #### `fpsWhen`
 
 ``` purescript
-fpsWhen :: forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER | e) m) => Float -> Signal Bool -> GraphState m (Signal Time)
+fpsWhen :: forall e m. (MonadEff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer | e) m) => Float -> Signal Bool -> GraphState m (Signal Time)
 ```
 
 Same as the `fps` function, but you can turn it on and off. Allows you
@@ -107,7 +107,7 @@ of time that the output signal has been running.
 #### `every`
 
 ``` purescript
-every :: forall e m. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) => Time -> GraphState m (Signal Time)
+every :: forall e m. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: Timer, console :: CONSOLE | e) m) => Time -> GraphState m (Signal Time)
 ```
 
 Takes a time interval `t`. The resulting signal is the current time, updated
@@ -116,7 +116,7 @@ every `t`.
 #### `delay`
 
 ``` purescript
-delay :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) => Time -> Signal a -> GraphState m (Signal a)
+delay :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: Timer, console :: CONSOLE | e) m) => Time -> Signal a -> GraphState m (Signal a)
 ```
 
 Delay a signal by a certain amount of time. So `(delay second Mouse.clicks)`
@@ -125,7 +125,7 @@ will update one second later than any mouse click.
 #### `since`
 
 ``` purescript
-since :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: TIMER, console :: CONSOLE | e) m) => Time -> Signal a -> GraphState m (Signal Bool)
+since :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, now :: Now, timer :: Timer, console :: CONSOLE | e) m) => Time -> Signal a -> GraphState m (Signal Bool)
 ```
 
 Takes a time `t` and any signal. The resulting boolean signal is true for

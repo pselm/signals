@@ -7,7 +7,6 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE, log)
-import Control.Monad.Eff.Timer (TIMER)
 import Control.Monad.Trans (lift)
 import Data.Date (Now)
 import DOM.HTML (window)
@@ -15,6 +14,7 @@ import DOM.HTML.Types (htmlDocumentToNonElementParentNode, readHTMLElement)
 import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (ElementId(..))
+import DOM.Timer (Timer)
 import DOM (DOM)
 import Prelude (class Show, show, bind, Unit, (<<<), (++), ($), (>>=))
 import Data.Nullable (toMaybe)
@@ -35,7 +35,7 @@ logWindow label signal = do
     lift $ runSignal printer
 
 
-main :: ∀ e. Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: TIMER, dom :: DOM | e) Unit
+main :: ∀ e. Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE, timer :: Timer, dom :: DOM | e) Unit
 main =
     setup do
         doc <- liftEff $
