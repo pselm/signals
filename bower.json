@@ -18,12 +18,12 @@
   "dependencies": {
     "purescript-prelude": "~0.1.5",
     "purescript-colors": "~0.4.3",
-    "purescript-elm-compat": "~0.0.0",
+    "purescript-elm-compat": "~1.0.0",
     "purescript-nullable": "~0.2.1",
     "purescript-refs": "~0.2.0",
     "purescript-dom": "~0.2.19",
     "purescript-exists": "~0.2.0",
-    "purescript-format": "~0.1.0"
+    "purescript-format": "~0.1.0",
     "purescript-timers": "~1.0.0"
   },
   "devDependencies": {
