@@ -81,7 +81,8 @@ scenes =
         : scene7 : scene8 : scene9 : scene10 : scene11 : scene12
         : scene13 : scene14 : scene15 : scene16 : scene17 : scene18
         : scene19 : scene20 : scene21 : scene22 : scene23 : scene24
-        : scene25 : scene26 : scene27 : scene28
+        : scene25 : scene26 : scene27 : scene28 : scene29 : scene30
+        : scene31 : scene32 : scene33 : scene34 : scene35 : scene36
         : Nil
         )
 
@@ -324,5 +325,93 @@ scene28 =
     flow down
         ( title "Change to tiled image"
         : tiledImage 400 200 "library.png"
+        : Nil
+        )
+
+
+smallBlueBox :: Element
+smallBlueBox = color Elm.Color.blue (spacer 20 20)
+
+
+smallRedBox :: Element
+smallRedBox = color Elm.Color.red (spacer 20 20)
+
+
+smallYellowBox :: Element
+smallYellowBox = color Elm.Color.yellow (spacer 20 20)
+
+
+scene29 :: Element
+scene29 =
+    flow down
+        ( title "Two boxes flowing down"
+        : flow down (smallRedBox : smallBlueBox : Nil)
+        : Nil
+        )
+
+
+scene30 :: Element
+scene30 =
+    flow down
+        ( title "Add a third box"
+        : flow down (smallRedBox : smallBlueBox : smallYellowBox : Nil)
+        : Nil
+        )
+
+
+scene31 :: Element
+scene31 =
+    flow down
+        ( title "Keep direction, but rotate elements"
+        : flow down (smallYellowBox : smallRedBox : smallBlueBox : Nil)
+        : Nil
+        )
+
+
+scene32 :: Element
+scene32 =
+    flow down
+        ( title "Change one element"
+        : flow down (smallYellowBox : smallYellowBox : smallBlueBox : Nil)
+        : Nil
+        )
+
+
+scene33 :: Element
+scene33 =
+    flow down
+        ( title "Reverse the direction"
+        : flow up (smallYellowBox : smallYellowBox : smallBlueBox : Nil)
+        : Nil
+        )
+
+
+redColor :: Element -> Element
+redColor = color Elm.Color.red
+
+
+scene34 :: Element
+scene34 =
+    flow down
+        ( title "Container"
+        : redColor (container 100 100 middle smallBlueBox)
+        : Nil
+        )
+
+
+scene35 :: Element
+scene35 =
+    flow down
+        ( title "Container with changed position"
+        : redColor (container 100 100 topLeft smallBlueBox)
+        : Nil
+        )
+
+
+scene36 :: Element
+scene36 =
+    flow down
+        ( title "Container with changed size"
+        : redColor (container 150 150 topLeft smallBlueBox)
         : Nil
         )
