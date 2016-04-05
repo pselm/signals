@@ -5,8 +5,6 @@ env:
   - PATH=./node_modules/.bin:$PATH
 install:
   - npm install
-  - bower install
-  - bower install pulp
 script:
   - pulp build --censor-lib
   - gulp test
