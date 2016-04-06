@@ -120,6 +120,8 @@ multiply (Transform2D m) (Transform2D n) =
             ]
 
     where
+        -- Note that these aren't actually unsafe because a
+        -- Transform2D always has 6 members
         m11 = unsafeIndex m 0
         m12 = unsafeIndex m 1
         m21 = unsafeIndex m 3
