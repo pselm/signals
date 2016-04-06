@@ -25,6 +25,7 @@ module Elm.Graphics.Element
     ) where
 
 
+import Elm.Graphics.Internal (createNode, setStyle, removeStyle)
 import Elm.Basics (Float, truncate)
 import Elm.Color (Color)
 import Elm.List (List(..))
@@ -68,12 +69,6 @@ import Prelude
 
 
 -- FOREIGN
-
--- Sets the style named in the first param to the value of the second param
-foreign import setStyle :: ∀ e. String -> String -> DOM.Element -> Eff (dom :: DOM | e) Unit
-
--- Removes the style
-foreign import removeStyle :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
 
 -- Inner HTML
 foreign import setInnerHtml :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
@@ -734,14 +729,6 @@ outward = DOut
 -- The remainder is a conversion of the Native JS code from Elm
 
 -- CREATION
-
-createNode :: ∀ e. String -> Eff (dom :: DOM | e) DOM.Element
-createNode elementType = do
-    node <- window >>= document >>= htmlDocumentToDocument >>> createElement elementType
-    setStyle "padding" "0px" node
-    setStyle "margin" "0px" node
-    pure node
-
 
 newElement :: Int -> Int -> ElementPrim -> Element
 newElement w h prim =
