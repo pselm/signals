@@ -19,7 +19,7 @@ module Elm.Graphics.Collage
     ) where
 
 
-import Elm.Color (Color)
+import Elm.Color (Color, toCss)
 import Elm.Basics (Float)
 import Elm.Text (Text)
 import Elm.Transform2D (Transform2D)
@@ -33,6 +33,9 @@ import Data.Int (toNumber)
 import DOM (DOM)
 import DOM.Node.Types (Element) as DOM
 import Control.Monad.Eff (Eff)
+import Graphics.Canvas (Context2D, Canvas)
+import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle) as Canvas
+import Control.Bind ((>=>))
 import Prelude (pure, (<<<), (*), (/), ($), map, (+), (-), bind)
 
 
@@ -61,6 +64,12 @@ data LineCap
     | Padded
 
 
+lineCap2Canvas :: LineCap -> Canvas.LineCap
+lineCap2Canvas Flat = Canvas.Butt
+lineCap2Canvas Round = Canvas.Round
+lineCap2Canvas Padded = Canvas.Square
+
+
 -- | The shape of the &ldquo;joints&rdquo; of a line, where each line segment
 -- | meets. `Sharp` takes an argument to limit the length of the joint. This
 -- | defaults to 10.
@@ -70,13 +79,23 @@ data LineJoin
     | Clipped
 
 
+-- TODO: Should suggest adding something like this to Graphics.Canvas
+foreign import setLineJoinImpl :: ∀ e. String -> Number -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+
+-- | Set the current line join type.
+setLineJoin :: ∀ e. LineJoin -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+setLineJoin Smooth = setLineJoinImpl "round" 10.0
+setLineJoin (Sharp limit) = setLineJoinImpl "miter" limit
+setLineJoin Clipped = setLineJoinImpl "bevel" 10.0
+
+
 -- | All of the attributes of a line style. This lets you build up a line style
 -- | however you want. You can also update existing line styles with record updates.
 type LineStyle =
     { color :: Color
     , width :: Float
-    , cap   :: LineCap
-    , join  :: LineJoin
+    , cap :: LineCap
+    , join :: LineJoin
     , dashing :: List Int
     , dashOffset :: Int
     }
@@ -406,29 +425,15 @@ render model = do
     -- update div model model
     pure div
 
+
+setStrokeStyle :: ∀ e. LineStyle -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+setStrokeStyle style =
+    Canvas.setLineWidth style.width >=>
+    Canvas.setLineCap (lineCap2Canvas style.cap) >=>
+    setLineJoin style.join >=>
+    Canvas.setStrokeStyle (toCss style.color)
+
 {-
-	function setStrokeStyle(ctx, style)
-	{
-		ctx.lineWidth = style.width;
-
-		var cap = style.cap.ctor;
-		ctx.lineCap = cap === 'Flat'
-			? 'butt'
-			: cap === 'Round'
-				? 'round'
-				: 'square';
-
-		var join = style.join.ctor;
-		ctx.lineJoin = join === 'Smooth'
-			? 'round'
-			: join === 'Sharp'
-				? 'miter'
-				: 'bevel';
-
-		ctx.miterLimit = style.join._0 || 10;
-		ctx.strokeStyle = Color.toCss(style.color);
-	}
-
 	function setFillStyle(redo, ctx, style)
 	{
 		var sty = style.ctor;
