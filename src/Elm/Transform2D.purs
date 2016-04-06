@@ -7,7 +7,7 @@
 -- | coordinates, used for [affine transformations](http://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations).
 -- | Since the bottom row is always `0 0 1` in these matrices, it is omitted in the diagrams below.
 
-module Transform2D
+module Elm.Transform2D
     ( Transform2D
     , identity, matrix, multiply
     , rotation, translation
