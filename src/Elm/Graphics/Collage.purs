@@ -30,11 +30,12 @@ import Elm.Color (Gradient, black)
 import Math (pi, cos, sin)
 import Data.List (List(..), (..), (:))
 import Data.Int (toNumber)
+import Data.Foldable (for_)
 import DOM (DOM)
 import DOM.Node.Types (Element) as DOM
 import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Context2D, Canvas)
-import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle) as Canvas
+import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo) as Canvas
 import Control.Bind ((>=>))
 import Prelude (pure, (<<<), (*), (/), ($), map, (+), (-), bind)
 
@@ -443,27 +444,28 @@ setStrokeStyle style =
 				? texture(redo, ctx, style._0)
 				: gradient(ctx, style._0);
 	}
+ -}
 
-	function trace(ctx, path)
-	{
-		var points = List.toArray(path);
-		var i = points.length - 1;
-		if (i <= 0)
-		{
-			return;
-		}
-		ctx.moveTo(points[i]._0, points[i]._1);
-		while (i--)
-		{
-			ctx.lineTo(points[i]._0, points[i]._1);
-		}
-		if (path.closed)
-		{
-			i = points.length - 1;
-			ctx.lineTo(points[i]._0, points[i]._1);
-		}
-	}
+-- Note that this traces first to last, whereas Elm traces from last to
+-- first. If this turns out to matter, I can reverse the list.
+trace :: ∀ e. Boolean -> List Point -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+trace closed list ctx =
+    case list of
+        Cons first rest -> do
+            Canvas.moveTo ctx first.x first.y
 
+            for_ rest \point ->
+                Canvas.lineTo ctx point.x point.y
+
+            if closed
+                then Canvas.lineTo ctx first.x first.y
+                else pure ctx
+
+        _ ->
+            pure ctx
+
+
+{-
 	function line(ctx, style, path)
 	{
 		if (style.dashing.ctor === '[]')
