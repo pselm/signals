@@ -24,7 +24,8 @@
     "purescript-dom": "~0.2.19",
     "purescript-exists": "~0.2.0",
     "purescript-format": "~0.1.0",
-    "purescript-timers": "~1.0.0"
+    "purescript-timers": "~1.0.0",
+    "purescript-typedarray": "~0.5.0"
   },
   "devDependencies": {
     "purescript-test-unit": "~4.1.0",
