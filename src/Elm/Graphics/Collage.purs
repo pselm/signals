@@ -40,7 +40,7 @@ import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Context2D, Canvas)
 import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo) as Canvas
 import Control.Bind ((>=>))
-import Prelude (pure, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show)
+import Prelude (class Eq, eq, pure, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show, (<), (>), (&&), negate)
 
 
 -- | A visual `Form` has a shape and texture. This can be anything from a red
@@ -60,12 +60,24 @@ data FillStyle
     | Texture String
     | Grad Gradient
 
+instance eqFillStyle :: Eq FillStyle where
+    eq (Solid c1) (Solid c2) = eq c1 c2
+    eq (Texture s1) (Texture s2) = eq s1 s2
+    eq (Grad g1) (Grad g2) = eq g1 g2
+    eq _ _ = false
+
 
 -- | The shape of the ends of a line.
 data LineCap
     = Flat
     | Round
     | Padded
+
+instance eqLineCap :: Eq LineCap where
+    eq Flat Flat = true
+    eq Round Round = true
+    eq Padded Padded = true
+    eq _ _ = false
 
 
 lineCap2Canvas :: LineCap -> Canvas.LineCap
@@ -81,6 +93,12 @@ data LineJoin
     = Smooth
     | Sharp Float
     | Clipped
+
+instance eqLineJoin :: Eq LineJoin where
+    eq Smooth Smooth = true
+    eq (Sharp f1) (Sharp f2) = eq f1 f2
+    eq Clipped Clipped = true
+    eq _ _ = false
 
 
 -- TODO: Should suggest adding something like this to Graphics.Canvas

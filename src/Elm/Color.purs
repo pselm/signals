@@ -29,7 +29,7 @@ import Color (Color, rgb, rgba) as Virtual
 -- For internal use
 
 import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
-import Prelude (($), (*), (/))
+import Prelude (class Eq, eq, (&&), ($), (*), (/))
 import Data.Tuple (Tuple(..))
 import Elm.Basics (Float)
 import Elm.List (List)
@@ -120,6 +120,11 @@ toCss = cssStringHSLA
 data Gradient
     = Linear (Tuple Float Float) (Tuple Float Float) (List (Tuple Float Color))
     | Radial (Tuple Float Float) Float (Tuple Float Float) Float (List (Tuple Float Color))
+
+instance eqGradient :: Eq Gradient where
+    eq (Linear a1 b1 c1) (Linear a2 b2 c2) = eq a1 a2 && eq b1 b2 && eq c1 c2
+    eq (Radial a1 b1 c1 d1 e1) (Radial a2 b2 c2 d2 e2) = eq a2 a2 && eq b1 b2 && eq c1 c2 && eq d1 d2 && eq e1 e2
+    eq _ _ = false
 
 
 -- | Create a linear gradient. Takes a start and end point and then a series of
