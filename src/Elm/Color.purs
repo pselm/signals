@@ -12,7 +12,7 @@ module Elm.Color
     , hsl, hsla
     , greyscale, grayscale, complement
     , toRgb, toHsl, toCss
-    , Gradient, linear, radial
+    , Gradient, linear, radial, toCanvasGradient
 
     , red, orange, yellow, green, blue, purple, brown
     , lightRed, lightOrange, lightYellow, lightGreen, lightBlue, lightPurple, lightBrown
@@ -28,9 +28,12 @@ import Color (Color, rgb, rgba) as Virtual
 
 -- For internal use
 
+import Control.Monad.Eff (Eff)
+import Graphics.Canvas (Context2D, Canvas, CanvasGradient, createLinearGradient, createRadialGradient, addColorStop)
 import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
-import Prelude (class Eq, eq, (&&), ($), (*), (/))
-import Data.Tuple (Tuple(..))
+import Prelude (class Eq, eq, (==), (&&), ($), (*), (/), bind, (>>=), pure)
+import Data.Tuple (Tuple(..), fst, snd)
+import Data.Foldable (for_)
 import Elm.Basics (Float)
 import Elm.List (List)
 import Elm.Basics (degrees)
@@ -116,14 +119,23 @@ toCss :: Color -> String
 toCss = cssStringHSLA
 
 
+type Point =
+    { x :: Float
+    , y :: Float
+    }
+
+eqPoint :: Point -> Point -> Boolean
+eqPoint p0 p1 = p0.x == p1.x && p0.y == p1.y
+
+
 -- | Abstract representation of a color gradient.
 data Gradient
-    = Linear (Tuple Float Float) (Tuple Float Float) (List (Tuple Float Color))
-    | Radial (Tuple Float Float) Float (Tuple Float Float) Float (List (Tuple Float Color))
+    = Linear Point Point (List (Tuple Float Color))
+    | Radial Point Float Point Float (List (Tuple Float Color))
 
 instance eqGradient :: Eq Gradient where
-    eq (Linear a1 b1 c1) (Linear a2 b2 c2) = eq a1 a2 && eq b1 b2 && eq c1 c2
-    eq (Radial a1 b1 c1 d1 e1) (Radial a2 b2 c2 d2 e2) = eq a2 a2 && eq b1 b2 && eq c1 c2 && eq d1 d2 && eq e1 e2
+    eq (Linear a1 b1 c1) (Linear a2 b2 c2) = eqPoint a1 a2 && eqPoint b1 b2 && eq c1 c2
+    eq (Radial a1 b1 c1 d1 e1) (Radial a2 b2 c2 d2 e2) = eqPoint a2 a2 && eq b1 b2 && eqPoint c1 c2 && eq d1 d2 && eq e1 e2
     eq _ _ = false
 
 
@@ -131,7 +143,7 @@ instance eqGradient :: Eq Gradient where
 -- | &ldquo;color stops&rdquo; that indicate how to interpolate between the start and
 -- | end points. See [this example](http://elm-lang.org/examples/linear-gradient) for a
 -- | more visual explanation.
-linear :: (Tuple Float Float) -> (Tuple Float Float) -> List (Tuple Float Color) -> Gradient
+linear :: Point -> Point -> List (Tuple Float Color) -> Gradient
 linear = Linear
 
 
@@ -140,8 +152,43 @@ linear = Linear
 -- | stops&rdquo; that indicate how to interpolate between the inner and outer
 -- | circles. See [this example](http://elm-lang.org/examples/radial-gradient) for a
 -- | more visual explanation.
-radial :: (Tuple Float Float) -> Float -> (Tuple Float Float) -> Float -> List (Tuple Float Color) -> Gradient
+radial :: Point -> Float -> Point -> Float -> List (Tuple Float Color) -> Gradient
 radial = Radial
+
+
+-- | Make a CanvasGradient from a Gradient.
+toCanvasGradient :: ∀ e. Gradient -> Context2D -> Eff (canvas :: Canvas | e) CanvasGradient
+toCanvasGradient grad ctx =
+    case grad of
+        Linear p0 p1 stops ->
+            createLinearGradient
+                { x0: p0.x
+                , y0: p0.y
+                , x1: p1.x
+                , y1: p1.y
+                }
+                ctx
+            >>= addStops stops
+
+        Radial p0 r0 p1 r1 stops ->
+            createRadialGradient
+                { x0: p0.x
+                , y0: p0.y
+                , r0
+                , x1: p1.x
+                , y1: p1.y
+                , r1
+                }
+                ctx
+            >>= addStops stops
+
+
+addStops :: ∀ e. List (Tuple Float Color) -> CanvasGradient -> Eff (canvas :: Canvas | e) CanvasGradient
+addStops list grad = do
+    for_ list \tuple ->
+        addColorStop (fst tuple) (toCss $ snd tuple) grad
+
+    pure grad
 
 
 -- BUILT-IN COLORS

@@ -19,7 +19,7 @@ module Elm.Graphics.Collage
     ) where
 
 
-import Elm.Color (Color, toCss)
+import Elm.Color (Color, toCss, toCanvasGradient)
 import Elm.Basics (Float)
 import Elm.Text (Text)
 import Elm.Transform2D (Transform2D)
@@ -564,31 +564,6 @@ trace closed list ctx =
 		return ctx.createPattern(img, 'repeat');
 	}
 
-	function gradient(ctx, grad)
-	{
-		var g;
-		var stops = [];
-		if (grad.ctor === 'Linear')
-		{
-			var p0 = grad._0, p1 = grad._1;
-			g = ctx.createLinearGradient(p0._0, -p0._1, p1._0, -p1._1);
-			stops = List.toArray(grad._2);
-		}
-		else
-		{
-			var p0 = grad._0, p2 = grad._2;
-			g = ctx.createRadialGradient(p0._0, -p0._1, grad._1, p2._0, -p2._1, grad._3);
-			stops = List.toArray(grad._4);
-		}
-		var len = stops.length;
-		for (var i = 0; i < len; ++i)
-		{
-			var stop = stops[i];
-			g.addColorStop(stop._0, Color.toCss(stop._1));
-		}
-		return g;
-	}
-
 	function drawShape(redo, ctx, style, path)
 	{
 		trace(ctx, path);
@@ -810,16 +785,15 @@ trace closed list ctx =
 
 	   return matrix;
 	}
+ -}
 
-	function str(n)
-	{
-		if (n < 0.00001 && n > -0.00001)
-		{
-			return 0;
-		}
-		return n;
-	}
+str :: Number -> String
+str n =
+    if n < 0.00001 && n > (-0.00001)
+        then "0"
+        else show n
 
+{-
 	function makeTransform(w, h, form, matrices)
 	{
 		var props = form.form._0._0.props;
