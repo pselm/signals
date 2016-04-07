@@ -28,19 +28,24 @@ import Elm.Graphics.Element (Element)
 import Elm.Graphics.Internal (createNode, setStyle)
 import Elm.Color (Gradient, black)
 import Math (pi, cos, sin)
-import Data.List (List(..), (..), (:))
+import Data.List (List(..), (..), (:), snoc)
+import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
+import Data.Maybe (fromMaybe)
 import Data.Foldable (for_)
 import DOM (DOM)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Element (setAttribute)
 import DOM.HTML.Types (Window)
 import DOM.HTML (window)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, untilE)
+import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
+import Control.Comonad (extract)
 import Graphics.Canvas (Context2D, Canvas)
-import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo) as Canvas
+import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo, scale, stroke) as Canvas
 import Control.Bind ((>=>))
-import Prelude (class Eq, eq, pure, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show, (<), (>), (&&), negate)
+import Math (sqrt)
+import Prelude (class Eq, eq, pure, not, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show, (<), (>), (&&), negate)
 
 
 -- | A visual `Form` has a shape and texture. This can be anything from a red
@@ -486,76 +491,146 @@ trace closed list ctx =
             pure ctx
 
 
+line :: ∀ e. LineStyle -> Boolean -> List Point -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+line style closed pointList ctx =
+    case pointList of
+        -- Note that elm draws from the last point to the first, whereas we're
+        -- drawing from the first to the last. If this turns out to matter, we
+        -- can always start by reversing the list.
+        Cons firstPoint remainingPoints -> do
+
+            -- We have some points. So, check the dashing.
+            case style.dashing of
+                Cons firstDash remainingDashes ->
+
+                    -- We have some dashing.
+                    -- Note that Elm implements the Canvas `setLineDash` manually, perhaps for
+                    -- back-compat with IE <11. So, we'll do it too!
+
+                    -- The rest of this is easiest, I'm afraid, if we allow a bit of
+                    -- mutation. At least, at a first approximation. I should probably
+                    -- put all of this inside a state monad, but I'll try runST first.
+                    -- I suppose that what's really going on here is that we're iterating
+                    -- through both the points and the dashes, and each has to give up
+                    -- control to the other at certain points. So, probably the right way
+                    -- to do this would be with continuations. But that might be overkill.
+                    runST do
+
+                        -- The dashes are basically a list of on/off lengths which we
+                        -- want to iterate through, and then go back to the beginning.
+                        -- I think this is easiest with a zipper, though in fact you
+                        -- could construct something even more specific. We remember
+                        -- the firstPattern so we can go back to the beginning easily.
+                        let firstPattern = Zipper Nil firstDash remainingDashes
+                        pattern <- newSTRef firstPattern
+
+                        -- We also need to keep track of how much is left in the current
+                        -- pattern of the pattern ... that is, how much length we can
+                        -- draw or skip until we should look at the next segment
+                        leftInPattern <- newSTRef (toNumber firstDash)
+
+                        -- Here we keep track of whether we're drawing or not drawing.
+                        -- We start by drawing.
+                        drawing <- newSTRef true
+
+                        -- And, we'll want to track where we are
+                        position <- newSTRef firstPoint
+
+                        -- First, move to our first point
+                        Canvas.moveTo ctx firstPoint.x firstPoint.y
+
+                        let
+                            -- If we're closed, we add the first point to those remaining
+                            points =
+                                if closed
+                                    then snoc remainingPoints firstPoint
+                                    else remainingPoints
+
+                        -- Now, we iterate over the points
+                        for_ points \destination ->
+                            untilE do
+                                currentPosition <- readSTRef position
+                                currentlyDrawing <- readSTRef drawing
+                                currentSegment <- readSTRef leftInPattern
+
+                                let
+                                    dx = destination.x - currentPosition.x
+                                    dy = destination.y - currentPosition.y
+                                    distance = sqrt ((dx * dx) + (dy * dy))
+                                    operation = if currentlyDrawing then Canvas.lineTo else Canvas.moveTo
+
+                                if distance < currentSegment
+                                    then do
+                                        -- Aha, we'll complete this point with the current
+                                        -- segment. So, first we draw or move, to our
+                                        -- destination.
+                                        operation ctx destination.x destination.y
+
+                                        -- Now, we'll remain with our current segment ... but
+                                        -- we've used some of it, so we decrement
+                                        writeSTRef leftInPattern (currentSegment - distance)
+
+                                        -- And record our new position
+                                        writeSTRef position destination
+
+                                        -- And, we tell the untilE that we're done with this point,
+                                        -- so move to the next destination
+                                        pure true
+
+                                    else do
+                                        -- We've got more distance to travel than our current segment
+                                        -- length. So, first we need to calculate what position we'll
+                                        -- end up with for this segment.
+                                        let
+                                            nextPosition =
+                                                { x: currentPosition.x + (dx * currentSegment / distance)
+                                                , y: currentPosition.y + (dy * currentSegment / distance)
+                                                }
+
+                                        -- So, actually do the operation
+                                        operation ctx nextPosition.x nextPosition.y
+
+                                        -- And record our new position
+                                        writeSTRef position nextPosition
+
+                                        -- Now, we've used up this segment, so we need to flip our
+                                        -- drawing state.
+                                        writeSTRef drawing (not currentlyDrawing)
+
+                                        -- And get the next pattern
+                                        currentPattern <- readSTRef pattern
+
+                                        -- We go down, and if at end back to first
+                                        let nextPattern = fromMaybe firstPattern (down currentPattern)
+
+                                        writeSTRef pattern nextPattern
+                                        writeSTRef leftInPattern (toNumber (extract nextPattern))
+
+                                        -- And, tell the untilE that we're not done with this destination yet
+                                        pure false
+
+                        -- We're done all the points ... just return the ctx
+                        pure ctx
+
+                _ ->
+                    -- This the case where we have no dashing, so we can just trace the line
+                    trace closed pointList ctx
+
+            -- In either event, with or without dashing, we scale and stroke
+            Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+            Canvas.stroke ctx
+
+        _ ->
+            -- This is the case where we have an empty path, so there's nothing to do
+            pure ctx
+
+
+drawLine :: ∀ e. LineStyle -> Boolean -> List Point -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+drawLine style closed points =
+    setStrokeStyle style >=> line style closed points
+
+
 {-
-	function line(ctx, style, path)
-	{
-		if (style.dashing.ctor === '[]')
-		{
-			trace(ctx, path);
-		}
-		else
-		{
-			customLineHelp(ctx, style, path);
-		}
-		ctx.scale(1, -1);
-		ctx.stroke();
-	}
-
-	function customLineHelp(ctx, style, path)
-	{
-		var points = List.toArray(path);
-		if (path.closed)
-		{
-			points.push(points[0]);
-		}
-		var pattern = List.toArray(style.dashing);
-		var i = points.length - 1;
-		if (i <= 0)
-		{
-			return;
-		}
-		var x0 = points[i]._0, y0 = points[i]._1;
-		var x1 = 0, y1 = 0, dx = 0, dy = 0, remaining = 0;
-		var pindex = 0, plen = pattern.length;
-		var draw = true, segmentLength = pattern[0];
-		ctx.moveTo(x0, y0);
-		while (i--)
-		{
-			x1 = points[i]._0;
-			y1 = points[i]._1;
-			dx = x1 - x0;
-			dy = y1 - y0;
-			remaining = Math.sqrt(dx * dx + dy * dy);
-			while (segmentLength <= remaining)
-			{
-				x0 += dx * segmentLength / remaining;
-				y0 += dy * segmentLength / remaining;
-				ctx[draw ? 'lineTo' : 'moveTo'](x0, y0);
-				// update starting position
-				dx = x1 - x0;
-				dy = y1 - y0;
-				remaining = Math.sqrt(dx * dx + dy * dy);
-				// update pattern
-				draw = !draw;
-				pindex = (pindex + 1) % plen;
-				segmentLength = pattern[pindex];
-			}
-			if (remaining > 0)
-			{
-				ctx[draw ? 'lineTo' : 'moveTo'](x1, y1);
-				segmentLength -= remaining;
-			}
-			x0 = x1;
-			y0 = y1;
-		}
-	}
-
-	function drawLine(ctx, style, path)
-	{
-		setStrokeStyle(ctx, style);
-		return line(ctx, style, path);
-	}
-
 	function texture(redo, ctx, src)
 	{
 		var img = new Image();
