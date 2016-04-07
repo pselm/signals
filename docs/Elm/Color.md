@@ -99,10 +99,15 @@ data Gradient
 
 Abstract representation of a color gradient.
 
+##### Instances
+``` purescript
+Eq Gradient
+```
+
 #### `linear`
 
 ``` purescript
-linear :: Tuple Float Float -> Tuple Float Float -> List (Tuple Float Color) -> Gradient
+linear :: Point -> Point -> List (Tuple Float Color) -> Gradient
 ```
 
 Create a linear gradient. Takes a start and end point and then a series of
@@ -113,7 +118,7 @@ more visual explanation.
 #### `radial`
 
 ``` purescript
-radial :: Tuple Float Float -> Float -> Tuple Float Float -> Float -> List (Tuple Float Color) -> Gradient
+radial :: Point -> Float -> Point -> Float -> List (Tuple Float Color) -> Gradient
 ```
 
 Create a radial gradient. First takes a start point and inner radius.  Then
@@ -121,6 +126,14 @@ takes an end point and outer radius. It then takes a series of &ldquo;color
 stops&rdquo; that indicate how to interpolate between the inner and outer
 circles. See [this example](http://elm-lang.org/examples/radial-gradient) for a
 more visual explanation.
+
+#### `toCanvasGradient`
+
+``` purescript
+toCanvasGradient :: forall e. Gradient -> Context2D -> Eff (canvas :: Canvas | e) CanvasGradient
+```
+
+Make a CanvasGradient from a Gradient.
 
 #### `lightRed`
 
