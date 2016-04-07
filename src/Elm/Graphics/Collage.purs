@@ -33,11 +33,14 @@ import Data.Int (toNumber)
 import Data.Foldable (for_)
 import DOM (DOM)
 import DOM.Node.Types (Element) as DOM
+import DOM.Node.Element (setAttribute)
+import DOM.HTML.Types (Window)
+import DOM.HTML (window)
 import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Context2D, Canvas)
 import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo) as Canvas
 import Control.Bind ((>=>))
-import Prelude (pure, (<<<), (*), (/), ($), map, (+), (-), bind)
+import Prelude (pure, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show)
 
 
 -- | A visual `Form` has a shape and texture. This can be anything from a red
@@ -898,20 +901,26 @@ trace closed list ctx =
 			alpha: alpha
 		};
 	}
+-}
 
-	function makeCanvas(w, h)
-	{
-		var canvas = NativeElement.createNode('canvas');
-		canvas.style.width  = w + 'px';
-		canvas.style.height = h + 'px';
-		canvas.style.display = 'block';
-		canvas.style.position = 'absolute';
-		var ratio = window.devicePixelRatio || 1;
-		canvas.width  = w * ratio;
-		canvas.height = h * ratio;
-		return canvas;
-	}
+foreign import devicePixelRatio :: ∀ e. Window -> Eff (dom :: DOM | e) Number
 
+makeCanvas :: ∀ e. Int -> Int -> Eff (dom :: DOM | e) DOM.Element
+makeCanvas w h = do
+    canvas <- createNode "canvas"
+
+    setStyle "width" (show w <> "px") canvas
+    setStyle "height" (show h <> "px") canvas
+    setStyle "display" "block" canvas
+    setStyle "position" "absolute" canvas
+
+    ratio <- window >>= devicePixelRatio
+    setAttribute "width" (show $ toNumber w * ratio) canvas
+    setAttribute "height" (show $ toNumber h * ratio) canvas
+
+    pure canvas
+
+{-
 	function nodeStepper(w, h, div)
 	{
 		var kids = div.childNodes;
