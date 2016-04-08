@@ -19,7 +19,7 @@ module Elm.Graphics.Collage
     ) where
 
 
-import Elm.Color (Color, Gradient, black, toCss)
+import Elm.Color (Color, Gradient, black, toCss, toCanvasGradient)
 import Elm.Basics (Float)
 import Elm.Text (Text, drawCanvas)
 import Elm.Transform2D (Transform2D)
@@ -52,6 +52,7 @@ import Graphics.Canvas (Context2D, Canvas, CanvasPattern, PatternRepeat(Repeat))
 
 import Graphics.Canvas
     ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle
+    , setFillStyle, setPatternFillStyle, setGradientFillStyle
     , lineTo, moveTo, scale, stroke, fillText, strokeText
     , withImage, createPattern
     ) as Canvas
@@ -475,17 +476,23 @@ setStrokeStyle style =
     setLineJoin style.join >=>
     Canvas.setStrokeStyle (toCss style.color)
 
-{-
-	function setFillStyle(redo, ctx, style)
-	{
-		var sty = style.ctor;
-		ctx.fillStyle = sty === 'Solid'
-			? Color.toCss(style._0)
-			: sty === 'Texture'
-				? texture(redo, ctx, style._0)
-				: gradient(ctx, style._0);
-	}
- -}
+
+setFillStyle :: ∀ e. Context2D -> FillStyle -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Context2D
+setFillStyle ctx style redo =
+    case style of
+        Solid c ->
+            Canvas.setFillStyle (toCss c) ctx
+
+        Texture t -> do
+            texture ctx t \pattern -> do
+                Canvas.setPatternFillStyle pattern ctx
+                redo pattern
+            pure ctx
+
+        Grad g -> do
+            grad <- toCanvasGradient g ctx
+            Canvas.setGradientFillStyle grad ctx
+
 
 -- Note that this traces first to last, whereas Elm traces from last to
 -- first. If this turns out to matter, I can reverse the list.
@@ -645,8 +652,8 @@ drawLine style closed points =
     setStrokeStyle style >=> line style closed points
 
 
-texture :: ∀ e. (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Context2D -> String -> Eff (canvas :: Canvas | e) Unit
-texture redo ctx src =
+texture :: ∀ e. Context2D -> String -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Unit
+texture ctx src redo =
     Canvas.withImage src \source ->
         Canvas.createPattern source Repeat ctx >>= redo
 
