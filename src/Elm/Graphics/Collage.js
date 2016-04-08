@@ -21,3 +21,16 @@ exports.devicePixelRatio = function (window) {
     };
 };
 
+exports.setLineDash = function (dashes) {
+    return function (ctx) {
+        return function () {
+            // setLineDash not available in some browsers
+            if (ctx.setLineDash) {
+                ctx.setLineDash(dashes);
+                return true;
+            } else {
+                return false;
+            }
+        };
+    };
+};

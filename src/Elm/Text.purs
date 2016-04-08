@@ -10,7 +10,7 @@ module Elm.Text
     , fromString, empty, append, concat, join
     , link, Style, style, defaultStyle, Line(..)
     , typeface, monospace, height, color, bold, italic, line
-    , renderHtml
+    , renderHtml, drawCanvas
     ) where
 
 
@@ -21,19 +21,25 @@ import Elm.Regex (Regex, regex, HowMany(All), replace) as ER
 import Elm.Maybe (Maybe (..))
 import Elm.String (repeat)
 import Data.String (joinWith, contains, length, split)
-import Data.StrMap (StrMap, lookup, singleton, union, insert, foldMap)
-import Data.Tuple (Tuple(..), uncurry)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (class Foldable, foldr)
 import Data.String.Regex (RegexFlags, noFlags, replace, regex)
-import Data.List (catMaybes, (:))
-import Prelude (class Show, class Semigroup, ($), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-))
+import Data.Array (catMaybes)
+import Data.Maybe (fromMaybe)
+import Data.Traversable (for)
+import Graphics.Canvas (Context2D, Canvas)
+import Graphics.Canvas (setFillStyle, setFont, measureText, scale) as Canvas
+import Control.Monad.Eff (Eff)
+import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, modifySTRef, runST)
+import Control.Alt ((<|>))
+import Prelude (class Show, class Semigroup, ($), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, pure, negate)
 
 
 -- | Represents styled text. It can be rendered with collages or with elements.
 data Text
     = Text String
     | Append Text Text
-    | Meta (StrMap String) Text
+    | Meta Props Text
 
 
 instance showText :: Show Text where
@@ -44,38 +50,11 @@ instance semigroupText :: Semigroup Text where
     append = append
 
 
-maybeAddMeta :: Maybe (Tuple String String) -> Text -> Text
-maybeAddMeta (Just tuple) text = addMetaTuple tuple text
-maybeAddMeta Nothing text = text
-
-
-addMetaTuple :: Tuple String String -> Text -> Text
-addMetaTuple = uncurry addMeta
-
-
-addMeta :: String -> String -> Text -> Text
-addMeta key value text =
-    case text of
-        Meta oldProps oldText ->
-            -- If it's already meta, then just add the key/value
-            Meta (insert key value oldProps) oldText
-
-        _ ->
-            -- If it's not already meta, we wrap it
-            Meta (singleton key value) text
-
-
-addMetas :: StrMap String -> Text -> Text
-addMetas props text =
-    case text of
-        Meta oldProps oldText ->
-            -- If it's already meta, then just add the new props
-            -- Note that union prefers the first param for dup keys
-            Meta (union props oldProps) oldText
-
-        _ ->
-            -- Otherwise, we wrap it
-            Meta props text
+-- Given a function that updates the meta props, either update the existing
+-- props, or wrap the text in a new Meta
+updateProps :: (Props -> Props) -> Text -> Text
+updateProps updater (Meta props text) = Meta (updater props) text
+updateProps updater text = Meta (updater defaultProps) text
 
 
 -- | Styles for lines on text. This allows you to add an underline, an overline,
@@ -133,6 +112,31 @@ defaultStyle =
     }
 
 
+-- A type for various meta characteristics that could be set on text.
+-- Like `Style`, but more `Maybe`, and with `href`.
+type Props =
+    { typeface :: List String
+    , height :: Maybe Float
+    , color :: Maybe Color
+    , bold :: Maybe Boolean
+    , italic :: Maybe Boolean
+    , line :: Maybe Line
+    , href :: Maybe String
+    }
+
+
+defaultProps :: Props
+defaultProps =
+    { typeface: Nil
+    , color: Nothing
+    , height: Nothing
+    , bold: Nothing
+    , italic: Nothing
+    , line: Nothing
+    , href: Nothing
+    }
+
+
 -- | Convert a string into text which can be styled and displayed. To show the
 -- | string `"Hello World!"` on screen in italics, you could say:
 -- |
@@ -186,21 +190,130 @@ join seperator texts =
 -- | Note that this method will only *add* styles to text ... if some styles
 -- | have already been set, this will not remove them.
 style :: Style -> Text -> Text
-style newStyle = addMetas (style2props newStyle)
+style new =
+    updateProps \old ->
+        { typeface: if new.typeface == Nil then old.typeface else new.typeface
+        , height: new.height <|> old.height
+        , color: Just new.color
+        , bold: if new.bold then Just true else old.bold
+        , italic: if new.italic then Just true else old.italic
+        , line: new.line <|> old.line
+        , href: old.href
+        }
 
 
-style2props :: Style -> StrMap String
-style2props s =
-    Data.StrMap.fromList $
-        catMaybes
-            ( Just (colorToCss s.color)
-            : typefaceToCss s.typeface
-            : map heightToCss s.height
-            : boldToCss s.bold
-            : italicToCss s.italic
-            : map lineToCss s.line
-            : Nil
-            )
+-- | Provide a list of preferred typefaces for some text.
+-- |
+-- |     ["helvetica","arial","sans-serif"]
+-- |
+-- | Not every browser has access to the same typefaces, so rendering will use the
+-- | first typeface in the list that is found on the user's computer. If there are
+-- | no matches, it will use their default typeface. This works the same as the CSS
+-- | font-family property.
+typeface :: List String -> Text -> Text
+typeface list =
+    updateProps $ _ { typeface = list }
+
+
+-- | Switch to a monospace typeface. Good for code snippets.
+-- |
+-- |     monospace (fromString "foldl (+) 0 [1,2,3]")
+monospace :: Text -> Text
+monospace =
+    typeface (Cons "monospace" Nil)
+
+
+-- | Create a link by providing a URL and the text of the link.
+-- |
+-- |     link "http://elm-lang.org" (fromString "Elm Website")
+link :: String -> Text -> Text
+link href =
+    updateProps $ _ { href = Just href }
+
+
+-- | Set the height of some text.
+-- |
+-- |     height 40 (fromString "Title")
+height :: Float -> Text -> Text
+height value =
+    updateProps $ _ { height = Just value }
+
+
+-- | Set the color of some text.
+-- |
+-- |     color red (fromString "Red")
+color :: Color -> Text -> Text
+color newColor =
+    updateProps $ _ { color = Just newColor }
+
+
+-- | Make text bold.
+-- |
+-- |     fromString "sometimes you want " ++ bold (fromString "emphasis")
+bold :: Text -> Text
+bold =
+    updateProps $ _ { bold = Just true }
+
+
+-- | Make text italic.
+-- |
+-- |     fromString "make it " ++ italic (fromString "important")
+italic :: Text -> Text
+italic =
+    updateProps $ _ { italic = Just true }
+
+
+-- | Put lines on text.
+-- |
+-- |     line Under   (fromString "underlined")
+-- |     line Over    (fromString "overlined")
+-- |     line Through (fromString "strike out")
+line :: Line -> Text -> Text
+line newLine =
+    updateProps $ _ { line = Just newLine }
+
+
+-- RENDER
+
+renderHtml :: Text -> String
+renderHtml (Text t) = properEscape t
+renderHtml (Append t1 t2) = renderHtml t1 <> renderHtml t2
+renderHtml (Meta props t) = renderMeta props (renderHtml t)
+
+
+renderMeta :: Props -> String -> String
+renderMeta props string =
+    let
+        hrefed =
+            case props.href of
+                Just href ->
+                    "<a href=\"" <> href <> "\">" <> string <> "</a>"
+
+                Nothing ->
+                    string
+
+        styleString =
+            joinWith "" $
+                map styleToString $
+                    catMaybes
+                        [ map colorToCss props.color
+                        , typefaceToCss props.typeface
+                        , map heightToCss props.height
+                        , props.bold >>= boldToCss
+                        , props.italic >>= italicToCss
+                        , map lineToCss props.line
+                        ]
+
+    in
+        if styleString == ""
+            then hrefed
+            else "<span style=\"" <> styleString <> "\">" <> hrefed <> "</span>"
+
+
+
+styleToString :: Tuple String String -> String
+styleToString tuple =
+    fst tuple <> ":" <> snd tuple <> ";"
 
 
 colorToCss :: Color -> Tuple String String
@@ -255,105 +368,6 @@ typefaceToCss list =
                     joinWith "," $
                         map quoteSpaces $
                             Data.List.fromList list
-
-
--- | Provide a list of preferred typefaces for some text.
--- |
--- |     ["helvetica","arial","sans-serif"]
--- |
--- | Not every browser has access to the same typefaces, so rendering will use the
--- | first typeface in the list that is found on the user's computer. If there are
--- | no matches, it will use their default typeface. This works the same as the CSS
--- | font-family property.
-typeface :: List String -> Text -> Text
-typeface list = maybeAddMeta (typefaceToCss list)
-
-
--- | Switch to a monospace typeface. Good for code snippets.
--- |
--- |     monospace (fromString "foldl (+) 0 [1,2,3]")
-monospace :: Text -> Text
-monospace = addMeta "font-family" "monospace"
-
-
--- | Create a link by providing a URL and the text of the link.
--- |
--- |     link "http://elm-lang.org" (fromString "Elm Website")
-link :: String -> Text -> Text
-link = addMeta "href"
-
-
--- | Set the height of some text.
--- |
--- |     height 40 (fromString "Title")
-height :: Float -> Text -> Text
-height newHeight = addMetaTuple (heightToCss newHeight)
-
-
--- | Set the color of some text.
--- |
--- |     color red (fromString "Red")
-color :: Color -> Text -> Text
-color newColor = addMetaTuple (colorToCss newColor)
-
-
--- | Make text bold.
--- |
--- |     fromString "sometimes you want " ++ bold (fromString "emphasis")
-bold :: Text -> Text
-bold = addMeta "font-weight" "bold"
-
-
--- | Make text italic.
--- |
--- |     fromString "make it " ++ italic (fromString "important")
-italic :: Text -> Text
-italic = addMeta "font-style" "italic"
-
-
--- | Put lines on text.
--- |
--- |     line Under   (fromString "underlined")
--- |     line Over    (fromString "overlined")
--- |     line Through (fromString "strike out")
-line :: Line -> Text -> Text
-line newLine = addMetaTuple (lineToCss newLine)
-
-
--- RENDER
-
-renderHtml :: Text -> String
-renderHtml (Text t) = properEscape t
-renderHtml (Append t1 t2) = renderHtml t1 <> renderHtml t2
-renderHtml (Meta props t) = renderMeta props (renderHtml t)
-
-
-styleToString :: String -> String -> String
-styleToString key value =
-    -- We ignore the href here because that's handled separately
-    if key == "href"
-        then ""
-        else key <> ":" <> value <> ";"
-
-
-renderMeta :: StrMap String -> String -> String
-renderMeta props string =
-    let
-        hrefed =
-            case lookup "href" props of
-                Just href ->
-                    "<a href=\"" <> href <> "\">" <> string <> "</a>"
-
-                Nothing ->
-                    string
-
-        styleString =
-            foldMap styleToString props
-
-    in
-        if styleString == ""
-            then hrefed
-            else "<span style=\"" <> styleString <> "\">" <> hrefed <> "</span>"
 
 
 global :: RegexFlags
@@ -541,4 +555,129 @@ properEscape string =
     if string == ""
         then string
         else makeLines $ escapes string
+
+
+-- DRAW
+
+defaultHeight :: Number
+defaultHeight = 12.0
+
+
+drawCanvas :: ∀ e. (∀ eff. Context2D -> String -> Number -> Number -> Eff (canvas :: Canvas | eff) Context2D) -> Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+drawCanvas draw text ctx =
+    runST do
+        Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+
+        -- To avoid multiple iterations ...
+        maxHeightRef <- newSTRef 0.0
+        totalWidthRef <- newSTRef 0.0
+
+        let
+            chunks = chunkText defaultProps text
+
+        measured <-
+            for chunks \chunk -> do
+                let
+                    font = toFont chunk.props
+                    chunkHeight = fromMaybe defaultHeight chunk.props.height
+
+                Canvas.setFont font ctx
+
+                metrics <-
+                    Canvas.measureText ctx chunk.text
+
+                modifySTRef maxHeightRef \h ->
+                    if h > chunkHeight then h else chunkHeight
+
+                modifySTRef totalWidthRef \w ->
+                    w + metrics.width
+
+                pure
+                    { width: metrics.width
+                    , height: chunkHeight
+                    , chunk
+                    , font
+                    }
+
+        maxHeight <- readSTRef maxHeightRef
+        totalWidth <- readSTRef totalWidthRef
+
+        xRef <- newSTRef $ (-totalWidth) / 2.0
+
+        for measured \m -> do
+            Canvas.setFont m.font ctx
+            Canvas.setFillStyle (fromMaybe "black" $ map toCss m.chunk.props.color) ctx
+
+            x <- readSTRef xRef
+            draw ctx m.chunk.text x (maxHeight / 2.0)
+            writeSTRef xRef $ x + m.width
+
+        pure ctx
+
+
+toFont :: Props -> String
+toFont props =
+    joinWith " "
+        [ italicToFont props.italic
+        , "normal" -- font-variant
+        , boldToFont props.bold
+        , heightToFont props.height
+        , typefaceToFont props.typeface
+        ]
+
+
+boldToFont :: Maybe Bool -> String
+boldToFont (Just true) = "bold"
+boldToFont _ = "normal"
+
+
+italicToFont :: Maybe Bool -> String
+italicToFont (Just true) = "italic"
+italicToFont _ = "normal"
+
+
+heightToFont :: Maybe Number -> String
+heightToFont (Just h) = show h <> "px"
+heightToFont _ = show defaultHeight <> "px"
+
+
+typefaceToFont :: List String -> String
+typefaceToFont Nil = "san-serif"
+typefaceToFont list =
+    joinWith "," $
+        map quoteSpaces $
+            Data.List.fromList list
+
+
+type Chunk =
+    { text :: String
+    , props :: Props
+    }
+
+
+-- Convert the object returned by the text module
+-- into something we can use for styling canvas text
+chunkText :: Props -> Text -> List Chunk
+chunkText props text =
+    case text of
+        Append left right ->
+            chunkText props left <> chunkText props right
+
+        Text text ->
+            Data.List.singleton { text, props }
+
+        Meta newProps text ->
+            chunkText (combineProps props newProps) text
+
+
+combineProps :: Props -> Props -> Props
+combineProps old new =
+    { typeface: if new.typeface == Nil then old.typeface else new.typeface
+    , height: new.height <|> old.height
+    , color: new.color <|> old.color
+    , bold: new.bold <|> old.bold
+    , italic: new.italic <|> old.italic
+    , line: new.line <|> old.line
+    , href: new.href <|> old.href
+    }
 

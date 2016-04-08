@@ -19,16 +19,15 @@ module Elm.Graphics.Collage
     ) where
 
 
-import Elm.Color (Color, toCss, toCanvasGradient)
+import Elm.Color (Color, Gradient, black, toCss)
 import Elm.Basics (Float)
-import Elm.Text (Text)
+import Elm.Text (Text, drawCanvas)
 import Elm.Transform2D (Transform2D)
 import Elm.Transform2D (identity) as T2D
 import Elm.Graphics.Element (Element)
 import Elm.Graphics.Internal (createNode, setStyle)
-import Elm.Color (Gradient, black)
 import Math (pi, cos, sin)
-import Data.List (List(..), (..), (:), snoc)
+import Data.List (List(..), (..), (:), snoc, fromList)
 import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
 import Data.Maybe (fromMaybe)
@@ -41,11 +40,12 @@ import DOM.HTML (window)
 import Control.Monad.Eff (Eff, untilE)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
 import Control.Comonad (extract)
-import Graphics.Canvas (Context2D, Canvas)
-import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo, scale, stroke) as Canvas
+import Control.Monad (when)
 import Control.Bind ((>=>))
+import Graphics.Canvas (Context2D, Canvas)
+import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo, scale, stroke, fillText, strokeText) as Canvas
 import Math (sqrt)
-import Prelude (class Eq, eq, pure, not, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show, (<), (>), (&&), negate)
+import Prelude (class Eq, eq, pure, void, not, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show, (<), (>), (&&), negate, (/=))
 
 
 -- | A visual `Form` has a shape and texture. This can be anything from a red
@@ -646,123 +646,30 @@ drawLine style closed points =
 		ctx.scale(1, -1);
 		ctx.fill();
 	}
+-}
 
 
-	// TEXT RENDERING
+-- TEXT RENDERING
 
-	function fillText(redo, ctx, text)
-	{
-		drawText(ctx, text, ctx.fillText);
-	}
-
-	function strokeText(redo, ctx, style, text)
-	{
-		setStrokeStyle(ctx, style);
-		// Use native canvas API for dashes only for text for now
-		// Degrades to non-dashed on IE 9 + 10
-		if (style.dashing.ctor !== '[]' && ctx.setLineDash)
-		{
-			var pattern = List.toArray(style.dashing);
-			ctx.setLineDash(pattern);
-		}
-		drawText(ctx, text, ctx.strokeText);
-	}
-
-	function drawText(ctx, text, canvasDrawFn)
-	{
-		var textChunks = chunkText(defaultContext, text);
-
-		var totalWidth = 0;
-		var maxHeight = 0;
-		var numChunks = textChunks.length;
-
-		ctx.scale(1,-1);
-
-		for (var i = numChunks; i--; )
-		{
-			var chunk = textChunks[i];
-			ctx.font = chunk.font;
-			var metrics = ctx.measureText(chunk.text);
-			chunk.width = metrics.width;
-			totalWidth += chunk.width;
-			if (chunk.height > maxHeight)
-			{
-				maxHeight = chunk.height;
-			}
-		}
-
-		var x = -totalWidth / 2.0;
-		for (var i = 0; i < numChunks; ++i)
-		{
-			var chunk = textChunks[i];
-			ctx.font = chunk.font;
-			ctx.fillStyle = chunk.color;
-			canvasDrawFn.call(ctx, chunk.text, x, maxHeight / 2);
-			x += chunk.width;
-		}
-	}
-
-	function toFont(props)
-	{
-		return [
-			props['font-style'],
-			props['font-variant'],
-			props['font-weight'],
-			props['font-size'],
-			props['font-family']
-		].join(' ');
-	}
+-- Returns true if setLineDash was available, false if not.
+foreign import setLineDash :: ∀ e. List Int -> Context2D -> Eff (canvas :: Canvas | e) Boolean
 
 
-	// Convert the object returned by the text module
-	// into something we can use for styling canvas text
-	function chunkText(context, text)
-	{
-		var tag = text.ctor;
-		if (tag === 'Text:Append')
-		{
-			var leftChunks = chunkText(context, text._0);
-			var rightChunks = chunkText(context, text._1);
-			return leftChunks.concat(rightChunks);
-		}
-		if (tag === 'Text:Text')
-		{
-			return [{
-				text: text._0,
-				color: context.color,
-				height: context['font-size'].slice(0, -2) | 0,
-				font: toFont(context)
-			}];
-		}
-		if (tag === 'Text:Meta')
-		{
-			var newContext = freshContext(text._0, context);
-			return chunkText(newContext, text._1);
-		}
-	}
-
-	function freshContext(props, ctx)
-	{
-		return {
-			'font-style': props['font-style'] || ctx['font-style'],
-			'font-variant': props['font-variant'] || ctx['font-variant'],
-			'font-weight': props['font-weight'] || ctx['font-weight'],
-			'font-size': props['font-size'] || ctx['font-size'],
-			'font-family': props['font-family'] || ctx['font-family'],
-			'color': props['color'] || ctx['color']
-		};
-	}
-
-	var defaultContext = {
-		'font-style': 'normal',
-		'font-variant': 'normal',
-		'font-weight': 'normal',
-		'font-size': '12px',
-		'font-family': 'sans-serif',
-		'color': 'black'
-	};
+fillText :: ∀ e. Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+fillText = drawCanvas Canvas.fillText
 
 
+strokeText :: ∀ e. LineStyle -> Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+strokeText style t ctx = do
+    setStrokeStyle style ctx
+
+    when (style.dashing /= Nil) $ void $
+        setLineDash (fromList style.dashing) ctx
+
+    drawCanvas Canvas.strokeText t ctx
+
+
+{-
 	// IMAGES
 
 	function drawImage(redo, ctx, form)
