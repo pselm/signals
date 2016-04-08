@@ -48,15 +48,16 @@ import Control.Comonad (extract)
 import Control.Monad (when)
 import Control.Bind ((>=>))
 
-import Graphics.Canvas (Context2D, Canvas)
+import Graphics.Canvas (Context2D, Canvas, CanvasPattern, PatternRepeat(Repeat))
 
 import Graphics.Canvas
     ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle
     , lineTo, moveTo, scale, stroke, fillText, strokeText
+    , withImage, createPattern
     ) as Canvas
 
 import Prelude
-    ( class Eq, eq, pure, void, not, (<<<)
+    ( class Eq, eq, pure, void, not, (<<<), Unit
     , (*), (/), ($), map, (+), (-), bind, (>>=), (<>)
     , show, (<), (>), (&&), negate, (/=), (==)
     )
@@ -644,15 +645,13 @@ drawLine style closed points =
     setStrokeStyle style >=> line style closed points
 
 
-{-
-	function texture(redo, ctx, src)
-	{
-		var img = new Image();
-		img.src = src;
-		img.onload = redo;
-		return ctx.createPattern(img, 'repeat');
-	}
+texture :: ∀ e. (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Context2D -> String -> Eff (canvas :: Canvas | e) Unit
+texture redo ctx src =
+    Canvas.withImage src \source ->
+        Canvas.createPattern source Repeat ctx >>= redo
 
+
+{-
 	function drawShape(redo, ctx, style, path)
 	{
 		trace(ctx, path);
