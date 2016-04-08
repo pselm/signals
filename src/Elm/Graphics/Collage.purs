@@ -23,29 +23,43 @@ import Elm.Color (Color, Gradient, black, toCss)
 import Elm.Basics (Float)
 import Elm.Text (Text, drawCanvas)
 import Elm.Transform2D (Transform2D)
-import Elm.Transform2D (identity) as T2D
+import Elm.Transform2D (identity, multiply, rotation, matrix) as T2D
 import Elm.Graphics.Element (Element)
 import Elm.Graphics.Internal (createNode, setStyle)
-import Math (pi, cos, sin)
+
 import Data.List (List(..), (..), (:), snoc, fromList)
 import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
 import Data.Maybe (fromMaybe)
 import Data.Foldable (for_)
+
+import Math (pi, cos, sin)
+import Math (sqrt)
+
 import DOM (DOM)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Element (setAttribute)
 import DOM.HTML.Types (Window)
 import DOM.HTML (window)
+
 import Control.Monad.Eff (Eff, untilE)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
 import Control.Comonad (extract)
 import Control.Monad (when)
 import Control.Bind ((>=>))
+
 import Graphics.Canvas (Context2D, Canvas)
-import Graphics.Canvas (LineCap(..), setLineWidth, setLineCap, setStrokeStyle, lineTo, moveTo, scale, stroke, fillText, strokeText) as Canvas
-import Math (sqrt)
-import Prelude (class Eq, eq, pure, void, not, (<<<), (*), (/), ($), map, (+), (-), bind, (>>=), (<>), show, (<), (>), (&&), negate, (/=))
+
+import Graphics.Canvas
+    ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle
+    , lineTo, moveTo, scale, stroke, fillText, strokeText
+    ) as Canvas
+
+import Prelude
+    ( class Eq, eq, pure, void, not, (<<<)
+    , (*), (/), ($), map, (+), (-), bind, (>>=), (<>)
+    , show, (<), (>), (&&), negate, (/=), (==)
+    )
 
 
 -- | A visual `Form` has a shape and texture. This can be anything from a red
@@ -754,20 +768,20 @@ strokeText style t ctx = do
 		ctx.restore();
 	}
 
-	function formToMatrix(form)
-	{
-	   var scale = form.scale;
-	   var matrix = A6( Transform.matrix, scale, 0, 0, scale, form.x, form.y );
+-}
 
-	   var theta = form.theta;
-	   if (theta !== 0)
-	   {
-		   matrix = A2( Transform.multiply, matrix, Transform.rotation(theta) );
-	   }
 
-	   return matrix;
-	}
- -}
+formToMatrix :: Form -> Transform2D
+formToMatrix (Form f) =
+    let
+        matrix =
+            T2D.matrix f.scale 0.0 0.0 f.scale f.x f.y
+
+    in
+        if f.theta == 0.0
+            then matrix
+            else T2D.multiply matrix (T2D.rotation f.theta)
+
 
 str :: Number -> String
 str n =
