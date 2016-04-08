@@ -18,9 +18,12 @@ Purescript does things -- and also fascinated by some of the inner workings of
 Elm. So, I have continued to work away at it, with my original goals receding
 far into the distance.
 
-At this point, I would put this project in the "alpha" stage ... that is, it's
-incomplete. However, some people could find parts of it useful, or at least
-interesting.
+I have now broken out some of the core Elm modules into a
+[purescript-elm-compat](https://github.com/rgrempel/purescript-elm-compat) library,
+which deals with "basic" core modules, such as, well, `Basics`, and `Array`, `Bitwise`,
+`Char`, `Date`, `Debug`, `Dict`, `Json.Encode`, `Json.Decode`, `List`, `Maybe`,
+`Random`, `Regex`, `Result`, `Set`, `String`, and `Trampoline`. So, you might find
+those useful already.
 
 The main things remaining to do are:
 
