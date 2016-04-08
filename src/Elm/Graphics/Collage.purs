@@ -51,16 +51,16 @@ import Control.Bind ((>=>))
 import Graphics.Canvas (Context2D, Canvas, CanvasPattern, PatternRepeat(Repeat))
 
 import Graphics.Canvas
-    ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle
-    , setFillStyle, setPatternFillStyle, setGradientFillStyle
-    , lineTo, moveTo, scale, stroke, fillText, strokeText
-    , withImage, createPattern, fill
+    ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha
+    , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath
+    , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate
+    , withImage, createPattern, fill, withContext, translate, drawImageFull
     ) as Canvas
 
 import Prelude
-    ( class Eq, eq, pure, void, not, (<<<), Unit
-    , (*), (/), ($), map, (+), (-), bind, (>>=), (<>)
-    , show, (<), (>), (&&), negate, (/=), (==)
+    ( class Eq, eq, pure, void, not, (<<<), Unit, unit, (||)
+    , (*), (/), ($), map, (+), (-), bind, (>>=), (<>), const
+    , show, (<), (>), (&&), negate, (/=), (==), mod
     )
 
 
@@ -658,7 +658,7 @@ texture ctx src redo =
         Canvas.createPattern source Repeat ctx >>= redo
 
 
-drawShape :: ∀ e. Context2D -> FillStyle -> Boolean -> List Point -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Context2D 
+drawShape :: ∀ e. Context2D -> FillStyle -> Boolean -> List Point -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Context2D
 drawShape ctx style closed points redo = do
     trace closed points ctx
     setFillStyle ctx style redo
@@ -686,92 +686,66 @@ strokeText style t ctx = do
     drawCanvas Canvas.strokeText t ctx
 
 
-{-
-	// IMAGES
+-- Should suggest adding this to Graphics.Canvas
+foreign import globalAlpha :: ∀ e. Context2D -> Eff (canvas :: Canvas | e) Number
 
-	function drawImage(redo, ctx, form)
-	{
-		var img = new Image();
-		img.onload = redo;
-		img.src = form._3;
-		var w = form._0,
-			h = form._1,
-			pos = form._2,
-			srcX = pos._0,
-			srcY = pos._1,
-			srcW = w,
-			srcH = h,
-			destX = -w / 2,
-			destY = -h / 2,
-			destW = w,
-			destH = h;
 
-		ctx.scale(1, -1);
-		ctx.drawImage(img, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
-	}
+renderForm :: ∀ e. Context2D -> Form -> Eff (canvas :: Canvas | e) Unit -> Eff (canvas :: Canvas | e) Context2D
+renderForm ctx (Form f) redo =
+    Canvas.withContext ctx do
+        when (f.x /= 0.0 || f.y /= 0.0) $ void $
+            Canvas.translate
+                { translateX: f.x
+                , translateY: f.y
+                }
+                ctx
 
-	function renderForm(redo, ctx, form)
-	{
-		ctx.save();
+        when (f.theta /= 0.0) $ void $
+            Canvas.rotate (f.theta `mod` (pi * 2.0)) ctx
 
-		var x = form.x,
-			y = form.y,
-			theta = form.theta,
-			scale = form.scale;
+        when (f.scale /= 1.0) $ void $
+            Canvas.scale { scaleX: f.scale, scaleY: f.scale } ctx
 
-		if (x !== 0 || y !== 0)
-		{
-			ctx.translate(x, y);
-		}
-		if (theta !== 0)
-		{
-			ctx.rotate(theta % (Math.PI * 2));
-		}
-		if (scale !== 1)
-		{
-			ctx.scale(scale, scale);
-		}
-		if (form.alpha !== 1)
-		{
-			ctx.globalAlpha = ctx.globalAlpha * form.alpha;
-		}
+        when (f.alpha /= 1.0) do
+            ga <- globalAlpha ctx
+            Canvas.setGlobalAlpha ctx (ga * f.alpha)
+            pure unit
 
-		ctx.beginPath();
-		var f = form.form;
-		switch (f.ctor)
-		{
-			case 'FPath':
-				drawLine(ctx, f._0, f._1);
-				break;
+        Canvas.beginPath ctx
 
-			case 'FImage':
-				drawImage(redo, ctx, f);
-				break;
+        case f.form of
+            FPath style points ->
+                drawLine style false points ctx
 
-			case 'FShape':
-				if (f._0.ctor === 'Line')
-				{
-					f._1.closed = true;
-					drawLine(ctx, f._0._0, f._1);
-				}
-				else
-				{
-					drawShape(redo, ctx, f._0._0, f._1);
-				}
-				break;
+            FImage w h pos src -> do
+                Canvas.withImage src \source -> do
+                    Canvas.scale { scaleX: 1.0, scaleY: (-1.0) } ctx
+                    Canvas.drawImageFull
+                        ctx source
+                        (toNumber pos.top) (toNumber pos.left)
+                        (toNumber w) (toNumber h)
+                        (toNumber (-w) / 2.0) (toNumber (-h) / 2.0)
+                        (toNumber w) (toNumber h)
+                    redo
+                pure ctx
 
-			case 'FText':
-				fillText(redo, ctx, f._0);
-				break;
+            FShape shapeStyle points ->
+                case shapeStyle of
+                    Line lineStyle ->
+                        drawLine lineStyle true points ctx
 
-			case 'FOutlinedText':
-				strokeText(redo, ctx, f._0, f._1);
-				break;
-		}
-		ctx.restore();
-	}
+                    Fill fillStyle ->
+                        drawShape ctx fillStyle false points (const redo)
 
--}
+            FText t ->
+                fillText t ctx
+
+            FOutlinedText lineStyle t ->
+                strokeText lineStyle t ctx
+
+            _ ->
+                -- There seem to be several unhandled cases in the original code ...
+                pure ctx
 
 
 formToMatrix :: Form -> Transform2D

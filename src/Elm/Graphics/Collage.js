@@ -34,3 +34,9 @@ exports.setLineDash = function (dashes) {
         };
     };
 };
+
+exports.globalAlpha = function (ctx) {
+    return function () {
+        return ctx.globalAlpha;
+    };
+};
