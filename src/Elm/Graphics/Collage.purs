@@ -54,7 +54,7 @@ import Graphics.Canvas
     ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle
     , setFillStyle, setPatternFillStyle, setGradientFillStyle
     , lineTo, moveTo, scale, stroke, fillText, strokeText
-    , withImage, createPattern
+    , withImage, createPattern, fill
     ) as Canvas
 
 import Prelude
@@ -658,15 +658,12 @@ texture ctx src redo =
         Canvas.createPattern source Repeat ctx >>= redo
 
 
-{-
-	function drawShape(redo, ctx, style, path)
-	{
-		trace(ctx, path);
-		setFillStyle(redo, ctx, style);
-		ctx.scale(1, -1);
-		ctx.fill();
-	}
--}
+drawShape :: ∀ e. Context2D -> FillStyle -> Boolean -> List Point -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Context2D 
+drawShape ctx style closed points redo = do
+    trace closed points ctx
+    setFillStyle ctx style redo
+    Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+    Canvas.fill ctx
 
 
 -- TEXT RENDERING
