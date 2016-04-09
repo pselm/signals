@@ -282,8 +282,8 @@ something like this:
 ```purescript
 fromPolar :: {r :: Float, theta :: Float} -> {x :: Float, y :: Float}
 fromPolar {r, theta} =
-    { x: r * cos(theta)
-    , y: r * sin(theta)
+    { x: r * cos theta
+    , y: r * sin theta
     }
 ```
 
@@ -335,7 +335,8 @@ an `Int32`. However, the Elm `Integer` type is essentially an `Int53`, in the
 sense that you can safely use 53 bits before things like adding 1 don't work
 quite right.
 
-To deal with this, I've implemented an `Int53` type in `Elm.Int53`. It was
+To deal with this, I've implemented an `Int53` type in
+[`Data.Int53`](https://github.com/rgrempel/purescript-int-53). It was
 an interesting exercise ... by implementing the various numeric typeclasses,
 one can re-use the familiar operators. And, one can then define functions
 that work on multiple types -- essentially, you can treat `Int53` as a
