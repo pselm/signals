@@ -7,7 +7,7 @@ module Elm.Graphics.Internal
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Window (document)
-import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToNode)
+import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import Control.Monad.Eff (Eff)
