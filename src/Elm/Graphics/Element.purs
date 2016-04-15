@@ -18,9 +18,7 @@ module Elm.Graphics.Element
     , absolute, relative, middleAt, midTopAt, midBottomAt, midLeftAt
     , midRightAt, topLeftAt, topRightAt, bottomLeftAt, bottomRightAt
     -- The following aren't exposed by Elm, since the runtime accesses them
-    -- magically. Ultimately, we'll probably create a class which would be
-    -- implemented here, so that we can swap in Graphics.Element or
-    -- a VirtualDOM etc.
+    -- magically.
     , updateAndReplace, render
     ) where
 
@@ -41,13 +39,15 @@ import Data.Nullable (Nullable, toMaybe)
 import Data.String (joinWith)
 import Data.Array (catMaybes)
 import DOM (DOM)
+import DOM.Renderable (DynamicRenderable)
+import DOM.Renderable (render, update) as Renderable
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToNode)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
 import DOM.Node.Element (setId, setAttribute, tagName)
-import DOM.Node.Node (appendChild, removeChild, parentNode, parentElement, replaceChild)
+import DOM.Node.Node (firstChild, appendChild, removeChild, parentNode, parentElement, replaceChild)
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
 import DOM.Event.EventTarget (addEventListener, eventListener)
@@ -102,10 +102,6 @@ newtype Element = Element
     , element :: ElementPrim
     }
 
-instance eqElement :: Eq Element where
-    eq (Element a) (Element b) =
-        (eqProperties a.props b.props) && a.element == b.element
-
 
 -- I've removed the `id :: Int` because it's essentially effectful to add an id.
 -- It seems to be used (indirectly) to determine whether two ElementPrim's are
@@ -138,27 +134,7 @@ data ElementPrim
     | Flow Direction (List Element)
     | Spacer
     | RawHtml String String -- html align
-    | Custom -- for custom Elements implemented in JS, see collage for example
-
-instance eqElementPrim :: Eq ElementPrim where
-    eq (Image style1 width1 height1 src1) (Image style2 width2 height2 src2) =
-        style1 == style2 && width1 == width2 && height1 == height2 && src1 == src2
-
-    eq (Container pos1 elem1) (Container pos2 elem2) =
-        (eqRawPosition pos1 pos2) && elem1 == elem2
-
-    eq (Flow dir1 list1) (Flow dir2 list2) =
-        dir1 == dir2 && list1 == list2
-
-    eq Spacer Spacer = true
-
-    eq (RawHtml html1 align1) (RawHtml html2 align2) =
-        align1 == align2 && html1 == html2
-
-    -- For now ... revisit later!
-    eq Custom Custom = true
-
-    eq _ _ = false
+    | Custom DynamicRenderable
 
 
 data ImageStyle
@@ -214,7 +190,7 @@ type RawPosition =
 
 eqRawPosition :: RawPosition -> RawPosition -> Boolean
 eqRawPosition a b =
-    a.horizontal == b.horizontal && a.vertical == b.vertical && a.x == b. x && a.y == b.y 
+    a.horizontal == b.horizontal && a.vertical == b.vertical && a.x == b. x && a.y == b.y
 
 
 -- | Represents a `flow` direction for a list of elements.
@@ -1122,10 +1098,14 @@ makeElement (Element {element, props}) =
         RawHtml html align ->
             rawHtml html align
 
-        Custom ->
-            createNode "div"
-            -- TODO:
-            -- return elem.render(elem.model);
+        Custom renderable -> do
+            -- We don't insist on renderables creating elements, so we use a wrapper here.
+            -- I suppose we could test what we get back from Renderable and only use a wrapper
+            -- if it's not in fact an element.
+            wrapper <- createNode "div"
+            child <- Renderable.render renderable
+            appendChild child (elementToNode wrapper)
+            pure wrapper
 
 
 -- UPDATE
@@ -1207,7 +1187,10 @@ update outerNode (Element curr) (Element next) = do
                             -- Normally just an update props would be required.
                             if next.props.width /= curr.props.width ||
                                next.props.height /= curr.props.height ||
-                               nextE /= currE
+                               imageStyle /= oldImageStyle ||
+                               imageWidth /= oldImageWidth ||
+                               imageHeight /= oldImageHeight ||
+                               src /= oldSrc
                                     then render (Element next)
                                     else do
                                         updateProps innerNode (Element curr) (Element next)
@@ -1265,19 +1248,34 @@ update outerNode (Element curr) (Element next) = do
                     pure outerNode
 
                 -- Both custom
-                { nextE: Custom
-                , currE: Custom
-                } ->
-                    render (Element next)
-                    -- TODO
-                    {-
-                        if (currE.type === nextE.type)
-                        {
-                            var updatedNode = nextE.update(node, currE.model, nextE.model);
-                            updateProps(updatedNode, curr, next);
-                            return updatedNode;
-                        }
-                    -}
+                { nextE: Custom oldRenderable
+                , currE: Custom newRenderable
+                } -> do
+                    -- Because we wrap custom stuff in a div, we need to actually dive down one level
+                    nullableWrapped <- firstChild (elementToNode innerNode)
+
+                    case toMaybe nullableWrapped of
+                        Just oldResult -> do
+                            updatedNode <-
+                                Renderable.update
+                                    { value: oldRenderable
+                                    , result: oldResult
+                                    }
+                                    newRenderable
+
+                            -- If it updated in place, then we should update the props.
+                            -- Otherwise, we should set the props as if fresh.
+                            if same updatedNode oldResult
+                                then do
+                                    updateProps innerNode (Element curr) (Element next)
+                                    pure outerNode
+
+                                else
+                                    setProps (Element next) innerNode
+
+                        Nothing ->
+                            -- If there was no wrapper, then we should bail and just render
+                            render (Element next)
 
                 -- Different element constructors
                 _ ->
