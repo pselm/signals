@@ -22,7 +22,7 @@
     "purescript-list-zipper": "~0.1.0",
     "purescript-nullable": "~0.2.1",
     "purescript-refs": "~0.2.0",
-    "purescript-dom": "~0.2.19",
+    "purescript-dom": "~0.2.20",
     "purescript-exists": "~0.2.0",
     "purescript-format": "~0.1.0",
     "purescript-timers": "~1.0.0",
