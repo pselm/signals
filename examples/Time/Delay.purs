@@ -18,8 +18,8 @@ main =
         timer <- every 1500.0
         delayed <- delay 500.0 timer
         
-        printTimer <- Elm.Signal.map (log <<< (++ " <- timer") <<< show) timer
-        printDelayed <- Elm.Signal.map (log <<< (++ " <- delayed") <<< show) delayed
+        printTimer <- Elm.Signal.map (log <<< (_ ++ " <- timer") <<< show) timer
+        printDelayed <- Elm.Signal.map (log <<< (_ ++ " <- delayed") <<< show) delayed
 
         runSignal printTimer
         runSignal printDelayed

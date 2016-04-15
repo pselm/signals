@@ -21,7 +21,7 @@ logMouse ::
 
 logMouse label signal = do
     sig <- signal
-    printer <- lift $ map (log <<< (++ (" <- " ++ label)) <<< show) sig
+    printer <- lift $ map (log <<< (_ ++ (" <- " ++ label)) <<< show) sig
     lift $ runSignal printer
 
 

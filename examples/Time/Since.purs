@@ -18,8 +18,8 @@ main =
         timer <- every 1500.0
         sinced <- since 500.0 timer
         
-        printTimer <- Elm.Signal.map (log <<< (++ " <- timer") <<< show) timer
-        printSinced <- Elm.Signal.map (log <<< (++ " <- sinced") <<< show) sinced
+        printTimer <- Elm.Signal.map (log <<< (_ ++ " <- timer") <<< show) timer
+        printSinced <- Elm.Signal.map (log <<< (_ ++ " <- sinced") <<< show) sinced
 
         runSignal printTimer
         runSignal printSinced
