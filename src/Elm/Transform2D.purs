@@ -5,7 +5,10 @@
 -- |
 -- | Note that all the matrices in this library are 3x3 matrices of homogeneous
 -- | coordinates, used for [affine transformations](http://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations).
--- | Since the bottom row is always `0 0 1` in these matrices, it is omitted in the diagrams below.
+-- | Since the bottom row is always `0 0 1` in these matrices, it is omitted in
+-- | the diagrams below.
+-- |
+-- | This is implemented as a wrapper around the purescript-canvas module, and its `Transform` type.
 
 module Elm.Transform2D
     ( Transform2D
@@ -15,15 +18,16 @@ module Elm.Transform2D
     ) where
 
 
-import Data.TypedArray (asFloat32Array, unsafeIndex)
-import Data.ArrayBuffer.Types (Float32Array)
+import Graphics.Canvas (Transform)
 import Math (cos, sin)
-import Prelude (($), (*), (+), negate)
+import Prelude ((*), (+), negate)
 import Elm.Basics (Float)
 
 
 -- | A matrix representing a 2D transformation.
-newtype Transform2D = Transform2D Float32Array
+-- |
+-- | Equivalent to Purescript's `Graphics.Canvas.Transform`.
+type Transform2D = Transform
 
 
 -- | Create an identity transform. Transforming by the identity does
@@ -33,9 +37,7 @@ newtype Transform2D = Transform2D Float32Array
 -- |         / 1 0 0 \
 -- |         \ 0 1 0 /
 identity :: Transform2D
-identity =
-    Transform2D $
-        asFloat32Array [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+identity = translation 0.0 0.0
 
 
 -- | Create a transformation matrix. This lets you create transforms
@@ -48,9 +50,17 @@ identity =
 -- |
 -- | Note that `x` and `y` are the translation values.
 matrix :: Float -> Float -> Float -> Float -> Float -> Float -> Transform2D
-matrix m11 m12 m21 m22 dx dy =
-    Transform2D $
-        asFloat32Array [m11, m12, dx, m21, m22, dy]
+matrix a b c d x y =
+    -- Basically, we translate from the order Elm expects to the labels
+    -- that Graphics.Canvas uses. In Graphics.Canvas, the first number
+    -- is the column, and the second number the row.
+    { m11: a
+    , m12: c
+    , m21: b
+    , m22: d
+    , m31: x
+    , m32: y
+    }
 
 
 -- | Create a [rotation matrix](http://en.wikipedia.org/wiki/Rotation_matrix).
@@ -62,8 +72,7 @@ matrix m11 m12 m21 m22 dx dy =
 -- |         \ sin t   cos t  0 /
 rotation :: Float -> Transform2D
 rotation t =
-    Transform2D $
-        asFloat32Array [c, (-s), 0.0, s, c, 0.0]
+    matrix c (-s) s c 0.0 0.0
 
     where
         c = cos t
@@ -80,7 +89,7 @@ translation :: Float -> Float -> Transform2D
 translation = matrix 1.0 0.0 0.0 1.0
 
 
--- | Creates a transformation matrix for scaling by a all directions.
+-- | Creates a transformation matrix for scaling by all directions.
 -- |
 -- |     scale s
 -- |
@@ -95,7 +104,7 @@ scaleX :: Float -> Transform2D
 scaleX x = matrix x 0.0 0.0 1.0 0.0 0.0
 
 
--- | Create a transformation for vertical scaling. -}
+-- | Create a transformation for vertical scaling.
 scaleY :: Float -> Transform2D
 scaleY y = matrix 1.0 0.0 0.0 y 0.0 0.0
 
@@ -108,30 +117,13 @@ scaleY y = matrix 1.0 0.0 0.0 y 0.0 0.0
 -- |         | mc md my |  .  | nc nd ny |
 -- |         \  0  0  1 /     \  0  0  1 /
 multiply :: Transform2D -> Transform2D -> Transform2D
-multiply (Transform2D m) (Transform2D n) =
-    Transform2D $
-        asFloat32Array
-            [ m11 * n11 + m12 * n21
-            , m11 * n12 + m12 * n22
-            , m11 * ndx + m12 * ndy + mdx
-            , m21 * n11 + m22 * n21
-            , m21 * n12 + m22 * n22
-            , m21 * ndx + m22 * ndy + mdy
-            ]
-
-    where
-        -- Note that these aren't actually unsafe because a
-        -- Transform2D always has 6 members
-        m11 = unsafeIndex m 0
-        m12 = unsafeIndex m 1
-        m21 = unsafeIndex m 3
-        m22 = unsafeIndex m 4
-        mdx = unsafeIndex m 2
-        mdy = unsafeIndex m 5
-
-        n11 = unsafeIndex n 0
-        n12 = unsafeIndex n 1
-        n21 = unsafeIndex n 3
-        n22 = unsafeIndex n 4
-        ndx = unsafeIndex n 2
-        ndy = unsafeIndex n 5
+multiply a b =
+    -- This is very translated from Elm's representation to that
+    -- of Graphics.Canvas ... will need to test!
+    { m11: (a.m11 * b.m11) + (a.m21 * b.m12)
+    , m12: (a.m12 * b.m11) + (a.m22 * b.m21)
+    , m21: (a.m11 * b.m21) + (a.m21 * b.m22)
+    , m22: (a.m12 * b.m21) + (a.m22 * b.m22)
+    , m31: (a.m11 * b.m31) + (a.m21 * b.m32) + a.m31
+    , m32: (a.m12 * b.m31) + (a.m22 * b.m32) + a.m32
+    }
