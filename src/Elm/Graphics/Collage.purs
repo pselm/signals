@@ -8,9 +8,8 @@
 -- | so moving a form 10 units in the y-axis will move it up on screen.
 
 module Elm.Graphics.Collage
-    ( --collage
-      Form
-    , toForm, filled, textured, gradient, outlined, traced, text, outlinedText
+    ( --Collage, makeCollage, collage, toElement
+      Form, toForm, filled, textured, gradient, outlined, traced, text, outlinedText
     , move, moveX, moveY, scale, rotate, alpha
     , group, groupTransform
     , Shape, rect, oval, square, circle, ngon, polygon
@@ -30,36 +29,45 @@ import Elm.Graphics.Internal (createNode, setStyle)
 import Data.List (List(..), (..), (:), snoc, fromList)
 import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Foldable (for_)
+import Data.Nullable (toMaybe)
 
+import Unsafe.Coerce (unsafeCoerce)
 import Math (pi, cos, sin)
 import Math (sqrt)
 
 import DOM (DOM)
+import DOM.Node.Node (childNodes, nodeName, removeChild, appendChild)
+import DOM.Node.NodeList (item)
 import DOM.Node.Types (Element) as DOM
+import DOM.Node.Types (Node, NodeList, elementToNode)
 import DOM.Node.Element (setAttribute)
 import DOM.HTML.Types (Window)
 import DOM.HTML (window)
 
 import Control.Monad.Eff (Eff, untilE)
+import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
+import Control.Monad.State.Trans (StateT, evalStateT)
+import Control.Monad.State.Class (gets, modify)
 import Control.Comonad (extract)
 import Control.Monad (when)
 import Control.Bind ((>=>))
 
-import Graphics.Canvas (Context2D, Canvas, CanvasPattern, PatternRepeat(Repeat))
+import Graphics.Canvas (Context2D, Canvas, CanvasPattern, CanvasElement, PatternRepeat(Repeat))
 
 import Graphics.Canvas
     ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha
-    , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath
-    , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate
+    , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath, getContext2D
+    , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate, save, transform
     , withImage, createPattern, fill, withContext, translate, drawImageFull
     ) as Canvas
 
 import Prelude
-    ( class Eq, eq, pure, void, not, (<<<), Unit, unit, (||)
-    , (*), (/), ($), map, (+), (-), bind, (>>=), (<>), const
+    ( class Eq, eq, not, (<<<), Unit, unit, (||)
+    , class Monad, bind, (>>=), pure, void
+    , (*), (/), ($), map, (<$>), (+), (-), (<>), const
     , show, (<), (>), (&&), negate, (/=), (==), mod
     )
 
@@ -329,23 +337,39 @@ alpha a (Form f) =
         f { alpha = a }
 
 
-type Collage =
+newtype Collage = Collage
     { w :: Int
     , h :: Int
     , forms :: List Form
     }
 
 
--- | Create a collage with certain dimensions and content. It takes width and height
+-- | Create a `Collage` with certain dimensions and content. It takes width and height
 -- | arguments to specify dimensions, and then a list of 2D forms to decribe the content.
 -- |
--- | Unlike with `Element`s, these 2D forms can be moved and rotated however you like.
 -- | The forms are drawn in the order of the list, i.e., `collage w h (a : b : Nil)` will
 -- | draw `b` on top of `a`.
--- TODO
---collage :: Int -> Int -> List Form -> Element
---collage =
---    Native.Graphics.Collage.collage
+-- |
+-- | Note that this normally might be called `collage`, but Elm uses that for the function
+-- | that actually creates an `Element`.
+makeCollage :: Int -> Int -> List Form -> Collage
+makeCollage w h forms = Collage {w, h, forms}
+
+
+-- | Create a collage `Element` with certain dimensions and content. It takes width and height
+-- | arguments to specify dimensions, and then a list of 2D forms to decribe the content.
+-- |
+-- | The forms are drawn in the order of the list, i.e., `collage w h (a : b : Nil)` will
+-- | draw `b` on top of `a`.
+-- |
+-- | To make a `Collage` without immediately turning it into an `Element`, see `makeCollage`.
+-- collage :: Int -> Int -> List Form -> Element
+-- collage = makeCollage >>> toElement
+
+
+-- | Turn a `Collage` into an `Element`.
+-- toElement :: Collage -> Element
+-- toElement collage =
 
 
 -- | A 2D path. Paths are a sequence of points. They do not have a color.
@@ -766,26 +790,8 @@ str n =
         then "0"
         else show n
 
+
 {-
-	function makeTransform(w, h, form, matrices)
-	{
-		var props = form.form._0._0.props;
-		var m = A6( Transform.matrix, 1, 0, 0, -1,
-					(w - props.width ) / 2,
-					(h - props.height) / 2 );
-		var len = matrices.length;
-		for (var i = 0; i < len; ++i)
-		{
-			m = A2( Transform.multiply, m, matrices[i] );
-		}
-		m = A2( Transform.multiply, m, formToMatrix(form) );
-
-		return 'matrix(' +
-			str( m[0]) + ', ' + str( m[3]) + ', ' +
-			str(-m[1]) + ', ' + str(-m[4]) + ', ' +
-			str( m[2]) + ', ' + str( m[5]) + ')';
-	}
-
 	function stepperHelp(list)
 	{
 		var arr = List.toArray(list);
@@ -868,66 +874,203 @@ str n =
 	}
 -}
 
+
+-- There are a bunch of inter-related functions used in the `update` process that all want
+-- some shared state. So, we'll define the functions in terms of a `StateT` that we'll call
+-- `UpdateStateT`, where the state is an `UpdateState`.
+--
+-- In fact, some of this is read-only, so I suppose one ought to either combine StateT and
+-- ReaderT, or use RWS, but I'll keep in simple for now.
+--
+-- I was having some trouble with the StateT stuff until I made this a newtype instead of a type
+newtype UpdateState = UpdateState
+    { w :: Number
+    , h :: Number
+    , div :: DOM.Element
+    , kids :: NodeList
+    , index :: Int
+    , ratio :: Float
+    }
+
+
+type UpdateStateT m a = StateT UpdateState m a
+
+
+evalUpdateT :: ∀ e m a. (MonadEff (dom :: DOM | e) m) => Number -> Number -> DOM.Element -> UpdateStateT m a -> m a
+evalUpdateT w h div cb = do
+    ratio <-
+        liftEff $
+            window >>= devicePixelRatio
+
+    kids <-
+        liftEff $
+            childNodes (elementToNode div)
+
+    let index = 0
+
+    evalStateT cb $
+        UpdateState
+            { w, h, div, kids, index, ratio }
+
+
 foreign import devicePixelRatio :: ∀ e. Window -> Eff (dom :: DOM | e) Number
 
-makeCanvas :: ∀ e. Int -> Int -> Eff (dom :: DOM | e) DOM.Element
-makeCanvas w h = do
-    canvas <- createNode "canvas"
 
-    setStyle "width" (show w <> "px") canvas
-    setStyle "height" (show h <> "px") canvas
-    setStyle "display" "block" canvas
-    setStyle "position" "absolute" canvas
+makeCanvas :: ∀ e m. (MonadEff (dom :: DOM | e) m) => UpdateStateT m CanvasElement
+makeCanvas = do
+    canvas <-
+        liftEff $
+            createNode "canvas"
 
-    ratio <- window >>= devicePixelRatio
-    setAttribute "width" (show $ toNumber w * ratio) canvas
-    setAttribute "height" (show $ toNumber h * ratio) canvas
+    liftEff do
+        setStyle "display" "block" canvas
+        setStyle "position" "absolute" canvas
+
+    setCanvasProps canvas
+
+    -- The unsafeCoerce should be fine, since we just created it and we know it's a canvas ...
+    pure $
+        unsafeCoerce canvas
+
+
+setCanvasProps :: ∀ e m. (MonadEff (dom :: DOM | e) m) => DOM.Element -> UpdateStateT m DOM.Element
+setCanvasProps canvas = do
+    state <-
+        gets \(UpdateState s) -> s
+
+    liftEff do
+        setStyle "width" ((show state.w) <> "px") canvas
+        setStyle "height" ((show state.h) <> "px") canvas
+
+        setAttribute "width" (show $ state.w * state.ratio) canvas
+        setAttribute "height" (show $ state.h * state.ratio) canvas
 
     pure canvas
 
-{-
-	function nodeStepper(w, h, div)
-	{
-		var kids = div.childNodes;
-		var i = 0;
-		var ratio = window.devicePixelRatio || 1;
 
-		function transform(transforms, ctx)
+-- This unsafeCoerce should also be fine, since a CanvasElement must be a DOM.Element
+canvasElementToElement :: CanvasElement -> DOM.Element
+canvasElementToElement = unsafeCoerce
+
+
+nodeToCanvasElement :: Node -> Maybe CanvasElement
+nodeToCanvasElement node =
+    case nodeName node of
+        "CANVAS" ->
+            Just $ unsafeCoerce node
+
+        _ ->
+            Nothing
+
+
+transform :: ∀ e m. (MonadEff (canvas :: Canvas | e) m) => List Transform2D -> Context2D -> UpdateStateT m Context2D
+transform transforms ctx = do
+    state <-
+        gets \(UpdateState s) -> s
+
+    liftEff do
+        Canvas.translate
+            { translateX: state.w / 2.0 * state.ratio
+            , translateY: state.h / 2.0 * state.ratio
+            }
+            ctx
+
+        Canvas.scale
+            { scaleX: state.ratio
+            , scaleY: -state.ratio
+            }
+            ctx
+
+        for_ transforms \m -> do
+            -- It isn't clear in the Elm code where the corresponding `restore` will happen,
+            -- or, indeed, what the point of saving each intermediate state is. So, once this
+            -- is done, I should try deleting it and see what happens.
+            Canvas.save ctx
+            Canvas.transform m ctx
+
+        pure ctx
+
+
+currentChild :: ∀ e m. (MonadEff (dom :: DOM | e) m) => UpdateStateT m (Maybe Node)
+currentChild = do
+    state <-
+        gets \(UpdateState s) -> s
+
+    liftEff $
+        toMaybe <$>
+            item state.index state.kids
+
+
+moveToNextChild :: ∀ m. (Monad m) => UpdateStateT m Unit
+moveToNextChild =
+    modify \(UpdateState s) ->
+        UpdateState $
+            s { index = s.index + 1 }
+
+
+nextContext :: ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) => List Transform2D -> UpdateStateT m Context2D
+nextContext transforms = do
+    state <-
+        gets \(UpdateState s) -> s
+
+    current <- currentChild
+
+    case current of
+        Just node ->
+            case nodeToCanvasElement node of
+                Just canvas -> do
+                    -- We have a canvas, so we'll re-use it, and increment the index
+                    -- so we're now pointing at the next thing.
+                    moveToNextChild
+                    setCanvasProps (canvasElementToElement canvas)
+                    (liftEff $ Canvas.getContext2D canvas) >>= transform transforms
+
+                Nothing -> do
+                    -- Not a canvas, so remove it. And, we don't iterate the index,
+                    -- since we've removed it, so it will already point to the next thing.
+                    liftEff $ removeChild node (elementToNode state.div)
+
+                    -- And we recurse. Should figure out how to use purescript-tailrec
+                    nextContext transforms
+
+        Nothing -> do
+            -- We've run out of children. So, we make a new one, and increment
+            -- the index to point *past* it.
+            canvas <- makeCanvas
+
+            ctx <- liftEff do
+                appendChild (elementToNode (canvasElementToElement canvas)) (elementToNode state.div)
+                Canvas.getContext2D canvas
+
+            moveToNextChild
+
+            transform transforms ctx
+
+
+{-
+makeTransform :: Number -> Number ->
+
+	function makeTransform(w, h, form, matrices)
+	{
+		var props = form.form._0._0.props;
+		var m = A6( Transform.matrix, 1, 0, 0, -1,
+					(w - props.width ) / 2,
+					(h - props.height) / 2 );
+		var len = matrices.length;
+		for (var i = 0; i < len; ++i)
 		{
-			ctx.translate( w / 2 * ratio, h / 2 * ratio );
-			ctx.scale( ratio, -ratio );
-			var len = transforms.length;
-			for (var i = 0; i < len; ++i)
-			{
-				var m = transforms[i];
-				ctx.save();
-				ctx.transform(m[0], m[3], m[1], m[4], m[2], m[5]);
-			}
-			return ctx;
+			m = A2( Transform.multiply, m, matrices[i] );
 		}
-		function nextContext(transforms)
-		{
-			while (i < kids.length)
-			{
-				var node = kids[i];
-				if (node.getContext)
-				{
-					node.width = w * ratio;
-					node.height = h * ratio;
-					node.style.width = w + 'px';
-					node.style.height = h + 'px';
-					++i;
-					return transform(transforms, node.getContext('2d'));
-				}
-				div.removeChild(node);
-			}
-			var canvas = makeCanvas(w, h);
-			div.appendChild(canvas);
-			// we have added a new node, so we must step our position
-			++i;
-			return transform(transforms, canvas.getContext('2d'));
-		}
-		function addElement(matrices, alpha, form)
+		m = A2( Transform.multiply, m, formToMatrix(form) );
+
+		return 'matrix(' +
+			str( m[0]) + ', ' + str( m[3]) + ', ' +
+			str(-m[1]) + ', ' + str(-m[4]) + ', ' +
+			str( m[2]) + ', ' + str( m[5]) + ')';
+	}
+
+addElement ::
+        function addElement(matrices, alpha, form)
 		{
 			var kid = kids[i];
 			var elem = form.form._0;
@@ -950,21 +1093,28 @@ makeCanvas w h = do
 				div.insertBefore(node, kid);
 			}
 		}
-		function clearRest()
-		{
-			while (i < kids.length)
-			{
-				div.removeChild(kids[i]);
-			}
-		}
-		return {
-			nextContext: nextContext,
-			addElement: addElement,
-			clearRest: clearRest
-		};
-	}
+  -}
+
+clearRest :: ∀ e m. (MonadEff (dom :: DOM | e) m) => UpdateStateT m Unit
+clearRest = do
+    child <- currentChild
+
+    case child of
+        Just c -> do
+            state <-
+                gets \(UpdateState s) -> s
+
+            liftEff $
+                removeChild c (elementToNode state.div)
+
+            -- And recurse ... should investigate purescript-tailrec
+            clearRest
+
+        Nothing ->
+            pure unit
 
 
+{-
 	function update(div, _, model)
 	{
 		var w = model.w;
@@ -1001,15 +1151,4 @@ makeCanvas w h = do
 		return div;
 	}
 
-
-	function collage(w, h, forms)
-	{
-		return A3(NativeElement.newElement, w, h, {
-			ctor: 'Custom',
-			type: 'Collage',
-			render: render,
-			update: update,
-			model: {w: w, h: h, forms: forms}
-		});
-	}
 -}

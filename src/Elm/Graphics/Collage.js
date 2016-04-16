@@ -17,7 +17,7 @@ exports.setLineJoinImpl = function (lineJoin) {
 
 exports.devicePixelRatio = function (window) {
     return function () {
-        return window.devicePixelRatio;
+        return window.devicePixelRatio || 1.0;
     };
 };
 

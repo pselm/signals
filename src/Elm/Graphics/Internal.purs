@@ -1,6 +1,11 @@
 
+-- | Some helper functions used internally by multiple modules.
+-- | Not part of the official API, thus subject to change without affecting semver.
+
 module Elm.Graphics.Internal
-    ( createNode, setStyle, removeStyle
+    ( createNode
+    , setStyle, removeStyle
+    , addTransform, removeTransform
     ) where
 
 
@@ -30,3 +35,19 @@ createNode elementType = do
     pure node
 
 
+addTransform :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
+addTransform transform node = do
+    setStyle "transform" transform node
+    setStyle "msTransform" transform node
+    setStyle "MozTransform" transform node
+    setStyle "webkitTransform" transform node
+    setStyle "OTransform" transform node
+
+
+removeTransform :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Unit
+removeTransform node = do
+    removeStyle "transform" node
+    removeStyle "msTransform" node
+    removeStyle "MozTransform" node
+    removeStyle "webkitTransform" node
+    removeStyle "OTransform" node

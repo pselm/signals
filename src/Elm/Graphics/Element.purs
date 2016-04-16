@@ -23,14 +23,13 @@ module Elm.Graphics.Element
     ) where
 
 
-import Elm.Graphics.Internal (createNode, setStyle, removeStyle)
+import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform)
 import Elm.Basics (Float, truncate)
 import Elm.Color (Color)
-import Elm.List (List(..))
-import Data.List (null, (:), reverse, length, index)
-import Elm.Maybe (Maybe(..))
 import Elm.Text (Text, renderHtml)
-import Data.Maybe (fromMaybe)
+
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.List (List(..), null, (:), reverse, length, index)
 import Data.Int (round, toNumber)
 import Data.Ord (max)
 import Data.Foldable (maximum, sum, for_)
@@ -38,6 +37,7 @@ import Data.Traversable (for)
 import Data.Nullable (Nullable, toMaybe)
 import Data.String (joinWith)
 import Data.Array (catMaybes)
+
 import DOM (DOM)
 import DOM.Renderable (DynamicRenderable)
 import DOM.Renderable (render, update) as Renderable
@@ -52,9 +52,11 @@ import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
 import DOM.Event.EventTarget (addEventListener, eventListener)
 import DOM.Event.EventTypes (load)
+
 import Control.Monad.Eff (Eff, forE)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad (when, unless)
+
 import Text.Format (format, precision)
 
 import Prelude
@@ -1025,24 +1027,6 @@ setPos pos (Element {element, props}) e = do
         else addTransform transform e
 
     pure e
-
-
-addTransform :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
-addTransform transform node = do
-    setStyle "transform" transform node
-    setStyle "msTransform" transform node
-    setStyle "MozTransform" transform node
-    setStyle "webkitTransform" transform node
-    setStyle "OTransform" transform node
-
-
-removeTransform :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Unit
-removeTransform node = do
-    removeStyle "transform" node
-    removeStyle "msTransform" node
-    removeStyle "MozTransform" node
-    removeStyle "webkitTransform" node
-    removeStyle "OTransform" node
 
 
 makeContainer :: ∀ e. RawPosition -> Element -> Eff (dom :: DOM | e) DOM.Element
