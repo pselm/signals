@@ -571,7 +571,7 @@ line style closed pointList ctx =
                         pattern <- newSTRef firstPattern
 
                         -- We also need to keep track of how much is left in the current
-                        -- pattern of the pattern ... that is, how much length we can
+                        -- segment of the pattern ... that is, how much length we can
                         -- draw or skip until we should look at the next segment
                         leftInPattern <- newSTRef (toNumber firstDash)
 
