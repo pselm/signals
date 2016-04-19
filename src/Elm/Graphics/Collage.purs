@@ -24,13 +24,14 @@ import Elm.Text (Text, drawCanvas)
 import Elm.Transform2D (Transform2D)
 import Elm.Transform2D (identity, multiply, rotation, matrix) as T2D
 import Elm.Graphics.Element (Element)
-import Elm.Graphics.Internal (createNode, setStyle)
+import Elm.Graphics.Internal (createNode, setStyle, addTransform, removeTransform)
 
-import Data.List (List(..), (..), (:), snoc, fromList)
+import Data.List (List(..), (..), (:), snoc, fromList, head, tail, reverse)
 import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Foldable (for_)
+import Data.Traversable (traverse)
 import Data.Nullable (toMaybe)
 
 import Unsafe.Coerce (unsafeCoerce)
@@ -38,7 +39,9 @@ import Math (pi, cos, sin)
 import Math (sqrt)
 
 import DOM (DOM)
-import DOM.Node.Node (childNodes, nodeName, removeChild, appendChild)
+import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
+import DOM.Renderable (render) as DR
+import DOM.Node.Node (childNodes, nodeName, removeChild, appendChild, insertBefore)
 import DOM.Node.NodeList (item)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, NodeList, elementToNode)
@@ -51,23 +54,24 @@ import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
 import Control.Monad.State.Trans (StateT, evalStateT)
 import Control.Monad.State.Class (gets, modify)
+import Control.Monad.Reader.Trans (ReaderT, runReaderT)
+import Control.Monad.Reader.Class (reader)
 import Control.Comonad (extract)
 import Control.Monad (when)
-import Control.Bind ((>=>))
 
-import Graphics.Canvas (Context2D, Canvas, CanvasPattern, CanvasElement, PatternRepeat(Repeat))
+import Graphics.Canvas (Context2D, Canvas, CanvasElement, PatternRepeat(Repeat))
 
 import Graphics.Canvas
-    ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha
+    ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore
     , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath, getContext2D
     , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate, save, transform
-    , withImage, createPattern, fill, withContext, translate, drawImageFull
+    , withImage, createPattern, fill, translate, drawImageFull
     ) as Canvas
 
 import Prelude
     ( class Eq, eq, not, (<<<), Unit, unit, (||)
     , class Monad, bind, (>>=), pure, void
-    , (*), (/), ($), map, (<$>), (+), (-), (<>), const
+    , (*), (/), ($), map, (<$>), (+), (-), (<>)
     , show, (<), (>), (&&), negate, (/=), (==), mod
     )
 
@@ -80,7 +84,7 @@ newtype Form = Form
     , x :: Number
     , y :: Number
     , alpha :: Number
-    , form :: BasicForm
+    , basicForm :: BasicForm
     }
 
 
@@ -205,7 +209,7 @@ data BasicForm
     | FOutlinedText LineStyle Text
     | FText Text
     | FImage Int Int {top :: Int, left :: Int} String
-    | FElement Element
+    | FElement DynamicRenderable
     | FGroup Transform2D (List Form)
 
 
@@ -222,7 +226,7 @@ form f =
         , x: 0.0
         , y: 0.0
         , alpha: 1.0
-        , form: f
+        , basicForm: f
         }
 
 fill :: FillStyle -> Shape -> Form
@@ -246,7 +250,7 @@ gradient :: Gradient -> Shape -> Form
 gradient grad = fill (Grad grad)
 
 
-{-| Outline a shape with a given line style. -}
+-- | Outline a shape with a given line style.
 outlined :: LineStyle -> Shape -> Form
 outlined style (Shape shape) =
     form (FShape (Line style) shape)
@@ -267,8 +271,10 @@ sprite a b c d = form $ FImage a b c d
 -- | Turn any `Element` into a `Form`. This lets you use text, gifs, and video
 -- | in your collage. This means you can move, rotate, and scale
 -- | an `Element` however you want.
-toForm :: Element -> Form
-toForm e = form (FElement e)
+-- |
+-- | In fact, this works with any `Renderable`, not just Elements.
+toForm :: ∀ a. (Renderable a) => a -> Form
+toForm = form <<< FElement <<< toDynamic
 
 
 -- | Flatten many forms into a single `Form`. This lets you move and rotate them
@@ -481,64 +487,202 @@ outlinedText ls t =
     form (FOutlinedText ls t)
 
 
+---------
 -- RENDER
+---------
 
-
-render :: ∀ e. Collage -> Eff (dom :: DOM | e) DOM.Element
+render :: ∀ e. Collage -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 render model = do
     div <- createNode "div"
     setStyle "overflow" "hidden" div
     setStyle "position" "relative" div
-    -- update div model model
+    update true (elementToNode div) model
     pure div
 
 
-setStrokeStyle :: ∀ e. LineStyle -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-setStrokeStyle style =
-    Canvas.setLineWidth style.width >=>
-    Canvas.setLineCap (lineCap2Canvas style.cap) >=>
-    setLineJoin style.join >=>
-    Canvas.setStrokeStyle (toCss style.color)
+-- The idea is that the div is a node created by `render` ... that is, a div
+-- which should contain the rendering of the collage. The div may be empty,
+-- or it may have been previously rendered by a call to `update`.
+--
+-- The supplied collage contains possibly multiple forms, and each form might
+-- itself be an `Element`, or represent a group of forms. So, there is a need
+-- to deal with a bit of a tree of possibilities, you might say.
+--
+-- The original Javascript code does a number of clever things with a `formStepper`
+-- and a `nodeStepper`. The cleverness appears to have two purposes. One is
+-- to re-use existing Canvas elements that had been previously rendered, rather
+-- than deleting them and creating new ones. The other is to help manage the
+-- tree of possibilities ... that is, the possibility of Elements or groups of forms.
+--
+-- I had originally tried a more "literal" translation of some of this cleverness
+-- to Purescript, but it proved to be difficult to follow (what was clever in
+-- Javascript doesn't necessarily translate easily into Purescript). So, now I'm
+-- trying to do something that seems equivalent in purpose, but not having quite
+-- the same structure. So, ultimately I'll need to test it against example code
+-- to see that it produces the same results.
+update :: ∀ e. Boolean -> Node -> Collage -> Eff (dom :: DOM, canvas :: Canvas | e) Node
+update redoWhenImageLoads div c@(Collage {forms}) = do
+    evalUpdate redoWhenImageLoads div c $
+        traverse renderForm forms
+
+    pure div
 
 
-setFillStyle :: ∀ e. Context2D -> FillStyle -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Context2D
-setFillStyle ctx style redo =
+-- There are a bunch of inter-related functions used in the `update` process that all want
+-- some params or state. So, we define a ReaderT and StateT to help us out. For some
+-- reason, it seemed to solve some problems to make them a newtype instead of a type ...
+-- I didn't make a note of exactly what the problems were.
+newtype UpdateState = UpdateState
+    -- An index into the `kids` NodeList. We use it to keep track of what we're currently
+    -- "pointed" at (in the case where we've rendered to this div before).
+    { index :: Int
+
+    -- Remember a context that we should be drawing into right now. If `Nothing`, it means
+    -- that we'll need to construct a new context next time we need one. (At which point,
+    -- we'll store it here).
+    , context :: Maybe Context2D
+
+    -- When we get an FGroup, we apply the group's alpha and transforms to the context
+    -- before we recurse on the group (and restore our context after). This works fine
+    -- when we're still using the same context. However, when we hit an FElement, we
+    -- start a new div, and then if we need a new context afterwards, we start a new
+    -- Canvas, rather than re-using the old one. (I'm not entirely sure why the original
+    -- code does this ... perhaps to get the layering right, since if you re-used the old
+    -- Canvas then you'd be in the wrong layer relative to the FElement). In any event, if we're
+    -- making a new Canvas in the middle of (possibly nested) FGroups, we need to
+    -- re-apply the alpha and the transforms when we create the new Canvas. So, we
+    -- keep track of them here ...
+    , groupSettings :: List { alpha :: Float, trans :: Transform2D }
+    }
+
+
+newtype UpdateEnv = UpdateEnv
+    -- The original Javascript sets up callbacks that re-run the `update` function after
+    -- images load. This is probably because at that time the size of the image will be
+    -- known. We keep track here of whether to do that, so that we can disable it when
+    -- we're doing it. That is, to avoid infinite loops. (The original Javascript presumably
+    -- also avoids infinite loops, but we're using a somewhat different mechanism).
+    { redoWhenImageLoads :: Boolean
+
+    -- The collage we're working on.
+    , collage :: Collage
+
+    -- The node we're rending into
+    , div :: Node
+
+    -- The children of the `div`. Note that a NodeList is "live", so it's always the current
+    -- children of the `div`, even if we add or remove children.
+    , kids :: NodeList
+
+    -- The devicePixelRatio
+    , devicePixelRatio :: Float
+    }
+
+
+type Update m a = ReaderT UpdateEnv (StateT UpdateState m) a
+
+
+evalUpdate ::
+    ∀ e m a. (MonadEff (dom :: DOM | e) m) =>
+    Boolean -> Node -> Collage -> Update m a -> m a
+
+evalUpdate redoWhenImageLoads div c cb = do
+    ratio <-
+        liftEff $
+            window >>= devicePixelRatio
+
+    kids <-
+        liftEff $
+            childNodes div
+
+    let
+        env =
+            UpdateEnv
+                { redoWhenImageLoads
+                , collage: c
+                , div
+                , kids
+                , devicePixelRatio: ratio
+                }
+
+        state =
+            UpdateState
+                { index: 0
+                , context: Nothing
+                , groupSettings: Nil
+                }
+
+    evalStateT (runReaderT cb env) state
+
+
+setStrokeStyle ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    LineStyle -> Update m Context2D
+
+setStrokeStyle style = do
+    ctx <- getContext
+
+    liftEff do
+        Canvas.setLineWidth style.width ctx
+        Canvas.setLineCap (lineCap2Canvas style.cap) ctx
+        setLineJoin style.join ctx
+        Canvas.setStrokeStyle (toCss style.color) ctx
+
+
+setFillStyle ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    FillStyle -> Update m Context2D
+
+setFillStyle style = do
+    ctx <- getContext
+
     case style of
         Solid c ->
-            Canvas.setFillStyle (toCss c) ctx
+            liftEff $
+                Canvas.setFillStyle (toCss c) ctx
 
         Texture t -> do
-            texture ctx t \pattern -> do
-                Canvas.setPatternFillStyle pattern ctx
-                redo pattern
+            texture t
             pure ctx
 
-        Grad g -> do
-            grad <- toCanvasGradient g ctx
-            Canvas.setGradientFillStyle grad ctx
+        Grad g ->
+            liftEff do
+                grad <- toCanvasGradient g ctx
+                Canvas.setGradientFillStyle grad ctx
 
 
 -- Note that this traces first to last, whereas Elm traces from last to
 -- first. If this turns out to matter, I can reverse the list.
-trace :: ∀ e. Boolean -> List Point -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-trace closed list ctx =
-    case list of
-        Cons first rest -> do
-            Canvas.moveTo ctx first.x first.y
+trace ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    Boolean -> List Point -> Update m Context2D
 
-            for_ rest \point ->
-                Canvas.lineTo ctx point.x point.y
+trace closed list = do
+    ctx <- getContext
 
-            if closed
-                then Canvas.lineTo ctx first.x first.y
-                else pure ctx
+    liftEff
+        case list of
+            Cons first rest -> do
+                Canvas.moveTo ctx first.x first.y
 
-        _ ->
-            pure ctx
+                for_ rest \point ->
+                    Canvas.lineTo ctx point.x point.y
+
+                if closed
+                    then Canvas.lineTo ctx first.x first.y
+                    else pure ctx
+
+            _ ->
+                pure ctx
 
 
-line :: ∀ e. LineStyle -> Boolean -> List Point -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-line style closed pointList ctx =
+line ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    LineStyle -> Boolean -> List Point -> Update m Context2D
+
+line style closed pointList = do
+    ctx <- getContext
+
     case pointList of
         -- Note that elm draws from the last point to the first, whereas we're
         -- drawing from the first to the last. If this turns out to matter, we
@@ -560,7 +704,7 @@ line style closed pointList ctx =
                     -- through both the points and the dashes, and each has to give up
                     -- control to the other at certain points. So, probably the right way
                     -- to do this would be with continuations. But that might be overkill.
-                    runST do
+                    liftEff $ runST do
 
                         -- The dashes are basically a list of on/off lengths which we
                         -- want to iterate through, and then go back to the beginning.
@@ -660,34 +804,59 @@ line style closed pointList ctx =
 
                 _ ->
                     -- This the case where we have no dashing, so we can just trace the line
-                    trace closed pointList ctx
+                    trace closed pointList
 
             -- In either event, with or without dashing, we scale and stroke
-            Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
-            Canvas.stroke ctx
+            liftEff do
+                Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+                Canvas.stroke ctx
 
         _ ->
             -- This is the case where we have an empty path, so there's nothing to do
             pure ctx
 
 
-drawLine :: ∀ e. LineStyle -> Boolean -> List Point -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-drawLine style closed points =
-    setStrokeStyle style >=> line style closed points
+drawLine ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    LineStyle -> Boolean -> List Point -> Update m Context2D
+
+drawLine style closed points = do
+    setStrokeStyle style
+    line style closed points
 
 
-texture :: ∀ e. Context2D -> String -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Unit
-texture ctx src redo =
-    Canvas.withImage src \source ->
-        Canvas.createPattern source Repeat ctx >>= redo
+texture ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    String -> Update m Unit
+
+texture src = do
+    ctx <- getContext
+
+    liftEff $
+        Canvas.withImage src \source -> do
+            pattern <-
+                Canvas.createPattern source Repeat ctx
+
+            Canvas.setPatternFillStyle pattern ctx
+            pure unit
+
+    pure unit
+            -- redo
 
 
-drawShape :: ∀ e. Context2D -> FillStyle -> Boolean -> List Point -> (CanvasPattern -> Eff (canvas :: Canvas | e) Unit) -> Eff (canvas :: Canvas | e) Context2D
-drawShape ctx style closed points redo = do
-    trace closed points ctx
-    setFillStyle ctx style redo
-    Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
-    Canvas.fill ctx
+drawShape ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    FillStyle -> Boolean -> List Point -> Update m Context2D
+
+drawShape style closed points = do
+    ctx <- getContext
+
+    trace closed points
+    setFillStyle style
+
+    liftEff do
+        Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+        Canvas.fill ctx
 
 
 -- TEXT RENDERING
@@ -696,80 +865,35 @@ drawShape ctx style closed points redo = do
 foreign import setLineDash :: ∀ e. List Int -> Context2D -> Eff (canvas :: Canvas | e) Boolean
 
 
-fillText :: ∀ e. Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-fillText = drawCanvas Canvas.fillText
+fillText ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    Text -> Update m Context2D
+
+fillText t = do
+    ctx <- getContext
+
+    liftEff $
+        drawCanvas Canvas.fillText t ctx
 
 
-strokeText :: ∀ e. LineStyle -> Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-strokeText style t ctx = do
-    setStrokeStyle style ctx
+strokeText ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    LineStyle -> Text -> Update m Context2D
 
-    when (style.dashing /= Nil) $ void $
-        setLineDash (fromList style.dashing) ctx
+strokeText style t = do
+    ctx <- getContext
 
-    drawCanvas Canvas.strokeText t ctx
+    setStrokeStyle style
+
+    liftEff do
+        when (style.dashing /= Nil) $ void $
+            setLineDash (fromList style.dashing) ctx
+
+        drawCanvas Canvas.strokeText t ctx
 
 
 -- Should suggest adding this to Graphics.Canvas
 foreign import globalAlpha :: ∀ e. Context2D -> Eff (canvas :: Canvas | e) Number
-
-
-renderForm :: ∀ e. Context2D -> Form -> Eff (canvas :: Canvas | e) Unit -> Eff (canvas :: Canvas | e) Context2D
-renderForm ctx (Form f) redo =
-    Canvas.withContext ctx do
-        when (f.x /= 0.0 || f.y /= 0.0) $ void $
-            Canvas.translate
-                { translateX: f.x
-                , translateY: f.y
-                }
-                ctx
-
-        when (f.theta /= 0.0) $ void $
-            Canvas.rotate (f.theta `mod` (pi * 2.0)) ctx
-
-        when (f.scale /= 1.0) $ void $
-            Canvas.scale { scaleX: f.scale, scaleY: f.scale } ctx
-
-        when (f.alpha /= 1.0) do
-            ga <- globalAlpha ctx
-            Canvas.setGlobalAlpha ctx (ga * f.alpha)
-            pure unit
-
-        Canvas.beginPath ctx
-
-        case f.form of
-            FPath style points ->
-                drawLine style false points ctx
-
-            FImage w h pos src -> do
-                Canvas.withImage src \source -> do
-                    Canvas.scale { scaleX: 1.0, scaleY: (-1.0) } ctx
-                    Canvas.drawImageFull
-                        ctx source
-                        (toNumber pos.top) (toNumber pos.left)
-                        (toNumber w) (toNumber h)
-                        (toNumber (-w) / 2.0) (toNumber (-h) / 2.0)
-                        (toNumber w) (toNumber h)
-                    redo
-                pure ctx
-
-            FShape shapeStyle points ->
-                case shapeStyle of
-                    Line lineStyle ->
-                        drawLine lineStyle true points ctx
-
-                    Fill fillStyle ->
-                        drawShape ctx fillStyle false points (const redo)
-
-            FText t ->
-                fillText t ctx
-
-            FOutlinedText lineStyle t ->
-                strokeText lineStyle t ctx
-
-            _ ->
-                -- There seem to be several unhandled cases in the original code ...
-                pure ctx
 
 
 formToMatrix :: Form -> Transform2D
@@ -791,265 +915,76 @@ str n =
         else show n
 
 
-{-
-	function stepperHelp(list)
-	{
-		var arr = List.toArray(list);
-		var i = 0;
-		function peekNext()
-		{
-			return i < arr.length ? arr[i]._0.form.ctor : '';
-		}
-		// assumes that there is a next element
-		function next()
-		{
-			var out = arr[i]._0;
-			++i;
-			return out;
-		}
-		return {
-			peekNext: peekNext,
-			next: next
-		};
-	}
-
-	function formStepper(forms)
-	{
-		var ps = [stepperHelp(forms)];
-		var matrices = [];
-		var alphas = [];
-		function peekNext()
-		{
-			var len = ps.length;
-			var formType = '';
-			for (var i = 0; i < len; ++i )
-			{
-				if (formType = ps[i].peekNext()) return formType;
-			}
-			return '';
-		}
-		// assumes that there is a next element
-		function next(ctx)
-		{
-			while (!ps[0].peekNext())
-			{
-				ps.shift();
-				matrices.pop();
-				alphas.shift();
-				if (ctx)
-				{
-					ctx.restore();
-				}
-			}
-			var out = ps[0].next();
-			var f = out.form;
-			if (f.ctor === 'FGroup')
-			{
-				ps.unshift(stepperHelp(f._1));
-				var m = A2(Transform.multiply, f._0, formToMatrix(out));
-				ctx.save();
-				ctx.transform(m[0], m[3], m[1], m[4], m[2], m[5]);
-				matrices.push(m);
-
-				var alpha = (alphas[0] || 1) * out.alpha;
-				alphas.unshift(alpha);
-				ctx.globalAlpha = alpha;
-			}
-			return out;
-		}
-		function transforms()
-		{
-			return matrices;
-		}
-		function alpha()
-		{
-			return alphas[0] || 1;
-		}
-		return {
-			peekNext: peekNext,
-			next: next,
-			transforms: transforms,
-			alpha: alpha
-		};
-	}
--}
-
-
--- There are a bunch of inter-related functions used in the `update` process that all want
--- some shared state. So, we'll define the functions in terms of a `StateT` that we'll call
--- `UpdateStateT`, where the state is an `UpdateState`.
---
--- In fact, some of this is read-only, so I suppose one ought to either combine StateT and
--- ReaderT, or use RWS, but I'll keep in simple for now.
---
--- I was having some trouble with the StateT stuff until I made this a newtype instead of a type
-newtype UpdateState = UpdateState
-    { w :: Number
-    , h :: Number
-    , div :: DOM.Element
-    , kids :: NodeList
-    , index :: Int
-    , ratio :: Float
-    }
-
-
-type UpdateStateT m a = StateT UpdateState m a
-
-
-evalUpdateT :: ∀ e m a. (MonadEff (dom :: DOM | e) m) => Number -> Number -> DOM.Element -> UpdateStateT m a -> m a
-evalUpdateT w h div cb = do
-    ratio <-
-        liftEff $
-            window >>= devicePixelRatio
-
-    kids <-
-        liftEff $
-            childNodes (elementToNode div)
-
-    let index = 0
-
-    evalStateT cb $
-        UpdateState
-            { w, h, div, kids, index, ratio }
-
-
 foreign import devicePixelRatio :: ∀ e. Window -> Eff (dom :: DOM | e) Number
 
 
-makeCanvas :: ∀ e m. (MonadEff (dom :: DOM | e) m) => UpdateStateT m CanvasElement
-makeCanvas = do
-    canvas <-
+-- So, we pull the original params to `update` out of the state, and call it again,
+-- if redo was allowed. And, this time we don't allow redo ...
+redo :: ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) => Update m Unit
+redo = do
+    env <-
+        reader \(UpdateEnv e) -> e
+
+    when env.redoWhenImageLoads $
         liftEff $
-            createNode "canvas"
+            void $
+                update false env.div env.collage
+
+
+drawInContext ::
+    ∀ e m a. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    Form -> Update m a -> Update m a
+
+drawInContext (Form f) cb = do
+    ctx <- getContext
 
     liftEff do
-        setStyle "display" "block" canvas
-        setStyle "position" "absolute" canvas
+        Canvas.save ctx
 
-    setCanvasProps canvas
+        when (f.x /= 0.0 || f.y /= 0.0) $ void $
+            Canvas.translate
+                { translateX: f.x
+                , translateY: f.y
+                }
+                ctx
 
-    -- The unsafeCoerce should be fine, since we just created it and we know it's a canvas ...
-    pure $
-        unsafeCoerce canvas
+        when (f.theta /= 0.0) $ void $
+            Canvas.rotate (f.theta `mod` (pi * 2.0)) ctx
 
+        when (f.scale /= 1.0) $ void $
+            Canvas.scale { scaleX: f.scale, scaleY: f.scale } ctx
 
-setCanvasProps :: ∀ e m. (MonadEff (dom :: DOM | e) m) => DOM.Element -> UpdateStateT m DOM.Element
-setCanvasProps canvas = do
-    state <-
-        gets \(UpdateState s) -> s
+        when (f.alpha /= 1.0) do
+            ga <- globalAlpha ctx
+            Canvas.setGlobalAlpha ctx (ga * f.alpha)
+            pure unit
 
-    liftEff do
-        setStyle "width" ((show state.w) <> "px") canvas
-        setStyle "height" ((show state.h) <> "px") canvas
+        Canvas.beginPath ctx
 
-        setAttribute "width" (show $ state.w * state.ratio) canvas
-        setAttribute "height" (show $ state.h * state.ratio) canvas
-
-    pure canvas
-
-
--- This unsafeCoerce should also be fine, since a CanvasElement must be a DOM.Element
-canvasElementToElement :: CanvasElement -> DOM.Element
-canvasElementToElement = unsafeCoerce
-
-
-nodeToCanvasElement :: Node -> Maybe CanvasElement
-nodeToCanvasElement node =
-    case nodeName node of
-        "CANVAS" ->
-            Just $ unsafeCoerce node
-
-        _ ->
-            Nothing
-
-
-transform :: ∀ e m. (MonadEff (canvas :: Canvas | e) m) => List Transform2D -> Context2D -> UpdateStateT m Context2D
-transform transforms ctx = do
-    state <-
-        gets \(UpdateState s) -> s
-
-    liftEff do
-        Canvas.translate
-            { translateX: state.w / 2.0 * state.ratio
-            , translateY: state.h / 2.0 * state.ratio
-            }
-            ctx
-
-        Canvas.scale
-            { scaleX: state.ratio
-            , scaleY: -state.ratio
-            }
-            ctx
-
-        for_ transforms \m -> do
-            -- It isn't clear in the Elm code where the corresponding `restore` will happen,
-            -- or, indeed, what the point of saving each intermediate state is. So, once this
-            -- is done, I should try deleting it and see what happens.
-            Canvas.save ctx
-            Canvas.transform m ctx
-
-        pure ctx
-
-
-currentChild :: ∀ e m. (MonadEff (dom :: DOM | e) m) => UpdateStateT m (Maybe Node)
-currentChild = do
-    state <-
-        gets \(UpdateState s) -> s
+    result <-
+        cb
 
     liftEff $
-        toMaybe <$>
-            item state.index state.kids
+        Canvas.restore ctx
+
+    pure result
 
 
-moveToNextChild :: ∀ m. (Monad m) => UpdateStateT m Unit
-moveToNextChild =
-    modify \(UpdateState s) ->
-        UpdateState $
-            s { index = s.index + 1 }
+-- Gets the alpha from our stack of group settings. Returns the first alpha, if
+-- there is one, or 1.0.
+getGroupAlpha :: ∀ m. (Monad m) => Update m Number
+getGroupAlpha =
+    gets \(UpdateState s) ->
+        fromMaybe 1.0 (_.alpha <$> head s.groupSettings)
 
 
-nextContext :: ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) => List Transform2D -> UpdateStateT m Context2D
-nextContext transforms = do
-    state <-
-        gets \(UpdateState s) -> s
-
-    current <- currentChild
-
-    case current of
-        Just node ->
-            case nodeToCanvasElement node of
-                Just canvas -> do
-                    -- We have a canvas, so we'll re-use it, and increment the index
-                    -- so we're now pointing at the next thing.
-                    moveToNextChild
-                    setCanvasProps (canvasElementToElement canvas)
-                    (liftEff $ Canvas.getContext2D canvas) >>= transform transforms
-
-                Nothing -> do
-                    -- Not a canvas, so remove it. And, we don't iterate the index,
-                    -- since we've removed it, so it will already point to the next thing.
-                    liftEff $ removeChild node (elementToNode state.div)
-
-                    -- And we recurse. Should figure out how to use purescript-tailrec
-                    nextContext transforms
-
-        Nothing -> do
-            -- We've run out of children. So, we make a new one, and increment
-            -- the index to point *past* it.
-            canvas <- makeCanvas
-
-            ctx <- liftEff do
-                appendChild (elementToNode (canvasElementToElement canvas)) (elementToNode state.div)
-                Canvas.getContext2D canvas
-
-            moveToNextChild
-
-            transform transforms ctx
-
+makeTransform :: ∀ m. (Monad m) => Number -> Number -> Form -> Update m String
+makeTransform w h (Form formRec) =
+-- This is another one that actually knows about the structure of an `Element`.
+-- So, I might actually need to specialize for that.
+    pure "matrix ()"
 
 {-
-makeTransform :: Number -> Number ->
-
 	function makeTransform(w, h, form, matrices)
 	{
 		var props = form.form._0._0.props;
@@ -1068,44 +1003,352 @@ makeTransform :: Number -> Number ->
 			str(-m[1]) + ', ' + str(-m[4]) + ', ' +
 			str( m[2]) + ', ' + str( m[5]) + ')';
 	}
+-}
 
-addElement ::
-        function addElement(matrices, alpha, form)
-		{
-			var kid = kids[i];
-			var elem = form.form._0;
 
-			var node = (!kid || kid.getContext)
-				? NativeElement.render(elem)
-				: NativeElement.update(kid, kid.oldElement, elem);
+renderForm ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    Form -> Update m Context2D
 
-			node.style.position = 'absolute';
-			node.style.opacity = alpha * form.alpha * elem._0.props.opacity;
-			NativeElement.addTransform(node.style, makeTransform(w, h, form, matrices));
-			node.oldElement = elem;
-			++i;
-			if (!kid)
-			{
-				div.appendChild(node);
-			}
-			else
-			{
-				div.insertBefore(node, kid);
-			}
-		}
-  -}
+renderForm f@(Form innerForm) = do
+    ctx <- getContext
 
-clearRest :: ∀ e m. (MonadEff (dom :: DOM | e) m) => UpdateStateT m Unit
+    case innerForm.basicForm of
+        FPath lineStyle points ->
+            drawInContext f $
+                drawLine lineStyle false points
+
+        FImage w h pos src ->
+            drawInContext f do
+                liftEff $ Canvas.withImage src \source -> do
+                    Canvas.scale { scaleX: 1.0, scaleY: (-1.0) } ctx
+                    Canvas.drawImageFull
+                        ctx source
+                        (toNumber pos.top) (toNumber pos.left)
+                        (toNumber w) (toNumber h)
+                        (toNumber (-w) / 2.0) (toNumber (-h) / 2.0)
+                        (toNumber w) (toNumber h)
+
+                    pure unit
+                    -- redo
+                pure ctx
+
+        FShape shapeStyle points ->
+            drawInContext f $
+                case shapeStyle of
+                    Line lineStyle ->
+                        drawLine lineStyle true points
+
+                    Fill fillStyle ->
+                        drawShape fillStyle false points
+
+        FText t ->
+            drawInContext f $
+                fillText t
+
+        FOutlinedText lineStyle t ->
+            drawInContext f $
+                strokeText lineStyle t
+
+        FElement renderable -> do
+            kid <-
+                currentChild
+
+            div <-
+                getDiv
+
+            newNode <-
+                liftEff
+                    case kid of
+                        Just k -> do
+                            n <- if isCanvasElement k
+                                then DR.render renderable
+                                else DR.render renderable
+                                -- The Javascript code hanngs the renderable on the node, and possibly does
+                                -- an update ... should do that!
+
+                            insertBefore n k div
+
+                        Nothing -> do
+                            n <- DR.render renderable
+                            appendChild n div
+
+            moveToNextChild
+            pure ctx
+
+            -- groupAlpha <- getGroupAlpha
+
+            -- setStyle "position" "absolute" newNode
+
+            -- The original Javascript code also takes into account the opacity of the
+            -- `Element`. Of course, I don't know that it is an `Element`, since I've
+            -- generalized it to `Renderable`. But, I guess I could read back the
+            -- current opacity from the style? Or, set these properties on a wrapper?
+            -- Actually, using a wrapper probably makes the most sense ... TODO.
+            -- setStyle "opacity" (show (groupAlpha * form.alpha)) newNode
+
+            -- addTransform newNode (makeTransform w h form)
+			
+        FGroup transform forms -> do
+            -- First, we figure out what our transform should be. It combines the
+            -- scale, theta, x and y from the form with the additional transform
+            -- from the group
+            let trans = T2D.multiply transform (formToMatrix f)
+
+            -- Now, get the new alpha we should use (given any groups already in the stack)
+            groupAlpha <- (_ * innerForm.alpha) <$> getGroupAlpha
+
+            -- We push the transform and alpha onto a stack, so that we can
+            -- re-apply them if we end up on a new Canvas element while we're
+            -- iterating the sub-forms
+            putStuffOnTheStackOfGroupSettings { alpha: groupAlpha, trans }
+
+            -- Then we save our context and actually apply the alpha and transform
+            liftEff do
+                Canvas.save ctx
+                Canvas.transform trans ctx
+                Canvas.setGlobalAlpha ctx groupAlpha
+
+            -- Now, traverse the forms and render them. Isn't this fun? The original
+            -- Javascript code actually does something clever here to avoid the recursion.
+            -- But I think I'll try the recursive version first and see if it causes any
+            -- trouble. You wouldn't think that FGruops would go so deep as to exhaust
+            -- the function stack.
+            traverse renderForm forms
+
+            -- So, we've rendered our forms, and possibly their sub-forms, and the
+            -- sub-forms' sub-forms, and the sub-forms' sub-forms' sub-forms, and
+            -- the sub-forms' sub-forms' sub-forms' sub-forms, and so on. So, it's
+            -- time to restore the context, and pop the stuff off the stack of
+            -- groupSettings.
+            liftEff (Canvas.restore ctx)
+
+            popStuffOffTheStackOfGroupSettings
+
+            pure ctx
+
+
+putStuffOnTheStackOfGroupSettings ::
+    ∀ m. (Monad m) =>
+    { alpha :: Number, trans :: Transform2D } -> Update m Unit
+
+putStuffOnTheStackOfGroupSettings stuff =
+    modify \(UpdateState state) ->
+        UpdateState $
+            state
+                { groupSettings = Cons stuff state.groupSettings
+                }
+
+
+popStuffOffTheStackOfGroupSettings :: ∀ m. (Monad m) => Update m Unit
+popStuffOffTheStackOfGroupSettings =
+    modify \(UpdateState state) ->
+        UpdateState $
+            state
+                { groupSettings = fromMaybe Nil (tail state.groupSettings)
+                }
+
+
+makeCanvas :: ∀ e m. (MonadEff (dom :: DOM | e) m) => Update m CanvasElement
+makeCanvas = do
+    canvas <-
+        liftEff $
+            createNode "canvas"
+
+    liftEff do
+        setStyle "display" "block" canvas
+        setStyle "position" "absolute" canvas
+
+    setCanvasProps canvas
+
+    -- The unsafeCoerce should be fine, since we just created it and we know it's a canvas ...
+    pure $
+        unsafeCoerce canvas
+
+
+setCanvasProps :: ∀ e m. (MonadEff (dom :: DOM | e) m) => DOM.Element -> Update m DOM.Element
+setCanvasProps canvas = do
+    env <-
+        reader \(UpdateEnv {devicePixelRatio, collage: Collage collage}) ->
+            {devicePixelRatio, collage}
+
+    liftEff do
+        setStyle "width" ((show env.collage.w) <> "px") canvas
+        setStyle "height" ((show env.collage.h) <> "px") canvas
+
+        setAttribute "width" (show $ (toNumber env.collage.w) * env.devicePixelRatio) canvas
+        setAttribute "height" (show $ (toNumber env.collage.h) * env.devicePixelRatio) canvas
+
+    pure canvas
+
+
+-- This unsafeCoerce should also be fine, since a CanvasElement must be a DOM.Element
+canvasElementToElement :: CanvasElement -> DOM.Element
+canvasElementToElement = unsafeCoerce
+
+
+isCanvasElement :: Node -> Boolean
+isCanvasElement node =
+    nodeName node == "CANVAS"
+
+
+nodeToCanvasElement :: Node -> Maybe CanvasElement
+nodeToCanvasElement node =
+    case nodeName node of
+        "CANVAS" ->
+            Just $ unsafeCoerce node
+
+        _ ->
+            Nothing
+
+
+currentChild :: ∀ e m. (MonadEff (dom :: DOM | e) m) => Update m (Maybe Node)
+currentChild = do
+    index <-
+        gets \(UpdateState s) -> s.index
+
+    kids <-
+        reader \(UpdateEnv e) -> e.kids
+
+    liftEff $
+        toMaybe <$>
+            item index kids
+
+
+moveToNextChild :: ∀ m. (Monad m) => Update m Unit
+moveToNextChild =
+    modify \(UpdateState s) ->
+        UpdateState $
+            s { index = s.index + 1 }
+
+
+getDiv :: ∀ m. (Monad m) => Update m Node
+getDiv =
+    reader \(UpdateEnv env) ->
+        env.div
+
+
+getContext ::
+    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
+    Update m Context2D
+
+getContext = do
+    state <-
+        gets \(UpdateState s) -> s
+
+    div <-
+        getDiv
+
+    case state.context of
+        Just c ->
+            pure c
+
+        Nothing -> do
+            current <-
+                currentChild
+
+            case current of
+                Just node ->
+                    case nodeToCanvasElement node of
+                        Just canvas -> do
+                            -- We have a canvas, so we'll re-use it, and increment the index
+                            -- so we're now pointing at the next thing.
+                            moveToNextChild
+
+                            setCanvasProps $
+                                canvasElementToElement canvas
+
+                            ctx <-
+                                liftEff $
+                                    Canvas.getContext2D canvas
+
+                            useContext ctx
+
+                        Nothing -> do
+                            -- Not a canvas, so remove it. And, we don't iterate the index,
+                            -- since we've removed it, so it will already point to the next thing.
+                            liftEff $
+                                removeChild node div
+
+                            -- And we recurse. Should figure out how to use purescript-tailrec
+                            getContext
+
+                Nothing -> do
+                    -- We've run out of children. So, we make a new one, and increment
+                    -- the index to point *past* it.
+                    canvas <- makeCanvas
+
+                    ctx <- liftEff do
+                        appendChild (elementToNode (canvasElementToElement canvas)) div
+                        Canvas.getContext2D canvas
+
+                    moveToNextChild
+
+                    useContext ctx
+
+
+useContext :: ∀ e m. (MonadEff (canvas :: Canvas | e) m) => Context2D -> Update m Context2D
+useContext ctx = do
+    modify \(UpdateState s) ->
+        UpdateState $
+            s { context = Just ctx }
+
+    env <-
+        reader \(UpdateEnv {devicePixelRatio, collage: Collage {w, h}}) ->
+            {devicePixelRatio, w, h}
+
+    groupSettings <-
+        gets \(UpdateState state) ->
+            state.groupSettings
+
+    liftEff do
+        -- Start the alpha at 1.0 ... we'll restore the groupSettings below
+        Canvas.setGlobalAlpha ctx 1.0
+
+        Canvas.translate
+            { translateX: (toNumber env.w) / 2.0 * env.devicePixelRatio
+            , translateY: (toNumber env.h) / 2.0 * env.devicePixelRatio
+            }
+            ctx
+
+        Canvas.scale
+            { scaleX: env.devicePixelRatio
+            , scaleY: -env.devicePixelRatio
+            }
+            ctx
+
+        for_ (reverse groupSettings) \setting -> do
+            -- So, for each of the groupSettings that we've pushed on to the stack,
+            -- we will have done a save in the previous context, and we'll expect
+            -- to be able to do restores on the way back out. So, we'll do a save
+            -- here before we re-apply each transform.
+            Canvas.save ctx
+            Canvas.transform setting.trans ctx
+            Canvas.setGlobalAlpha ctx setting.alpha
+
+        pure ctx
+
+
+forgetContext :: ∀ m. (Monad m) => Update m Unit
+forgetContext =
+    modify \(UpdateState s) ->
+        UpdateState $
+            s { context = Nothing }
+
+
+clearRest :: ∀ e m. (MonadEff (dom :: DOM | e) m) => Update m Unit
 clearRest = do
-    child <- currentChild
+    child <-
+        currentChild
 
     case child of
         Just c -> do
-            state <-
-                gets \(UpdateState s) -> s
+            div <-
+                reader \(UpdateEnv env) ->
+                    env.div
 
             liftEff $
-                removeChild c (elementToNode state.div)
+                removeChild c div
 
             -- And recurse ... should investigate purescript-tailrec
             clearRest
@@ -1113,42 +1356,3 @@ clearRest = do
         Nothing ->
             pure unit
 
-
-{-
-	function update(div, _, model)
-	{
-		var w = model.w;
-		var h = model.h;
-
-		var forms = formStepper(model.forms);
-		var nodes = nodeStepper(w, h, div);
-		var ctx = null;
-		var formType = '';
-
-		while (formType = forms.peekNext())
-		{
-			// make sure we have context if we need it
-			if (ctx === null && formType !== 'FElement')
-			{
-				ctx = nodes.nextContext(forms.transforms());
-				ctx.globalAlpha = forms.alpha();
-			}
-
-			var form = forms.next(ctx);
-			// if it is FGroup, all updates are made within formStepper when next is called.
-			if (formType === 'FElement')
-			{
-				// update or insert an element, get a new context
-				nodes.addElement(forms.transforms(), forms.alpha(), form);
-				ctx = null;
-			}
-			else if (formType !== 'FGroup')
-			{
-				renderForm(function() { update(div, model, model); }, ctx, form);
-			}
-		}
-		nodes.clearRest();
-		return div;
-	}
-
--}
