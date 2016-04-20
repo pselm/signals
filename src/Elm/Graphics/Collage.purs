@@ -50,7 +50,7 @@ import DOM.HTML.Types (Window)
 import DOM.HTML (window)
 
 import Control.Monad.Eff (Eff, untilE)
-import Control.Monad.Eff.Class (class MonadEff, liftEff)
+import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
 import Control.Monad.State.Trans (StateT, evalStateT)
 import Control.Monad.State.Class (gets, modify)
@@ -70,7 +70,7 @@ import Graphics.Canvas
 
 import Prelude
     ( class Eq, eq, not, (<<<), Unit, unit, (||)
-    , class Monad, bind, (>>=), pure, void
+    , bind, (>>=), pure, void
     , (*), (/), ($), map, (<$>), (+), (-), (<>)
     , show, (<), (>), (&&), negate, (/=), (==), mod
     )
@@ -580,12 +580,10 @@ newtype UpdateEnv = UpdateEnv
 
 
 type Update m a = ReaderT UpdateEnv (StateT UpdateState m) a
+type UpdateEffects e a = Update (Eff (canvas :: Canvas, dom :: DOM | e)) a
 
 
-evalUpdate ::
-    ∀ e m a. (MonadEff (dom :: DOM | e) m) =>
-    Boolean -> Node -> Collage -> Update m a -> m a
-
+evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> Eff (canvas :: Canvas, dom :: DOM | e) a
 evalUpdate redoWhenImageLoads div c cb = do
     ratio <-
         liftEff $
@@ -615,10 +613,7 @@ evalUpdate redoWhenImageLoads div c cb = do
     evalStateT (runReaderT cb env) state
 
 
-setStrokeStyle ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    LineStyle -> Update m Context2D
-
+setStrokeStyle :: ∀ e. LineStyle -> UpdateEffects e Context2D
 setStrokeStyle style = do
     ctx <- getContext
 
@@ -629,10 +624,7 @@ setStrokeStyle style = do
         Canvas.setStrokeStyle (toCss style.color) ctx
 
 
-setFillStyle ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    FillStyle -> Update m Context2D
-
+setFillStyle :: ∀ e. FillStyle -> UpdateEffects e Context2D
 setFillStyle style = do
     ctx <- getContext
 
@@ -653,10 +645,7 @@ setFillStyle style = do
 
 -- Note that this traces first to last, whereas Elm traces from last to
 -- first. If this turns out to matter, I can reverse the list.
-trace ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    Boolean -> List Point -> Update m Context2D
-
+trace :: ∀ e. Boolean -> List Point -> UpdateEffects e Context2D
 trace closed list = do
     ctx <- getContext
 
@@ -676,10 +665,7 @@ trace closed list = do
                 pure ctx
 
 
-line ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    LineStyle -> Boolean -> List Point -> Update m Context2D
-
+line :: ∀ e. LineStyle -> Boolean -> List Point -> UpdateEffects e Context2D
 line style closed pointList = do
     ctx <- getContext
 
@@ -816,19 +802,13 @@ line style closed pointList = do
             pure ctx
 
 
-drawLine ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    LineStyle -> Boolean -> List Point -> Update m Context2D
-
+drawLine :: ∀ e. LineStyle -> Boolean -> List Point -> UpdateEffects e Context2D
 drawLine style closed points = do
     setStrokeStyle style
     line style closed points
 
 
-texture ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    String -> Update m Unit
-
+texture :: ∀ e. String -> UpdateEffects e Unit
 texture src = do
     ctx <- getContext
 
@@ -844,10 +824,7 @@ texture src = do
             -- redo
 
 
-drawShape ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    FillStyle -> Boolean -> List Point -> Update m Context2D
-
+drawShape :: ∀ e. FillStyle -> Boolean -> List Point -> UpdateEffects e Context2D
 drawShape style closed points = do
     ctx <- getContext
 
@@ -865,21 +842,12 @@ drawShape style closed points = do
 foreign import setLineDash :: ∀ e. List Int -> Context2D -> Eff (canvas :: Canvas | e) Boolean
 
 
-fillText ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    Text -> Update m Context2D
-
-fillText t = do
-    ctx <- getContext
-
-    liftEff $
-        drawCanvas Canvas.fillText t ctx
+fillText :: ∀ e. Text -> UpdateEffects e Context2D
+fillText t =
+    getContext >>= liftEff <<< drawCanvas Canvas.fillText t
 
 
-strokeText ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    LineStyle -> Text -> Update m Context2D
-
+strokeText :: ∀ e. LineStyle -> Text -> UpdateEffects e Context2D
 strokeText style t = do
     ctx <- getContext
 
@@ -920,7 +888,7 @@ foreign import devicePixelRatio :: ∀ e. Window -> Eff (dom :: DOM | e) Number
 
 -- So, we pull the original params to `update` out of the state, and call it again,
 -- if redo was allowed. And, this time we don't allow redo ...
-redo :: ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) => Update m Unit
+redo :: ∀ e. UpdateEffects e Unit
 redo = do
     env <-
         reader \(UpdateEnv e) -> e
@@ -931,10 +899,7 @@ redo = do
                 update false env.div env.collage
 
 
-drawInContext ::
-    ∀ e m a. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    Form -> Update m a -> Update m a
-
+drawInContext :: ∀ e a. Form -> UpdateEffects e a -> UpdateEffects e a
 drawInContext (Form f) cb = do
     ctx <- getContext
 
@@ -972,13 +937,13 @@ drawInContext (Form f) cb = do
 
 -- Gets the alpha from our stack of group settings. Returns the first alpha, if
 -- there is one, or 1.0.
-getGroupAlpha :: ∀ m. (Monad m) => Update m Number
+getGroupAlpha :: ∀ e. UpdateEffects e Number
 getGroupAlpha =
     gets \(UpdateState s) ->
         fromMaybe 1.0 (_.alpha <$> head s.groupSettings)
 
 
-makeTransform :: ∀ m. (Monad m) => Number -> Number -> Form -> Update m String
+makeTransform :: ∀ e. Number -> Number -> Form -> UpdateEffects e String
 makeTransform w h (Form formRec) =
 -- This is another one that actually knows about the structure of an `Element`.
 -- So, I might actually need to specialize for that.
@@ -1006,10 +971,7 @@ makeTransform w h (Form formRec) =
 -}
 
 
-renderForm ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    Form -> Update m Context2D
-
+renderForm :: ∀ e. Form -> UpdateEffects e Context2D
 renderForm f@(Form innerForm) = do
     ctx <- getContext
 
@@ -1128,10 +1090,7 @@ renderForm f@(Form innerForm) = do
             pure ctx
 
 
-putStuffOnTheStackOfGroupSettings ::
-    ∀ m. (Monad m) =>
-    { alpha :: Number, trans :: Transform2D } -> Update m Unit
-
+putStuffOnTheStackOfGroupSettings :: ∀ e. { alpha :: Number, trans :: Transform2D } -> UpdateEffects e Unit
 putStuffOnTheStackOfGroupSettings stuff =
     modify \(UpdateState state) ->
         UpdateState $
@@ -1140,7 +1099,7 @@ putStuffOnTheStackOfGroupSettings stuff =
                 }
 
 
-popStuffOffTheStackOfGroupSettings :: ∀ m. (Monad m) => Update m Unit
+popStuffOffTheStackOfGroupSettings :: ∀ e. UpdateEffects e Unit
 popStuffOffTheStackOfGroupSettings =
     modify \(UpdateState state) ->
         UpdateState $
@@ -1149,7 +1108,7 @@ popStuffOffTheStackOfGroupSettings =
                 }
 
 
-makeCanvas :: ∀ e m. (MonadEff (dom :: DOM | e) m) => Update m CanvasElement
+makeCanvas :: ∀ e. UpdateEffects e CanvasElement
 makeCanvas = do
     canvas <-
         liftEff $
@@ -1166,7 +1125,7 @@ makeCanvas = do
         unsafeCoerce canvas
 
 
-setCanvasProps :: ∀ e m. (MonadEff (dom :: DOM | e) m) => DOM.Element -> Update m DOM.Element
+setCanvasProps :: ∀ e. DOM.Element -> UpdateEffects e DOM.Element
 setCanvasProps canvas = do
     env <-
         reader \(UpdateEnv {devicePixelRatio, collage: Collage collage}) ->
@@ -1202,7 +1161,7 @@ nodeToCanvasElement node =
             Nothing
 
 
-currentChild :: ∀ e m. (MonadEff (dom :: DOM | e) m) => Update m (Maybe Node)
+currentChild :: ∀ e. UpdateEffects e (Maybe Node)
 currentChild = do
     index <-
         gets \(UpdateState s) -> s.index
@@ -1215,23 +1174,20 @@ currentChild = do
             item index kids
 
 
-moveToNextChild :: ∀ m. (Monad m) => Update m Unit
+moveToNextChild :: ∀ e. UpdateEffects e Unit
 moveToNextChild =
     modify \(UpdateState s) ->
         UpdateState $
             s { index = s.index + 1 }
 
 
-getDiv :: ∀ m. (Monad m) => Update m Node
+getDiv :: ∀ e. UpdateEffects e Node
 getDiv =
     reader \(UpdateEnv env) ->
         env.div
 
 
-getContext ::
-    ∀ e m. (MonadEff (canvas :: Canvas, dom :: DOM | e) m) =>
-    Update m Context2D
-
+getContext :: ∀ e. UpdateEffects e Context2D
 getContext = do
     state <-
         gets \(UpdateState s) -> s
@@ -1287,7 +1243,7 @@ getContext = do
                     useContext ctx
 
 
-useContext :: ∀ e m. (MonadEff (canvas :: Canvas | e) m) => Context2D -> Update m Context2D
+useContext :: ∀ e. Context2D -> UpdateEffects e Context2D
 useContext ctx = do
     modify \(UpdateState s) ->
         UpdateState $
@@ -1329,14 +1285,14 @@ useContext ctx = do
         pure ctx
 
 
-forgetContext :: ∀ m. (Monad m) => Update m Unit
+forgetContext :: ∀ e. UpdateEffects e Unit
 forgetContext =
     modify \(UpdateState s) ->
         UpdateState $
             s { context = Nothing }
 
 
-clearRest :: ∀ e m. (MonadEff (dom :: DOM | e) m) => Update m Unit
+clearRest :: ∀ e. UpdateEffects e Unit
 clearRest = do
     child <-
         currentChild
