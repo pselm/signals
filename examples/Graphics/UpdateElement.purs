@@ -6,6 +6,7 @@ import Elm.Text (fromString)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import DOM (DOM)
+import DOM.Renderable (Position(..), renderIntoDOM, updateDOM)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode)
 import DOM.HTML.Window (document)
@@ -36,11 +37,13 @@ main = do
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
     for_ (toMaybe nullableContainer) \container -> do
-        zippedScenes <- newRef scenes
+        zippedScenes <-
+            newRef scenes
 
         -- Render the first scene
-        element <- render $ extract $ Zipper.beginning scenes
-        appendChild (elementToNode element) (elementToNode container)
+        element <-
+            renderIntoDOM ReplacingChildren (elementToNode container) $
+                extract (Zipper.beginning scenes)
 
         let
             move current maybeNext =
@@ -50,7 +53,12 @@ main = do
                         ParentNode.firstElementChild (elementToParentNode container)
 
                     for_ (toMaybe nullableChild) \child -> do
-                        updateAndReplace child (extract current) (extract next)
+                        updateDOM
+                            { result: (elementToNode child)
+                            , value: extract current
+                            }
+                            (extract next)
+
                         writeRef zippedScenes next
 
             listener =

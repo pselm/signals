@@ -5,6 +5,7 @@ import Elm.Graphics.Element
 import Elm.Text (bold, fromString)
 import Control.Monad.Eff (Eff)
 import DOM (DOM)
+import DOM.Renderable (render)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode)
 import DOM.HTML.Window (document)
@@ -27,7 +28,7 @@ main = do
 
     for_ (toMaybe nullableContainer) \container -> do
         element <- render scene
-        appendChild (elementToNode element) (elementToNode container)
+        appendChild element (elementToNode container)
 
 
 scene :: Element

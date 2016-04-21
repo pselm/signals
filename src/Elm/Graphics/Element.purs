@@ -17,9 +17,6 @@ module Elm.Graphics.Element
     , Pos, Position
     , absolute, relative, middleAt, midTopAt, midBottomAt, midLeftAt
     , midRightAt, topLeftAt, topRightAt, bottomLeftAt, bottomRightAt
-    -- The following aren't exposed by Elm, since the runtime accesses them
-    -- magically.
-    , updateAndReplace, render
     ) where
 
 
@@ -39,15 +36,16 @@ import Data.String (joinWith)
 import Data.Array (catMaybes)
 
 import DOM (DOM)
-import DOM.Renderable (DynamicRenderable)
+import DOM.Renderable (class Renderable, DynamicRenderable)
 import DOM.Renderable (render, update) as Renderable
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToNode)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
+import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
 import DOM.Node.Element (setId, setAttribute, tagName)
-import DOM.Node.Node (firstChild, appendChild, removeChild, parentNode, parentElement, replaceChild)
+import DOM.Node.Node (firstChild, appendChild, removeChild, parentNode, parentElement, replaceChild, nodeType)
+import DOM.Node.NodeType (NodeType(ElementNode))
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
 import DOM.Event.EventTarget (addEventListener, eventListener)
@@ -58,6 +56,7 @@ import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad (when, unless)
 
 import Text.Format (format, precision)
+import Unsafe.Coerce (unsafeCoerce)
 
 import Prelude
     ( class Show, class Eq, Unit, unit
@@ -103,6 +102,10 @@ newtype Element = Element
     { props :: Properties
     , element :: ElementPrim
     }
+
+instance renderableElement :: Renderable Element where
+    render value = elementToNode <$> render value
+    update {result, value} = updateFromNode result value
 
 
 -- I've removed the `id :: Int` because it's essentially effectful to add an id.
@@ -1094,7 +1097,7 @@ makeElement (Element {element, props}) =
 
 -- UPDATE
 
-updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) DOM.Element
+updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) DOM.Element 
 updateAndReplace node curr next = do
     newNode <- update node curr next
 
@@ -1104,6 +1107,33 @@ updateAndReplace node curr next = do
             replaceChild (elementToNode newNode) (elementToNode node) parent
 
     pure newNode
+
+
+unsafeNodeToElement :: Node -> DOM.Element
+unsafeNodeToElement = unsafeCoerce
+
+
+-- Perhaps should suggest this for purescript-dom?
+nodeToElement :: Node -> Maybe DOM.Element
+nodeToElement node =
+    case nodeType node of
+        ElementNode ->
+            Just (unsafeNodeToElement node)
+
+        _ ->
+            Nothing
+
+
+updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (dom :: DOM | e) Node
+updateFromNode node curr next =
+    case nodeToElement node of
+        Just element ->
+            elementToNode <$> update element curr next
+
+        Nothing ->
+            -- We would have produced an element, so something's wrong ... fall
+            -- back to `render`
+            elementToNode <$> render next
 
 
 update :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) DOM.Element

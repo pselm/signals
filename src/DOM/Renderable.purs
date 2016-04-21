@@ -65,7 +65,7 @@
 
 module DOM.Renderable
     ( class Renderable, render, update, defaultUpdate
-    , Rendered, Position, renderIntoDOM, updateDOM
+    , Rendered, Position(..), renderIntoDOM, updateDOM
     , DynamicRenderable, toDynamic, makeDynamic
     ) where
 
