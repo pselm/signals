@@ -35,8 +35,7 @@ import Data.Traversable (traverse)
 import Data.Nullable (toMaybe)
 
 import Unsafe.Coerce (unsafeCoerce)
-import Math (pi, cos, sin)
-import Math (sqrt)
+import Math (pi, cos, sin, sqrt)
 
 import DOM (DOM)
 import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)

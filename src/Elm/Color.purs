@@ -32,11 +32,10 @@ import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Context2D, Canvas, CanvasGradient, createLinearGradient, createRadialGradient, addColorStop)
 import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
 import Prelude (class Eq, eq, (==), (&&), ($), (*), (/), bind, (>>=), pure)
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple, fst, snd)
 import Data.Foldable (for_)
-import Elm.Basics (Float)
+import Elm.Basics (Float, degrees)
 import Elm.List (List)
-import Elm.Basics (degrees)
 import Math (pi)
 
 
