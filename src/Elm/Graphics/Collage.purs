@@ -8,8 +8,8 @@
 -- | so moving a form 10 units in the y-axis will move it up on screen.
 
 module Elm.Graphics.Collage
-    ( --Collage, makeCollage, collage, toElement
-      Form, toForm, filled, textured, gradient, outlined, traced, text, outlinedText
+    ( Collage, makeCollage, collage, toElement
+    , Form, toForm, filled, textured, gradient, outlined, traced, text, outlinedText
     , move, moveX, moveY, scale, rotate, alpha
     , group, groupTransform
     , Shape, rect, oval, square, circle, ngon, polygon
@@ -24,6 +24,7 @@ import Elm.Text (Text, drawCanvas)
 import Elm.Transform2D (Transform2D)
 import Elm.Transform2D (identity, multiply, rotation, matrix) as T2D
 import Elm.Graphics.Element (Element)
+import Elm.Graphics.Element (fromRenderable) as Element
 import Elm.Graphics.Internal (createNode, setStyle, addTransform, removeTransform)
 
 import Data.List (List(..), (..), (:), snoc, fromList, head, tail, reverse)
@@ -349,6 +350,14 @@ newtype Collage = Collage
     }
 
 
+instance renderableCollage :: Renderable Collage where
+    render a =
+        elementToNode <$> render a
+
+    update rendered new =
+        update true rendered.result new
+
+
 -- | Create a `Collage` with certain dimensions and content. It takes width and height
 -- | arguments to specify dimensions, and then a list of 2D forms to decribe the content.
 -- |
@@ -368,13 +377,14 @@ makeCollage w h forms = Collage {w, h, forms}
 -- | draw `b` on top of `a`.
 -- |
 -- | To make a `Collage` without immediately turning it into an `Element`, see `makeCollage`.
--- collage :: Int -> Int -> List Form -> Element
--- collage = makeCollage >>> toElement
+collage :: Int -> Int -> List Form -> Element
+collage a b c = toElement (makeCollage a b c)
 
 
 -- | Turn a `Collage` into an `Element`.
--- toElement :: Collage -> Element
--- toElement collage =
+toElement :: Collage -> Element
+toElement c@(Collage props) =
+    Element.fromRenderable props.w props.h c
 
 
 -- | A 2D path. Paths are a sequence of points. They do not have a color.

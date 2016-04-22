@@ -79,6 +79,7 @@ import Data.Maybe (Maybe(..))
 import Data.Exists (Exists, runExists, mkExists)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude (Unit, bind, pure, not, void, ($), (#))
+import Graphics.Canvas (Canvas)
 
 -- | A `Renderable` is somethng that knows how to render some data type as a DOM
 -- | node. If given a previous version of the data, and the previously rendered
@@ -107,13 +108,16 @@ import Prelude (Unit, bind, pure, not, void, ($), (#))
 -- |   `Renderable` explicitly permits (and is able to detect or compensate for in its
 -- |   `update` method).
 class Renderable a where
-    render :: ∀ e. a -> Eff (dom :: DOM | e) Node
-    update :: ∀ e. Rendered a -> a -> Eff (dom :: DOM | e) Node
+    render :: ∀ e. a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
+    update :: ∀ e. Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
+
+-- Originally, I didn't have `Canvas` in the row of effects, but it looks as though
+-- you need to list anything that an instance might want to use ...
 
 
 -- | A default implementation of `update`, which just calls `render` on the
 -- | new data, ignoring the previous state.
-defaultUpdate :: ∀ a e. (Renderable a) => Rendered a -> a -> Eff (dom :: DOM | e) Node
+defaultUpdate :: ∀ a e. (Renderable a) => Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
 defaultUpdate rendered = render
 
 
@@ -129,8 +133,8 @@ type Rendered a =
 -- Packages up a value with the render and update methods that can act on it
 newtype RenderableValue a = RenderableValue
     { value :: a
-    , render :: ∀ e. a -> Eff (dom :: DOM | e) Node
-    , update :: ∀ e. Rendered a -> a -> Eff (dom :: DOM | e) Node
+    , render :: ∀ e. a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
+    , update :: ∀ e. Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
     }
 
 
@@ -196,8 +200,8 @@ toDynamic = makeDynamic render update
 -- | An alternative to `toDynamic`, in cases where you don't have a
 -- | `Renderable` instance, but you do have the necessary functions.
 makeDynamic :: ∀ a.
-    (∀ e. a -> Eff (dom :: DOM | e) Node) ->
-    (∀ e. Rendered a -> a -> Eff (dom :: DOM | e) Node) ->
+    (∀ e. a -> Eff (canvas :: Canvas, dom :: DOM | e) Node) ->
+    (∀ e. Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node) ->
     a ->
     DynamicRenderable
 
@@ -215,7 +219,7 @@ data Position
     | ReplacingItself
 
 
-renderIntoDOM :: ∀ e a. (Renderable a) => Position -> Node -> a -> Eff (dom :: DOM | e) (Rendered a)
+renderIntoDOM :: ∀ e a. (Renderable a) => Position -> Node -> a -> Eff (canvas :: Canvas, dom :: DOM | e) (Rendered a)
 renderIntoDOM position node value = do
     result <- render value
 
@@ -243,7 +247,7 @@ renderIntoDOM position node value = do
     pure { value, result }
 
 
-removeChildren :: ∀ e. Node -> Eff (dom :: DOM | e) Unit
+removeChildren :: ∀ e. Node -> Eff (canvas :: Canvas, dom :: DOM | e) Unit
 removeChildren parent =
     untilE do
         child <- firstChild parent
@@ -257,7 +261,7 @@ removeChildren parent =
                 pure true
 
 
-replaceNode :: ∀ e. Node -> Node -> Eff (dom :: DOM | e) Node
+replaceNode :: ∀ e. Node -> Node -> Eff (canvas :: Canvas, dom :: DOM | e) Node
 replaceNode old new = do
     parent <- parentNode old
 
@@ -271,7 +275,7 @@ replaceNode old new = do
 
 
 -- | Updates previously rendered data, replacing the originally rendered node in the DOM.
-updateDOM :: ∀ e a. (Renderable a) => Rendered a -> a -> Eff (dom :: DOM | e) (Rendered a)
+updateDOM :: ∀ e a. (Renderable a) => Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) (Rendered a)
 updateDOM rendered value = do
     result <- update rendered value
 

@@ -17,6 +17,9 @@ module Elm.Graphics.Element
     , Pos, Position
     , absolute, relative, middleAt, midTopAt, midBottomAt, midLeftAt
     , midRightAt, topLeftAt, topRightAt, bottomLeftAt, bottomRightAt
+    -- Not part of the Elm API ... used to create an Element from a Collage,
+    -- or other renderabales.
+    , fromRenderable
     ) where
 
 
@@ -36,7 +39,7 @@ import Data.String (joinWith)
 import Data.Array (catMaybes)
 
 import DOM (DOM)
-import DOM.Renderable (class Renderable, DynamicRenderable)
+import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
 import DOM.Renderable (render, update) as Renderable
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToNode)
@@ -56,6 +59,7 @@ import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad (when, unless)
 
 import Text.Format (format, precision)
+import Graphics.Canvas (Canvas)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Prelude
@@ -352,6 +356,17 @@ croppedImage pos w h src =
 tiledImage :: Int -> Int -> String -> Element
 tiledImage w h src =
     newElement w h (Image Tiled w h src)
+
+
+-- CUSTOM
+
+-- | Create an `Element` from a custom type that is `Renderable`.
+fromRenderable :: ∀ a. (Renderable a) => Int -> Int -> a -> Element
+fromRenderable w h renderable =
+    newElement w h (Custom (toDynamic renderable))
+
+-- Perhaps should have another variant that doesn't take a fixed width and height,
+-- and instead measures it, anaologous to htmlHeight?
 
 
 -- TEXT
@@ -948,7 +963,7 @@ needsReversal DIn = true
 needsReversal _ = false
 
 
-makeFlow :: ∀ e. Direction -> List Element -> Eff (dom :: DOM | e) DOM.Element
+makeFlow :: ∀ e. Direction -> List Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 makeFlow dir elist = do
     parent <- createNode "div"
 
@@ -1032,7 +1047,7 @@ setPos pos (Element {element, props}) e = do
     pure e
 
 
-makeContainer :: ∀ e. RawPosition -> Element -> Eff (dom :: DOM | e) DOM.Element
+makeContainer :: ∀ e. RawPosition -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 makeContainer pos elem = do
     e <- render elem
     setPos pos elem e
@@ -1063,11 +1078,11 @@ rawHtml html align = do
 
 -- RENDER
 
-render :: ∀ e. Element -> Eff (dom :: DOM | e) DOM.Element
+render :: ∀ e. Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 render e = makeElement e >>= setProps e
 
 
-makeElement :: ∀ e. Element -> Eff (dom :: DOM | e) DOM.Element
+makeElement :: ∀ e. Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 makeElement (Element {element, props}) =
     case element of
         Image imageStyle imageWidth imageHeight src ->
@@ -1097,7 +1112,7 @@ makeElement (Element {element, props}) =
 
 -- UPDATE
 
-updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) DOM.Element 
+updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 updateAndReplace node curr next = do
     newNode <- update node curr next
 
@@ -1124,7 +1139,7 @@ nodeToElement node =
             Nothing
 
 
-updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (dom :: DOM | e) Node
+updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) Node
 updateFromNode node curr next =
     case nodeToElement node of
         Just element ->
@@ -1136,7 +1151,7 @@ updateFromNode node curr next =
             elementToNode <$> render next
 
 
-update :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) DOM.Element
+update :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 update outerNode (Element curr) (Element next) = do
     innerNode <-
         if tagName outerNode == "A"

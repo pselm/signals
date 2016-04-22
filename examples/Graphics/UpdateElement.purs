@@ -8,15 +8,13 @@ import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import DOM (DOM)
 import DOM.Renderable (Position(..), renderIntoDOM, updateDOM)
 import DOM.HTML (window)
-import DOM.HTML.Types (htmlDocumentToNonElementParentNode)
+import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToEventTarget)
 import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.ParentNode (firstElementChild) as ParentNode
 import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
-import DOM.Node.Node (appendChild)
 import DOM.Event.EventTarget (eventListener, addEventListener)
 import DOM.Event.EventTypes (keydown)
-import DOM.HTML.Types (htmlDocumentToEventTarget)
 import Prelude (bind, Unit, unit, (>>=), ($), (>>>), pure)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
@@ -26,9 +24,10 @@ import Data.Foreign (toForeign)
 import Data.Foreign.Class (readProp)
 import Data.List.Zipper (Zipper(..), up, down, beginning) as Zipper
 import Control.Comonad (extract)
+import Graphics.Canvas (Canvas)
 
 
-main :: ∀ e. Eff (dom :: DOM, ref :: REF | e) Unit
+main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM, ref :: REF | e) Unit
 main = do
     doc <-
         window >>= document

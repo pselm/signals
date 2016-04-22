@@ -16,9 +16,10 @@ import Prelude (bind, Unit, (>>=), ($), (<>), (<$>))
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
+import Graphics.Canvas (Canvas)
 
 
-main :: ∀ e. Eff (dom :: DOM | e) Unit
+main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
 main = do
     doc <-
         window >>= document
