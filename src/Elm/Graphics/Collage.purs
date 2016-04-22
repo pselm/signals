@@ -501,10 +501,14 @@ outlinedText ls t =
 ---------
 
 render :: ∀ e. Collage -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
-render model = do
+render model@(Collage {w, h}) = do
     div <- createNode "div"
+
     setStyle "overflow" "hidden" div
     setStyle "position" "relative" div
+    setStyle "width" ((show w) <> "px") div
+    setStyle "height" ((show h) <> "px") div
+
     update true (elementToNode div) model
     pure div
 

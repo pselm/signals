@@ -35,6 +35,9 @@ var htmlBundles = [{
     ps: "Examples.Graphics.UpdateElement",
     html: "examples/Graphics/UpdateElement.html"
 },{
+    ps: "Examples.Graphics.StaticCollage",
+    html: "examples/Graphics/StaticCollage.html"
+},{
     ps: "Examples.Keyboard.Console",
     html: "examples/Keyboard/Console.html"
 },{
