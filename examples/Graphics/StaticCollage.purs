@@ -11,6 +11,7 @@ import Elm.Graphics.Collage
 import Elm.Graphics.Internal (setStyle)
 import Elm.Color (red, linear, radial, rgb, rgba, white)
 
+import Control.Monad (when)
 import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Canvas)
 import Data.Nullable (toMaybe)
@@ -26,9 +27,10 @@ import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonElementParentNode)
 import DOM.Node.Document (createElement, createTextNode)
+import DOM.Node.Element (setAttribute)
 import DOM.Node.Node (appendChild)
 
-import Prelude (bind, pure, Unit, (>>=), ($), (<$>), negate)
+import Prelude (bind, pure, Unit, unit, (>>=), ($), (<$>), negate, (/=))
 
 
 main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
@@ -43,8 +45,27 @@ main = do
     for_ (toMaybe nullableContainer) \container -> do
         table <- elementToNode <$> createElement "table" doc
         tbody <- elementToNode <$> createElement "tbody" doc
+        thead <- elementToNode <$> createElement "thead" doc
+
+        appendChild thead table
         appendChild tbody table
         appendChild table (elementToNode container)
+
+        column1 <- elementToNode <$> createElement "th" doc
+        column2 <- elementToNode <$> createElement "th" doc
+        column3 <- elementToNode <$> createElement "th" doc
+
+        text1 <- textToNode <$> createTextNode "Code" doc
+        text2 <- textToNode <$> createTextNode "Result" doc
+        text3 <- textToNode <$> createTextNode "Should look like" doc
+
+        appendChild text1 column1
+        appendChild text2 column2
+        appendChild text3 column3
+
+        appendChild column1 thead
+        appendChild column2 thead
+        appendChild column3 thead
 
         for_ examples $
             renderIntoDOM AfterLastChild tbody
@@ -53,6 +74,7 @@ main = do
 newtype Example = Example
     { caption :: String
     , collage :: Collage
+    , reference :: String
     }
 
 instance renderableExample :: Renderable Example where
@@ -64,12 +86,18 @@ instance renderableExample :: Renderable Example where
                 (window >>= document)
 
         row <- elementToNode <$> createElement "tr" doc
+
         column1 <- createElement "td" doc
         column2 <- createElement "td" doc
+        column3 <- createElement "td" doc
+
         setStyle "border" "1px solid blue" column1
         setStyle "border" "1px solid blue" column2
+        setStyle "border" "1px solid blue" column3
+
         appendChild (elementToNode column1) row
         appendChild (elementToNode column2) row
+        appendChild (elementToNode column3) row
 
         caption <- elementToNode <$> createElement "pre" doc
         text <- textToNode <$> createTextNode example.caption doc
@@ -78,6 +106,12 @@ instance renderableExample :: Renderable Example where
 
         collage <- render example.collage
         appendChild collage (elementToNode column2)
+
+        when (example.reference /= "") do
+            image <- createElement "img" doc
+            setAttribute "src" example.reference image
+            appendChild (elementToNode image) (elementToNode column3)
+            pure unit
 
         pure row
 
@@ -92,7 +126,8 @@ instance renderableExample :: Renderable Example where
 examples :: List Example
 examples =
     ( example1 : example2 : example3 : example4 : example5 : example6
-    : example7 : example8
+    : example7 : example8 : example9 : example10 : example11 : example12
+    : example13 : example14 : example15 : example16 : example17
     : Nil
     )
 
@@ -107,6 +142,7 @@ example1 =
                 : Nil
                 )
             """
+        , reference: "StaticCollage/example1.png"
         , collage:
             makeCollage 50 50
                 ( filled red (rect 10.0 10.0)
@@ -125,6 +161,7 @@ example2 =
                 : Nil
                 )
             """
+        , reference: "StaticCollage/example2.png"
         , collage:
             makeCollage 50 50
                 ( filled red (rect 20.0 20.0)
@@ -143,6 +180,7 @@ example3 =
                 : Nil
                 )
             """
+        , reference: "StaticCollage/example3.png"
         , collage:
             makeCollage 100 100
                 ( filled red (rect 20.0 20.0)
@@ -161,6 +199,7 @@ example4 =
                 : Nil
                 )
             """
+        , reference: "StaticCollage/example4.png"
         , collage:
             makeCollage 50 50
                 ( filled red (rect 50.0 50.0)
@@ -179,6 +218,7 @@ example5 =
                 : Nil
                 )
             """
+        , reference: "StaticCollage/example5.png"
         , collage:
             makeCollage 50 50
                 ( filled red (rect 100.0 100.0)
@@ -198,6 +238,7 @@ example6 =
                 : Nil
                 )
             """
+        , reference: ""
         , collage:
             makeCollage 100 100
                 ( textured "texture.jpg" (rect 100.0 100.0)
@@ -212,6 +253,7 @@ example7 :: Example
 example7 =
     Example
         { caption: "Linear gradient"
+        , reference: "StaticCollage/example7.png"
         , collage:
             makeCollage 120 120
                 ( gradient grad (rect 120.0 120.0)
@@ -238,6 +280,7 @@ example8 :: Example
 example8 =
     Example
         { caption: "Radial gradient"
+        , reference: "StaticCollage/example8.png"
         , collage:
             makeCollage 300 300
                 ( move {x: -55.0, y: -55.0} (gradient grad1 (circle 100.0))
@@ -250,7 +293,7 @@ example8 =
 
     where
         grad1 =
-            radial 
+            radial
                 {x: 0.0, y:  0.0} 50.0
                 {x: 0.0, y: 10.0} 90.0
                 ( Tuple 0.0 (rgb  244 242 1)
@@ -288,3 +331,174 @@ example8 =
                 : Tuple 1.0 (rgba 1 159 98 0.0)
                 : Nil
                 )
+
+
+example9 :: Example
+example9 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined defaultLine (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example9.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined defaultLine (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example10 :: Example
+example10 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (defaultLine {color = red}) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example10.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (defaultLine {color = red}) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example11 :: Example
+example11 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (defaultLine {width = 4.0}) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example11.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (defaultLine {width = 4.0}) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example12 :: Example
+example12 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (defaultLine {join = Smooth}) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example12.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (defaultLine {join = Smooth}) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example13 :: Example
+example13 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (defaultLine {join = Clipped}) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example13.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (defaultLine {join = Clipped}) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example14 :: Example
+example14 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (defaultLine {join = Sharp 3.0}) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example14.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (defaultLine {join = Sharp 3.0}) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example15 :: Example
+example15 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (solid red) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example15.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (solid red) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example16 :: Example
+example16 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (dashed red) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example16.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (dashed red) (rect 100.0 50.0)
+                : Nil
+                )
+        }
+
+
+example17 :: Example
+example17 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined (dotted red) (rect 100.0 50.0)
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example17.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined (dotted red) (rect 100.0 50.0)
+                : Nil
+                )
+        }
