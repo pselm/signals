@@ -25,7 +25,7 @@ import Elm.Transform2D (Transform2D)
 import Elm.Transform2D (identity, multiply, rotation, matrix) as T2D
 import Elm.Graphics.Element (Element)
 import Elm.Graphics.Element (fromRenderable) as Element
-import Elm.Graphics.Internal (createNode, setStyle, addTransform, removeTransform)
+import Elm.Graphics.Internal (createNode, setStyle)
 
 import Data.List (List(..), (..), (:), snoc, fromList, head, tail, reverse)
 import Data.List.Zipper (Zipper(..), down)
@@ -229,6 +229,7 @@ form f =
         , basicForm: f
         }
 
+
 fill :: FillStyle -> Shape -> Form
 fill style (Shape shape) =
     form (FShape (Fill style) shape)
@@ -414,7 +415,7 @@ polygon :: List Point -> Shape
 polygon = Shape
 
 
--- | A rectangle with a given width and height.
+-- | A rectangle with a given width and height, centered on the origin.
 rect :: Float -> Float -> Shape
 rect w h =
     let
@@ -431,7 +432,7 @@ rect w h =
             )
 
 
--- | A square with a given edge length.
+-- | A square with a given edge length, centred on the origin.
 square :: Float -> Shape
 square n = rect n n
 

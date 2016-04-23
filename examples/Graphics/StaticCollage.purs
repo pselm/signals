@@ -9,19 +9,21 @@ module Examples.Graphics.StaticCollage where
 
 import Elm.Graphics.Collage
 import Elm.Graphics.Internal (setStyle)
-import Elm.Color (red, linear, radial, rgb, rgba, white, blue, purple, green)
+import Elm.Color (red, linear, radial, rgb, rgba, hsl, white, blue, purple, green)
 import Elm.Basics ((|>), degrees)
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Canvas)
+import Math (sin, cos)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
-import Data.List (List(..), (:))
+import Data.List (List(..), (..), (:))
 import Data.Tuple (Tuple(..))
+import Data.Int (toNumber)
 
 import DOM (DOM)
-import DOM.Renderable (class Renderable, render, renderIntoDOM, Position(AfterLastChild), defaultUpdate)
+import DOM.Renderable (class Renderable, render, renderIntoDOM, Position(AfterLastChild))
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.HTML.Window (document)
@@ -31,7 +33,7 @@ import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Element (setAttribute)
 import DOM.Node.Node (appendChild)
 
-import Prelude (bind, pure, Unit, unit, (>>=), ($), (<$>), negate, (/=), (#))
+import Prelude (bind, pure, Unit, unit, (>>=), ($), (<$>), negate, (/=), (#), (*))
 
 
 main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
@@ -129,7 +131,8 @@ examples =
     ( example1 : example2 : example3 : example4 : example5 : example6
     : example7 : example8 : example9 : example10 : example11 : example12
     : example13 : example14 : example15 : example16 : example17 : example18
-    : example19 : example20
+    : example19 : example20 : example21 : example22 : example23 : example24
+    : example25 : example26 : example27
     : Nil
     )
 
@@ -586,3 +589,213 @@ example20 =
         hexagon clr =
             outlined (solid clr) (ngon 6 40.0)
 
+
+example21 :: Example
+example21 =
+    Example
+        { caption: "http://elm-lang.org/examples/color"
+        , reference: "StaticCollage/example21.png"
+        , collage:
+            makeCollage 150 150 (shape <$> (0..11))
+        }
+
+    where
+        shape n =
+            let
+                angle = degrees (30.0 * toNumber n)
+
+            in
+                circle 10.0
+                |> filled (hsl angle 0.7 0.5)
+                |> move
+                    { x: 45.0 * cos angle
+                    , y: 45.0 * sin angle
+                    }
+
+
+example22 :: Example
+example22 =
+    Example
+        { caption:
+            """
+            makeCollage 300 300
+                ( ( ngon 4 75.0
+                    |> filled clearGrey
+                    |> moveX -10.0
+                  )
+                : ( ngon 5 50.0
+                    |> filled clearGrey
+                    |> moveX 50.0
+                    |> moveY 10.0
+                  )
+                : Nil
+                )
+
+            where
+                clearGrey =
+                    rgba 111 111 111 0.6
+
+            """
+        , reference: "StaticCollage/example19.png"
+        , collage:
+            makeCollage 300 300
+                ( ( ngon 4 75.0
+                    |> filled clearGrey
+                    |> moveX (-10.0)
+                  )
+                : ( ngon 5 50.0
+                    |> filled clearGrey
+                    |> moveX 50.0
+                    |> moveY 10.0
+                  )
+                : Nil
+                )
+        }
+
+    where
+        clearGrey =
+            rgba 111 111 111 0.6
+
+
+example23 :: Example
+example23 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined defaultLine
+                    ( polygon
+                        ( {x:  50.0, y:  50.0}
+                        : {x:  50.0, y: -50.0}
+                        : {x: -50.0, y: -50.0}
+                        : {x: -50.0, y:  50.0}
+                        : {x:  50.0, y:  50.0}
+                        : Nil
+                        )
+                    )
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example23.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined defaultLine
+                    ( polygon
+                        ( {x:  50.0, y:  50.0}
+                        : {x:  50.0, y: -50.0}
+                        : {x: -50.0, y: -50.0}
+                        : {x: -50.0, y:  50.0}
+                        : {x:  50.0, y:  50.0}
+                        : Nil
+                        )
+                    )
+                : Nil
+                )
+        }
+
+example24 :: Example
+example24 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( outlined defaultLine
+                    ( polygon
+                        ( {x:  50.0, y:  50.0}
+                        : {x:  50.0, y: -50.0}
+                        : {x: -50.0, y: -50.0}
+                        : {x: -50.0, y:  50.0}
+                        : Nil
+                        )
+                    )
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example24.png"
+        , collage:
+            makeCollage 100 100
+                ( outlined defaultLine
+                    ( polygon
+                        ( {x:  50.0, y:  50.0}
+                        : {x:  50.0, y: -50.0}
+                        : {x: -50.0, y: -50.0}
+                        : {x: -50.0, y:  50.0}
+                        : Nil
+                        )
+                    )
+                : Nil
+                )
+        }
+
+
+example25 :: Example
+example25 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( moveX 20.0 (outlined defaultLine (square 25.0))
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example25.png"
+        , collage:
+            makeCollage 100 100
+                ( moveX 20.0 (outlined defaultLine (square 25.0))
+                : Nil
+                )
+        }
+
+
+example26 :: Example
+example26 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( moveX 20.0 (outlined defaultLine (oval 25.0 40.0))
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example26.png"
+        , collage:
+            makeCollage 100 100
+                ( moveX 20.0 (outlined defaultLine (oval 25.0 40.0))
+                : Nil
+                )
+        }
+
+
+example27 :: Example
+example27 =
+    Example
+        { caption:
+            """
+            makeCollage 100 100
+                ( traced (solid red) (segment {x: 10.0, y: 5.0} {y: 10.0, x: 5.0})
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example27.png"
+        , collage:
+            makeCollage 100 100
+                ( traced (solid red) (segment {x: 10.0, y: 40.0} {y: 10.0, x: 40.0})
+                : Nil
+                )
+        }
+
+
+-- Still to test
+--
+-- different kinds of LineCap
+-- different kinds of LineJoin
+-- sprite
+-- toForm
+-- group
+-- groupTransform
+-- alpha
+-- text
+-- outlinedText
+-- try scale and rotate together
+-- Turning collage into an `Element`
+-- groups that mix Collage and Element
