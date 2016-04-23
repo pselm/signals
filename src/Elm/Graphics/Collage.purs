@@ -36,7 +36,7 @@ import Data.Traversable (traverse)
 import Data.Nullable (toMaybe)
 
 import Unsafe.Coerce (unsafeCoerce)
-import Math (pi, cos, sin, sqrt)
+import Math (pi, cos, sin, sqrt, (%))
 
 import DOM (DOM)
 import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
@@ -72,7 +72,7 @@ import Prelude
     ( class Eq, eq, not, (<<<), Unit, unit, (||)
     , bind, (>>=), pure, void
     , (*), (/), ($), map, (<$>), (+), (-), (<>)
-    , show, (<), (>), (&&), negate, (/=), (==), mod
+    , show, (<), (>), (&&), negate, (/=), (==)
     )
 
 
@@ -927,7 +927,7 @@ drawInContext (Form f) cb = do
                 ctx
 
         when (f.theta /= 0.0) $ void $
-            Canvas.rotate (f.theta `mod` (pi * 2.0)) ctx
+            Canvas.rotate (f.theta % (pi * 2.0)) ctx
 
         when (f.scale /= 1.0) $ void $
             Canvas.scale { scaleX: f.scale, scaleY: f.scale } ctx

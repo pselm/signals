@@ -9,7 +9,8 @@ module Examples.Graphics.StaticCollage where
 
 import Elm.Graphics.Collage
 import Elm.Graphics.Internal (setStyle)
-import Elm.Color (red, linear, radial, rgb, rgba, white)
+import Elm.Color (red, linear, radial, rgb, rgba, white, blue, purple, green)
+import Elm.Basics ((|>), degrees)
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff)
@@ -30,7 +31,7 @@ import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Element (setAttribute)
 import DOM.Node.Node (appendChild)
 
-import Prelude (bind, pure, Unit, unit, (>>=), ($), (<$>), negate, (/=))
+import Prelude (bind, pure, Unit, unit, (>>=), ($), (<$>), negate, (/=), (#))
 
 
 main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
@@ -127,7 +128,8 @@ examples :: List Example
 examples =
     ( example1 : example2 : example3 : example4 : example5 : example6
     : example7 : example8 : example9 : example10 : example11 : example12
-    : example13 : example14 : example15 : example16 : example17
+    : example13 : example14 : example15 : example16 : example17 : example18
+    : example19 : example20
     : Nil
     )
 
@@ -502,3 +504,85 @@ example17 =
                 : Nil
                 )
         }
+
+
+example18 :: Example
+example18 =
+    Example
+        { caption: "http://elm-lang.org/examples/lines"
+        , reference: "StaticCollage/example18.png"
+        , collage:
+            makeCollage 200 420
+                ( move {x: 0.0, y: -55.0} blueSquare
+                : move {x: 0.0, y:  55.0} redSquare
+                : Nil
+                )
+        }
+
+    where
+        blueSquare =
+            traced (dashed blue) square
+
+        redSquare =
+            traced (solid red) square
+
+        square =
+            path
+                ( {x:  50.0, y:  50.0}
+                : {x:  50.0, y: -50.0}
+                : {x: -50.0, y: -50.0}
+                : {x: -50.0, y:  50.0}
+                : {x:  50.0, y:  50.0}
+                : Nil
+                )
+
+
+example19 :: Example
+example19 =
+    Example
+        { caption: "http://elm-lang.org/examples/shapes"
+        , reference: "staticcollage/example19.png"
+        , collage:
+            makeCollage 300 300
+                ( ( ngon 4 75.0
+                    # filled clearGrey
+                    # move {x: -10.0, y: 0.0}
+                  )
+                : ( ngon 5 50.0
+                    # filled clearGrey
+                    # move {x: 50.0, y: 10.0}
+                  )
+                : Nil
+                )
+        }
+
+    where
+        clearGrey =
+            rgba 111 111 111 0.6
+
+
+example20 :: Example
+example20 =
+    Example
+        { caption: "http://elm-lang.org/examples/transforms"
+        , reference: "StaticCollage/example20.png"
+        , collage:
+            makeCollage 300 300
+                ( ( hexagon red )
+                : ( hexagon purple
+                    |> scale 2.0
+                  )
+                : ( hexagon green
+                    |> move {x: 100.0, y: 0.0}
+                  )
+                : ( hexagon blue
+                    |> rotate (degrees 30.0)
+                  )
+                : Nil
+                )
+        }
+
+    where
+        hexagon clr =
+            outlined (solid clr) (ngon 6 40.0)
+
