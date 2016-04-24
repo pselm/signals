@@ -129,8 +129,8 @@ instance renderableExample :: Renderable Example where
 examples :: List Example
 examples =
     ( example1 : example2 : example3 : example4 : example5 : example6
-    : example7 : example8 : example9 : example10 : example11 : example12
-    : example13 : example14 : example15 : example16 : example17 : example18
+    : example7 : example8 : example9
+    : example15 : example16 : example17 : example18
     : example19 : example20 : example21 : example22 : example23 : example24
     : example25 : example26 : example27
     : Nil
@@ -338,115 +338,45 @@ example8 =
                 )
 
 
+hook :: Path
+hook =
+    path
+        ( {x: (-100.0), y: 20.0}
+        : {x: (-70.0), y: 0.0}
+        : {x: (-100.0), y: (-20.0)}
+        : Nil
+        )
+
+
 example9 :: Example
 example9 =
     Example
         { caption:
             """
-            makeCollage 100 100
-                ( outlined defaultLine (rect 100.0 50.0)
-                : Nil
+            makeCollage 200 100
+                ( moveX 0.0 (traced defaultLine hook)
+                : moveX 10.0 (traced defaultLine { color = red } hook)
+                : moveX 20.0 (traced defaultLine { width = 8.0, join = Smooth } hook)
+                : moveX 40.0 (traced defaultLine { width = 8.0, join = Clipped } hook)
+                : moveX 60.0 (traced defaultLine { width = 8.0, join = Sharp 5.0 } hook)
+                : moveX 80.0 (traced defaultLine { width = 8.0, join = Sharp 10.0 } hook)
+                : moveX 100.0 (traced defaultLine { width = 8.0, cap = Flat, color = blue } hook)
+                : moveX 120.0 (traced defaultLine { width = 8.0, cap = Padded, color = blue } hook)
+                : moveX 140.0 (traced defaultLine { width = 8.0, cap = Round, color = blue } hook)
                 )
             """
         , reference: "StaticCollage/example9.png"
         , collage:
-            makeCollage 100 100
-                ( outlined defaultLine (rect 100.0 50.0)
-                : Nil
-                )
-        }
-
-
-example10 :: Example
-example10 =
-    Example
-        { caption:
-            """
-            makeCollage 100 100
-                ( outlined (defaultLine {color = red}) (rect 100.0 50.0)
-                : Nil
-                )
-            """
-        , reference: "StaticCollage/example10.png"
-        , collage:
-            makeCollage 100 100
-                ( outlined (defaultLine {color = red}) (rect 100.0 50.0)
-                : Nil
-                )
-        }
-
-
-example11 :: Example
-example11 =
-    Example
-        { caption:
-            """
-            makeCollage 100 100
-                ( outlined (defaultLine {width = 4.0}) (rect 100.0 50.0)
-                : Nil
-                )
-            """
-        , reference: "StaticCollage/example11.png"
-        , collage:
-            makeCollage 100 100
-                ( outlined (defaultLine {width = 4.0}) (rect 100.0 50.0)
-                : Nil
-                )
-        }
-
-
-example12 :: Example
-example12 =
-    Example
-        { caption:
-            """
-            makeCollage 100 100
-                ( outlined (defaultLine {join = Smooth}) (rect 100.0 50.0)
-                : Nil
-                )
-            """
-        , reference: "StaticCollage/example12.png"
-        , collage:
-            makeCollage 100 100
-                ( outlined (defaultLine {join = Smooth}) (rect 100.0 50.0)
-                : Nil
-                )
-        }
-
-
-example13 :: Example
-example13 =
-    Example
-        { caption:
-            """
-            makeCollage 100 100
-                ( outlined (defaultLine {join = Clipped}) (rect 100.0 50.0)
-                : Nil
-                )
-            """
-        , reference: "StaticCollage/example13.png"
-        , collage:
-            makeCollage 100 100
-                ( outlined (defaultLine {join = Clipped}) (rect 100.0 50.0)
-                : Nil
-                )
-        }
-
-
-example14 :: Example
-example14 =
-    Example
-        { caption:
-            """
-            makeCollage 100 100
-                ( outlined (defaultLine {join = Sharp 3.0}) (rect 100.0 50.0)
-                : Nil
-                )
-            """
-        , reference: "StaticCollage/example14.png"
-        , collage:
-            makeCollage 100 100
-                ( outlined (defaultLine {join = Sharp 3.0}) (rect 100.0 50.0)
+            makeCollage 200 100
+                ( moveX 0.0 (traced defaultLine hook)
+                : moveX 10.0 (traced defaultLine { color = red } hook)
+                : moveX 20.0 (traced defaultLine { width = 8.0, join = Smooth } hook)
+                : moveX 40.0 (traced defaultLine { width = 8.0, join = Clipped } hook)
+                : moveX 60.0 (traced defaultLine { width = 8.0, join = Sharp 5.0 } hook)
+                : moveX 80.0 (traced defaultLine { width = 8.0, join = Sharp 10.0 } hook)
+                : moveX 100.0 (traced defaultLine { width = 8.0, cap = Flat, color = blue } hook)
+                : moveX 120.0 (traced defaultLine { width = 8.0, cap = Padded, color = blue } hook)
+                : moveX 140.0 (traced defaultLine { width = 8.0, cap = Round, color = blue } hook)
                 : Nil
                 )
         }
@@ -787,8 +717,6 @@ example27 =
 
 -- Still to test
 --
--- different kinds of LineCap
--- different kinds of LineJoin
 -- sprite
 -- toForm
 -- group
