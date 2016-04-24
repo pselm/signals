@@ -18,88 +18,111 @@ var foreigns = [
     "examples/**/*.js"
 ];
 
-var nodeBundles = [
-    "Examples.Time.Delay",
-    "Examples.Time.Every",
-    "Examples.Time.FPS",
-    "Examples.Time.FPSWhen",
-    "Examples.Time.Since",
-    "Examples.Time.Timestamp",
-    "Test.Main"
-];
-
-var htmlBundles = [{
-    ps: "Examples.Graphics.StaticElement",
+// A list of things to process via pscBundle.
+//
+// `module` is the name of the relevant Purescript module
+//
+// `purs` is the path to the Purescript source file
+//
+// `html` is the html page that uses the bundle ... it
+//        is left out for bundles where main runs in Node.
+//
+// We make a gulp task for each bundle that uses pscBundle
+// to bundle it, and then either runs it via Node (if no
+// `html`), or opens the given `html` page.
+//
+// The task is given each of the names. So, you can invoke
+// it (for instance) via any of these:
+//
+//     gulp Examples.Graphics.StaticElement
+//     gulp examples/Graphics/StaticElement.purs
+//     gulp examples/Graphics/StaticElement.html
+var bundles = [{
+    module: "Examples.Graphics.StaticElement",
+    purs: "examples/Graphics/StaticElement.purs",
     html: "examples/Graphics/StaticElement.html"
 },{
-    ps: "Examples.Graphics.UpdateElement",
+    module: "Examples.Graphics.UpdateElement",
+    purs: "examples/Graphics/UpdateElement.purs",
     html: "examples/Graphics/UpdateElement.html"
 },{
-    ps: "Examples.Graphics.StaticCollage",
+    module: "Examples.Graphics.StaticCollage",
+    purs: "examples/Graphics/StaticCollage.purs",
     html: "examples/Graphics/StaticCollage.html"
 },{
-    ps: "Examples.Keyboard.Console",
+    module: "Examples.Keyboard.Console",
+    purs: "examples/Keyboard/Console.purs",
     html: "examples/Keyboard/Console.html"
 },{
-    ps: "Examples.Mouse.FullScreen",
+    module: "Examples.Mouse.FullScreen",
+    purs: "examples/Mouse/FullScreen.purs",
     html: "examples/Mouse/FullScreen.html"
 },{
-    ps: "Examples.Mouse.Embed",
+    module: "Examples.Mouse.Embed",
+    purs: "examples/Mouse/Embed.purs",
     html: "examples/Mouse/Embed.html"
 },{
-    ps: "Examples.Window.FullScreen",
+    module: "Examples.Window.FullScreen",
+    purs: "examples/Window/FullScreen.purs",
     html: "examples/Window/FullScreen.html"
 },{
-    ps: "Examples.Window.Embed",
+    module: "Examples.Window.Embed",
+    purs: "examples/Window/Embed.purs",
     html: "examples/Window/Embed.html"
+},{
+    module: "Examples.Time.Delay",
+    purs: "examples/Time/Delay.purs"
+},{
+    module: "Examples.Time.Every",
+    purs: "examples/Time/Every.purs"
+},{
+    module: "Examples.Time.FPS",
+    purs: "examples/Time/FPS.purs"
+},{
+    module: "Examples.Time.FPSWhen",
+    purs: "examples/Time/FPSWhen.purs"
+},{
+    module: "Examples.Time.Since",
+    purs: "examples/Time/Since.purs"
+},{
+    module: "Examples.Time.Timestamp",
+    purs: "examples/Time/Timestamp.purs"
+},{
+    module: "Test.Main",
+    purs: "test/Test/Main.purs"
 }];
-
-var allBundles =
-    nodeBundles.concat(
-        htmlBundles.map(
-            function (bundle) {
-                return bundle.ps
-            }
-        )
-    );
 
 function output (module) {
     return "build/" + module.split(".").join("/") + ".js";
 }
 
-nodeBundles.map(function (bundle) {
-    gulp.task("bundle-" + bundle, ["make"], function () {
+bundles.map(function (bundle) {
+    var bundleName = "bundle-" + bundle.module;
+
+    gulp.task(bundleName, ["make"], function () {
         return purescript.pscBundle({
             src: "output/**/*.js",
-            output: output(bundle),
-            module: bundle,
-            main: bundle
+            output: output(bundle.module),
+            module: bundle.module,
+            main: bundle.module
         });
     });
 
-    gulp.task(bundle, ["bundle-" + bundle], function (cb) {
-        fork(output(bundle)).on('exit', cb);
+    gulp.task(bundle.module, [bundleName], function (cb) {
+        if (bundle.html) {
+            exec("open " + bundle.html);
+            cb();
+        } else {
+            fork(output(bundle.module)).on('exit', cb);
+        }
     });
+
+    if (bundle.purs) gulp.task(bundle.purs, [bundle.module]);
+    if (bundle.html) gulp.task(bundle.html, [bundle.module]);
 });
 
-htmlBundles.map(function (bundle) {
-    gulp.task("bundle-" + bundle.ps, ["make"], function () {
-        return purescript.pscBundle({
-            src: "output/**/*.js",
-            output: output(bundle.ps),
-            module: bundle.ps,
-            main: bundle.ps
-        });
-    });
-
-    gulp.task(bundle.ps, ["bundle-" + bundle.ps], function (cb) {
-        exec("open " + bundle.html);
-        cb();
-    });
-});
-
-gulp.task("bundle", allBundles.map(function (bundle) {
-    return "bundle-" + bundle;
+gulp.task("bundle", bundles.map(function (bundle) {
+    return "bundle-" + bundle.module;
 }));
 
 gulp.task("test", ["Test.Main"]);
