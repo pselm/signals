@@ -16,7 +16,7 @@ easily.
 
 ##### Instances
 ``` purescript
-Eq Element
+Renderable Element
 ```
 
 #### `Position`
@@ -193,6 +193,14 @@ Create a tiled image. Repeat the image to fill the given width and height.
 
     tiledImage 100 100 "yogi.jpg"
 
+#### `fromRenderable`
+
+``` purescript
+fromRenderable :: forall a. Renderable a => Int -> Int -> a -> Element
+```
+
+Create an `Element` from a custom type that is `Renderable`.
+
 #### `leftAligned`
 
 ``` purescript
@@ -232,7 +240,7 @@ adjusted to make this possible.
 #### `show`
 
 ``` purescript
-show :: forall a. (Show a) => a -> Element
+show :: forall a. Show a => a -> Element
 ```
 
 Convert anything to its textual representation and make it displayable in
@@ -482,18 +490,6 @@ inward :: Direction
 
 ``` purescript
 outward :: Direction
-```
-
-#### `render`
-
-``` purescript
-render :: forall e. Element -> Eff (dom :: DOM | e) Element
-```
-
-#### `updateAndReplace`
-
-``` purescript
-updateAndReplace :: forall e. Element -> Element -> Element -> Eff (dom :: DOM | e) Element
 ```
 
 

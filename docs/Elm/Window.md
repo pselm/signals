@@ -27,7 +27,7 @@ type WindowState = { dimensions :: Signal Dimensions, node :: Maybe HTMLElement 
 #### `setupWindow`
 
 ``` purescript
-setupWindow :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => HTMLElement -> WindowCallback m a -> GraphState m a
+setupWindow :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => HTMLElement -> WindowCallback m a -> GraphState m a
 ```
 
 Setup window signals.
@@ -35,7 +35,7 @@ Setup window signals.
 #### `setupGlobalWindow`
 
 ``` purescript
-setupGlobalWindow :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => WindowCallback m a -> GraphState m a
+setupGlobalWindow :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => WindowCallback m a -> GraphState m a
 ```
 
 Setup window signals.
@@ -43,7 +43,7 @@ Setup window signals.
 #### `dimensions`
 
 ``` purescript
-dimensions :: forall e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal Dimensions)
+dimensions :: forall e m. MonadEff (ref :: REF | e) m => WindowCallback m (Signal Dimensions)
 ```
 
 The current width and height of the window (i.e. the area viewable to the
@@ -52,7 +52,7 @@ user, not including scroll bars).
 #### `width`
 
 ``` purescript
-width :: forall e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal Int)
+width :: forall e m. MonadEff (ref :: REF | e) m => WindowCallback m (Signal Int)
 ```
 
 The current width of the window.
@@ -60,7 +60,7 @@ The current width of the window.
 #### `height`
 
 ``` purescript
-height :: forall e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal Int)
+height :: forall e m. MonadEff (ref :: REF | e) m => WindowCallback m (Signal Int)
 ```
 
 The current height of the window.

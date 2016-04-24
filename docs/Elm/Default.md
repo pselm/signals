@@ -252,7 +252,7 @@ Equivalent to Purescript's `ceil`.
 #### `clamp`
 
 ``` purescript
-clamp :: forall a. (Ord a) => a -> a -> a -> a
+clamp :: forall a. Ord a => a -> a -> a -> a
 ```
 
 Clamp a value between a minimum and a maximum. For example:
@@ -266,13 +266,13 @@ Clamp a value between a minimum and a maximum. For example:
 #### `compare`
 
 ``` purescript
-compare :: forall a. (Ord a) => a -> a -> Ordering
+compare :: forall a. Ord a => a -> a -> Ordering
 ```
 
 #### `compose`
 
 ``` purescript
-compose :: forall a b c. (b -> c) -> (a -> b) -> a -> c
+compose :: forall a b c. (b -> c) -> (a -> b) -> (a -> c)
 ```
 
 Function composition, passing results along in the suggested direction. For
@@ -293,7 +293,7 @@ Equivalent to Purescript's `<<<`.
 #### `composeFlipped`
 
 ``` purescript
-composeFlipped :: forall a b c. (a -> b) -> (b -> c) -> a -> c
+composeFlipped :: forall a b c. (a -> b) -> (b -> c) -> (a -> c)
 ```
 
 Function composition, passing results along in the suggested direction. For
@@ -396,7 +396,7 @@ The Purescript equivalent is `id`.
 #### `intDiv`
 
 ``` purescript
-intDiv :: forall a. (ModuloSemiring a) => a -> a -> a
+intDiv :: forall a. ModuloSemiring a => a -> a -> a
 ```
 
 Integer division. The remainder is discarded.
@@ -443,7 +443,7 @@ Calculate the logarithm of a number with a given base.
 #### `max`
 
 ``` purescript
-max :: forall a. (Ord a) => a -> a -> a
+max :: forall a. Ord a => a -> a -> a
 ```
 
 Take the maximum of two values. If they compare to `EQ`, the first
@@ -452,7 +452,7 @@ argument is chosen.
 #### `min`
 
 ``` purescript
-min :: forall a. (Ord a) => a -> a -> a
+min :: forall a. Ord a => a -> a -> a
 ```
 
 Take the minimum of two values. If they compare to `EQ`, the first
@@ -475,7 +475,7 @@ for that, see `Basics.rem`.
 #### `negate`
 
 ``` purescript
-negate :: forall a. (Ring a) => a -> a
+negate :: forall a. Ring a => a -> a
 ```
 
 `negate x` can be used as a shorthand for `zero - x`.
@@ -483,7 +483,7 @@ negate :: forall a. (Ring a) => a -> a
 #### `not`
 
 ``` purescript
-not :: forall a. (BooleanAlgebra a) => a -> a
+not :: forall a. BooleanAlgebra a => a -> a
 ```
 
 #### `pi`
@@ -505,7 +505,7 @@ Convert radians to standard Elm angles (radians).
 #### `rem`
 
 ``` purescript
-rem :: forall a. (ModuloSemiring a) => a -> a -> a
+rem :: forall a. ModuloSemiring a => a -> a -> a
 ```
 
 Find the remainder after dividing one number by another.
@@ -584,7 +584,7 @@ If you want some more sophisticated handling of complex numbers, see
 #### `toString`
 
 ``` purescript
-toString :: forall a. (Show a) => a -> String
+toString :: forall a. Show a => a -> String
 ```
 
 Turn any kind of value into a string.
@@ -623,7 +623,7 @@ Turn a function of two arguments into a function that expects a tuple.
 #### `xor`
 
 ``` purescript
-xor :: forall a. (BooleanAlgebra a) => a -> a -> a
+xor :: forall a. BooleanAlgebra a => a -> a -> a
 ```
 
 The exclusive-or operator. `true` if exactly one input is `true`.
@@ -639,60 +639,60 @@ _left-associative / precedence 7_
 #### `(&&)`
 
 ``` purescript
-(&&) :: forall a. (BooleanAlgebra a) => a -> a -> a
+(&&) :: forall a. BooleanAlgebra a => a -> a -> a
 ```
 
-_right-associative / precedence 3_
+_left-associative / precedence -1_
 
 `(&&)` is an alias for `conj`.
 
 #### `(*)`
 
 ``` purescript
-(*) :: forall a. (Semiring a) => a -> a -> a
+(*) :: forall a. Semiring a => a -> a -> a
 ```
 
-_left-associative / precedence 7_
+_left-associative / precedence -1_
 
 `(*)` is an alias for `mul`.
 
 #### `(+)`
 
 ``` purescript
-(+) :: forall a. (Semiring a) => a -> a -> a
+(+) :: forall a. Semiring a => a -> a -> a
 ```
 
-_left-associative / precedence 6_
+_left-associative / precedence -1_
 
 `(+)` is an alias for `add`.
 
 #### `(++)`
 
 ``` purescript
-(++) :: forall s. (Semigroup s) => s -> s -> s
+(++) :: forall s. Semigroup s => s -> s -> s
 ```
 
-_right-associative / precedence 5_
+_left-associative / precedence -1_
 
 `(++)` is an alternative alias for `append`.
 
 #### `(-)`
 
 ``` purescript
-(-) :: forall a. (Ring a) => a -> a -> a
+(-) :: forall a. Ring a => a -> a -> a
 ```
 
-_left-associative / precedence 6_
+_left-associative / precedence -1_
 
 `(-)` is an alias for `sub`.
 
 #### `(/)`
 
 ``` purescript
-(/) :: forall a. (ModuloSemiring a) => a -> a -> a
+(/) :: forall a. ModuloSemiring a => a -> a -> a
 ```
 
-_left-associative / precedence 7_
+_left-associative / precedence -1_
 
 `(/)` is an alias for `div`.
 
@@ -707,10 +707,10 @@ _left-associative / precedence 7_
 #### `(/=)`
 
 ``` purescript
-(/=) :: forall a. (Eq a) => a -> a -> Boolean
+(/=) :: forall a. Eq a => a -> a -> Boolean
 ```
 
-_non-associative / precedence 4_
+_left-associative / precedence -1_
 
 `(/=)` tests whether one value is _not equal_ to another. Shorthand for
 `not (x == y)`.
@@ -718,10 +718,10 @@ _non-associative / precedence 4_
 #### `(<)`
 
 ``` purescript
-(<) :: forall a. (Ord a) => a -> a -> Boolean
+(<) :: forall a. Ord a => a -> a -> Boolean
 ```
 
-_left-associative / precedence 4_
+_left-associative / precedence -1_
 
 Test whether one value is _strictly less than_ another.
 
@@ -736,10 +736,10 @@ _right-associative / precedence 9_
 #### `(<=)`
 
 ``` purescript
-(<=) :: forall a. (Ord a) => a -> a -> Boolean
+(<=) :: forall a. Ord a => a -> a -> Boolean
 ```
 
-_left-associative / precedence 4_
+_left-associative / precedence -1_
 
 Test whether one value is _non-strictly less than_ another.
 
@@ -754,30 +754,30 @@ _right-associative / precedence 0_
 #### `(==)`
 
 ``` purescript
-(==) :: forall a. (Eq a) => a -> a -> Boolean
+(==) :: forall a. Eq a => a -> a -> Boolean
 ```
 
-_non-associative / precedence 4_
+_left-associative / precedence -1_
 
 `(==)` is an alias for `eq`. Tests whether one value is equal to another.
 
 #### `(>)`
 
 ``` purescript
-(>) :: forall a. (Ord a) => a -> a -> Boolean
+(>) :: forall a. Ord a => a -> a -> Boolean
 ```
 
-_left-associative / precedence 4_
+_left-associative / precedence -1_
 
 Test whether one value is _strictly greater than_ another.
 
 #### `(>=)`
 
 ``` purescript
-(>=) :: forall a. (Ord a) => a -> a -> Boolean
+(>=) :: forall a. Ord a => a -> a -> Boolean
 ```
 
-_left-associative / precedence 4_
+_left-associative / precedence -1_
 
 Test whether one value is _non-strictly greater than_ another.
 
@@ -808,10 +808,10 @@ _left-associative / precedence 0_
 #### `(||)`
 
 ``` purescript
-(||) :: forall a. (BooleanAlgebra a) => a -> a -> a
+(||) :: forall a. BooleanAlgebra a => a -> a -> a
 ```
 
-_right-associative / precedence 2_
+_left-associative / precedence -1_
 
 `(||)` is an alias for `disj`.
 

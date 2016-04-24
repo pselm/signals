@@ -23,7 +23,7 @@ A computational context that tracks the state of the signal graph
 #### `setup`
 
 ``` purescript
-setup :: forall e m a. (MonadEff (ref :: REF, now :: Now | e) m) => GraphState m a -> m a
+setup :: forall e m a. MonadEff (ref :: REF, now :: Now | e) m => GraphState m a -> m a
 ```
 
 Setup the signal graph.
@@ -56,7 +56,7 @@ the world.
 #### `constant`
 
 ``` purescript
-constant :: forall e m a. (MonadEff (ref :: REF | e) m) => a -> GraphState m (Signal a)
+constant :: forall e m a. MonadEff (ref :: REF | e) m => a -> GraphState m (Signal a)
 ```
 
 Create a signal that never changes. This can be useful if you need
@@ -67,13 +67,13 @@ to pass a combination of signals and normal values to a function:
 #### `output`
 
 ``` purescript
-output :: forall e1 e2 m a. (MonadEff (ref :: REF | e1) m) => String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
+output :: forall e1 e2 m a. MonadEff (ref :: REF | e1) m => String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
 ```
 
 #### `foldp`
 
 ``` purescript
-foldp :: forall e m a s. (MonadEff (ref :: REF | e) m) => (a -> s -> s) -> s -> Signal a -> GraphState m (Signal s)
+foldp :: forall e m a s. MonadEff (ref :: REF | e) m => (a -> s -> s) -> s -> Signal a -> GraphState m (Signal s)
 ```
 
 Create a past-dependent signal. Each update from the incoming signal will
@@ -99,7 +99,7 @@ the latter. So the initial value of `sig` is completely ignored in
 #### `timestamp`
 
 ``` purescript
-timestamp :: forall e m a. (MonadEff (ref :: REF | e) m) => Signal a -> GraphState m (Signal (Tuple Time a))
+timestamp :: forall e m a. MonadEff (ref :: REF | e) m => Signal a -> GraphState m (Signal (Tuple Time a))
 ```
 
 Add a timestamp to any signal. Timestamps increase monotonically. When you
@@ -113,7 +113,7 @@ the same underlying event (`Mouse.position`).
 #### `filter`
 
 ``` purescript
-filter :: forall e m a. (MonadEff (ref :: REF | e) m) => (a -> Boolean) -> a -> Signal a -> GraphState m (Signal a)
+filter :: forall e m a. MonadEff (ref :: REF | e) m => (a -> Boolean) -> a -> Signal a -> GraphState m (Signal a)
 ```
 
 Filter out some updates. The given function decides whether we should
@@ -132,7 +132,7 @@ value of zero.
 #### `filterMap`
 
 ``` purescript
-filterMap :: forall e m a b. (MonadEff (ref :: REF | e) m) => (a -> Maybe b) -> b -> Signal a -> GraphState m (Signal b)
+filterMap :: forall e m a b. MonadEff (ref :: REF | e) m => (a -> Maybe b) -> b -> Signal a -> GraphState m (Signal b)
 ```
 
 Filter out some updates. When the filter function gives back `Just` a
@@ -152,7 +152,7 @@ read as integers.
 #### `map`
 
 ``` purescript
-map :: forall e m a b. (MonadEff (ref :: REF | e) m) => (a -> b) -> Signal a -> GraphState m (Signal b)
+map :: forall e m a b. MonadEff (ref :: REF | e) m => (a -> b) -> Signal a -> GraphState m (Signal b)
 ```
 
 Apply a function to a signal.
@@ -168,7 +168,7 @@ Apply a function to a signal.
 #### `map2`
 
 ``` purescript
-map2 :: forall eff m a b r. (MonadEff (ref :: REF | eff) m) => (a -> b -> r) -> Signal a -> Signal b -> GraphState m (Signal r)
+map2 :: forall eff m a b r. MonadEff (ref :: REF | eff) m => (a -> b -> r) -> Signal a -> Signal b -> GraphState m (Signal r)
 ```
 
 Apply a function to the current value of two signals. The function
@@ -187,25 +187,25 @@ height.
 #### `map3`
 
 ``` purescript
-map3 :: forall eff m a b c r. (MonadEff (ref :: REF | eff) m) => (a -> b -> c -> r) -> Signal a -> Signal b -> Signal c -> GraphState m (Signal r)
+map3 :: forall eff m a b c r. MonadEff (ref :: REF | eff) m => (a -> b -> c -> r) -> Signal a -> Signal b -> Signal c -> GraphState m (Signal r)
 ```
 
 #### `map4`
 
 ``` purescript
-map4 :: forall eff m a b c d r. (MonadEff (ref :: REF | eff) m) => (a -> b -> c -> d -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> GraphState m (Signal r)
+map4 :: forall eff m a b c d r. MonadEff (ref :: REF | eff) m => (a -> b -> c -> d -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> GraphState m (Signal r)
 ```
 
 #### `map5`
 
 ``` purescript
-map5 :: forall eff m a b c d e r. (MonadEff (ref :: REF | eff) m) => (a -> b -> c -> d -> e -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> Signal e -> GraphState m (Signal r)
+map5 :: forall eff m a b c d e r. MonadEff (ref :: REF | eff) m => (a -> b -> c -> d -> e -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> Signal e -> GraphState m (Signal r)
 ```
 
 #### `sampleOn`
 
 ``` purescript
-sampleOn :: forall e m a b. (MonadEff (ref :: REF | e) m) => Signal a -> Signal b -> GraphState m (Signal b)
+sampleOn :: forall e m a b. MonadEff (ref :: REF | e) m => Signal a -> Signal b -> GraphState m (Signal b)
 ```
 
 Sample from the second input every time an event occurs on the first input.
@@ -232,7 +232,7 @@ Drop updates that repeat the current value of the signal.
 #### `merge`
 
 ``` purescript
-merge :: forall e m a. (MonadEff (ref :: REF | e) m) => Signal a -> Signal a -> GraphState m (Signal a)
+merge :: forall e m a. MonadEff (ref :: REF | e) m => Signal a -> Signal a -> GraphState m (Signal a)
 ```
 
 Merge two signals into one. This function is extremely useful for bringing
@@ -253,7 +253,7 @@ by the left input signal wins (i.e., the update from the second signal is discar
 #### `mergeMany`
 
 ``` purescript
-mergeMany :: forall e m a. (MonadEff (ref :: REF | e) m) => List (Signal a) -> GraphState m (Signal a)
+mergeMany :: forall e m a. MonadEff (ref :: REF | e) m => List (Signal a) -> GraphState m (Signal a)
 ```
 
 Merge many signals into one. This is useful when you are merging more than
@@ -296,7 +296,7 @@ main part of your application.
 #### `mailbox`
 
 ``` purescript
-mailbox :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY | e) m) => a -> GraphState m (Mailbox a)
+mailbox :: forall e m a. MonadEff (ref :: REF, delay :: DELAY | e) m => a -> GraphState m (Mailbox a)
 ```
 
 Create a mailbox you can send messages to. The primary use case is
@@ -402,7 +402,7 @@ delay :: forall eff a. Int -> Eff (delay :: DELAY | eff) a -> Eff (delay :: DELA
 #### `runSignal`
 
 ``` purescript
-runSignal :: forall e1 e2 m. (MonadEff (ref :: REF | e1) m) => Signal (Eff e2 Unit) -> GraphState m Unit
+runSignal :: forall e1 e2 m. MonadEff (ref :: REF | e1) m => Signal (Eff e2 Unit) -> GraphState m Unit
 ```
 
 Execute each effect as it arrives on a Signal.

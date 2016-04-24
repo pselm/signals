@@ -116,6 +116,7 @@ gulp.task("docs", ["make"], function () {
         src: sources,
         format: "markdown",
         docgen: {
+            "Elm.Graphics.Collage": "docs/Elm/Graphics/Collage.md",
             "Elm.Graphics.Element": "docs/Elm/Graphics/Element.md",
             "Elm.Color": "docs/Elm/Color.md",
             "Elm.Default": "docs/Elm/Default.md",
@@ -123,6 +124,8 @@ gulp.task("docs", ["make"], function () {
             "Elm.Mouse": "docs/Elm/Mouse.md",
             "Elm.Signal": "docs/Elm/Signal.md",
             "Elm.Task": "docs/Elm/Task.md",
+            "Elm.Text": "docs/Elm/Text.md",
+            "Elm.Transform2D": "docs/Elm/Transform2D.md",
             "Elm.Time": "docs/Elm/Time.md",
             "Elm.Window": "docs/Elm/Window.md"
         }

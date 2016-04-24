@@ -19,7 +19,7 @@ type KeyboardState = { model :: Signal Model, keysDown :: Signal (Set KeyCode) }
 #### `setupKeyboard`
 
 ``` purescript
-setupKeyboard :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => Keyboard m a -> GraphState m a
+setupKeyboard :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Keyboard m a -> GraphState m a
 ```
 
 Setup keyboard signals.
@@ -42,7 +42,7 @@ Show XY
 #### `arrows`
 
 ``` purescript
-arrows :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal XY)
+arrows :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal XY)
 ```
 
 A signal of records indicating which arrow keys are pressed.
@@ -55,7 +55,7 @@ A signal of records indicating which arrow keys are pressed.
 #### `wasd`
 
 ``` purescript
-wasd :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal XY)
+wasd :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal XY)
 ```
 
 Just like the arrows signal, but this uses keys w, a, s, and d,
@@ -64,7 +64,7 @@ which are common controls for many computer games.
 #### `isDown`
 
 ``` purescript
-isDown :: forall e m. (MonadEff (ref :: REF | e) m) => KeyCode -> Keyboard m (Signal Bool)
+isDown :: forall e m. MonadEff (ref :: REF | e) m => KeyCode -> Keyboard m (Signal Bool)
 ```
 
 Whether an arbitrary key is pressed.
@@ -72,7 +72,7 @@ Whether an arbitrary key is pressed.
 #### `alt`
 
 ``` purescript
-alt :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
+alt :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal Bool)
 ```
 
 Whether the alt key is pressed.
@@ -80,7 +80,7 @@ Whether the alt key is pressed.
 #### `ctrl`
 
 ``` purescript
-ctrl :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
+ctrl :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal Bool)
 ```
 
 Whether the ctrl key is pressed.
@@ -88,7 +88,7 @@ Whether the ctrl key is pressed.
 #### `meta`
 
 ``` purescript
-meta :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
+meta :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal Bool)
 ```
 
 Whether the meta key is pressed.
@@ -98,7 +98,7 @@ The meta key is the Windows key on Windows and the Command key on Mac.
 #### `shift`
 
 ``` purescript
-shift :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
+shift :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal Bool)
 ```
 
 Whether the shift key is pressed.
@@ -106,7 +106,7 @@ Whether the shift key is pressed.
 #### `space`
 
 ``` purescript
-space :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
+space :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal Bool)
 ```
 
 Whether the space key is pressed.
@@ -114,13 +114,13 @@ Whether the space key is pressed.
 #### `enter`
 
 ``` purescript
-enter :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
+enter :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal Bool)
 ```
 
 #### `keysDown`
 
 ``` purescript
-keysDown :: forall e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal (Set KeyCode))
+keysDown :: forall e m. MonadEff (ref :: REF | e) m => Keyboard m (Signal (Set KeyCode))
 ```
 
 Set of keys that are currently down.
@@ -128,7 +128,7 @@ Set of keys that are currently down.
 #### `presses`
 
 ``` purescript
-presses :: forall e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => Keyboard m (Signal KeyCode)
+presses :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Keyboard m (Signal KeyCode)
 ```
 
 The latest key that has been pressed.

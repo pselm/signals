@@ -25,7 +25,7 @@ type MouseState = { position :: Signal MousePosition, node :: EventTarget }
 #### `setupMouse`
 
 ``` purescript
-setupMouse :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => EventTarget -> Mouse m a -> GraphState m a
+setupMouse :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => EventTarget -> Mouse m a -> GraphState m a
 ```
 
 Setup mouse signals, where the mouse is relative to a particular node.
@@ -36,7 +36,7 @@ Setup mouse signals, where the mouse is relative to a particular node.
 #### `setupGlobalMouse`
 
 ``` purescript
-setupGlobalMouse :: forall e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => Mouse m a -> GraphState m a
+setupGlobalMouse :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Mouse m a -> GraphState m a
 ```
 
 Setup mouse signals, where the mouse is relative to the window.
@@ -47,7 +47,7 @@ Setup mouse signals, where the mouse is relative to the window.
 #### `position`
 
 ``` purescript
-position :: forall e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal MousePosition)
+position :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal MousePosition)
 ```
 
 The current mouse position.
@@ -55,7 +55,7 @@ The current mouse position.
 #### `x`
 
 ``` purescript
-x :: forall e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal Int)
+x :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal Int)
 ```
 
 The current x-coordinate of the mouse.
@@ -63,7 +63,7 @@ The current x-coordinate of the mouse.
 #### `y`
 
 ``` purescript
-y :: forall e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal Int)
+y :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal Int)
 ```
 
 The current y-coordinate of the mouse.
@@ -71,7 +71,7 @@ The current y-coordinate of the mouse.
 #### `isDown`
 
 ``` purescript
-isDown :: forall e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => Mouse m (Signal Bool)
+isDown :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Mouse m (Signal Bool)
 ```
 
 The current state of the mouse.
@@ -80,7 +80,7 @@ True when any mouse button is down, and false otherwise.
 #### `clicks`
 
 ``` purescript
-clicks :: forall e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) => Mouse m (Signal Unit)
+clicks :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Mouse m (Signal Unit)
 ```
 
 Always equal to unit. Event triggers on every mouse click.
