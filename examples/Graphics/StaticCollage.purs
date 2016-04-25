@@ -58,18 +58,22 @@ main = do
         column1 <- elementToNode <$> createElement "th" doc
         column2 <- elementToNode <$> createElement "th" doc
         column3 <- elementToNode <$> createElement "th" doc
+        column4 <- elementToNode <$> createElement "th" doc
 
         text1 <- textToNode <$> createTextNode "Code" doc
         text2 <- textToNode <$> createTextNode "Result" doc
         text3 <- textToNode <$> createTextNode "Should look like" doc
+        text4 <- textToNode <$> createTextNode "Difference" doc
 
         appendChild text1 column1
         appendChild text2 column2
         appendChild text3 column3
+        appendChild text4 column4
 
         appendChild column1 thead
         appendChild column2 thead
         appendChild column3 thead
+        appendChild column4 thead
 
         for_ examples $
             renderIntoDOM AfterLastChild tbody
@@ -94,14 +98,17 @@ instance renderableExample :: Renderable Example where
         column1 <- createElement "td" doc
         column2 <- createElement "td" doc
         column3 <- createElement "td" doc
+        column4 <- createElement "td" doc
 
         setStyle "border" "1px solid blue" column1
         setStyle "border" "1px solid blue" column2
         setStyle "border" "1px solid blue" column3
+        setStyle "border" "1px solid blue" column4
 
         appendChild (elementToNode column1) row
         appendChild (elementToNode column2) row
         appendChild (elementToNode column3) row
+        appendChild (elementToNode column4) row
 
         caption <- elementToNode <$> createElement "pre" doc
         text <- textToNode <$> createTextNode example.caption doc
@@ -115,6 +122,36 @@ instance renderableExample :: Renderable Example where
             image <- createElement "img" doc
             setAttribute "src" example.reference image
             appendChild (elementToNode image) (elementToNode column3)
+
+            setStyle "background-color" "black" column4
+
+            mixed <- createElement "div" doc
+            setStyle "position" "relative" mixed
+            setStyle "isolation" "isolate" mixed
+            appendChild (elementToNode mixed) (elementToNode column4)
+
+            -- This one is just to take up space ...
+            image2 <- createElement "img" doc
+            setAttribute "src" example.reference image2
+            setAttribute "visibility" "hidden" image2
+            appendChild (elementToNode image2) (elementToNode column4)
+
+            image3 <- createElement "img" doc
+            setAttribute "src" example.reference image3
+            setStyle "position" "absolute" image3
+            setStyle "left" "0px" image3
+            setStyle "top" "0px" image3
+            appendChild (elementToNode image3) (elementToNode mixed)
+
+            collage2 <- render example.collage
+            div <- createElement "div" doc
+            setStyle "position" "absolute" div
+            setStyle "left" "0px" div
+            setStyle "top" "0px" div
+            setStyle "mix-blend-mode" "difference" div
+            appendChild collage2 (elementToNode div)
+            appendChild (elementToNode div) (elementToNode mixed)
+
             pure unit
 
         pure row
