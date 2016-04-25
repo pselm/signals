@@ -139,6 +139,7 @@ gulp.task("docs", ["make"], function () {
         src: sources,
         format: "markdown",
         docgen: {
+            "DOM.Renderable": "docs/DOM/Renderable.md",
             "Elm.Graphics.Collage": "docs/Elm/Graphics/Collage.md",
             "Elm.Graphics.Element": "docs/Elm/Graphics/Element.md",
             "Elm.Color": "docs/Elm/Color.md",
