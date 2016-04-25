@@ -11,6 +11,7 @@ import Elm.Graphics.Collage
 import Elm.Graphics.Internal (setStyle)
 import Elm.Color (red, linear, radial, rgb, rgba, hsl, white, blue, purple, green)
 import Elm.Basics ((|>), degrees)
+import Elm.Text (Line(..), typeface, join, line, fromString, height, color, bold, italic, monospace) as Text
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff)
@@ -132,7 +133,7 @@ examples =
     : example7 : example8 : example9
     : example15 : example16 : example17 : example18
     : example19 : example20 : example21 : example22 : example23 : example24
-    : example25 : example26 : example27
+    : example25 : example26 : example27 : example28 : example29
     : Nil
     )
 
@@ -474,7 +475,7 @@ example19 :: Example
 example19 =
     Example
         { caption: "http://elm-lang.org/examples/shapes"
-        , reference: "staticcollage/example19.png"
+        , reference: "StaticCollage/example19.png"
         , collage:
             makeCollage 300 300
                 ( ( ngon 4 75.0
@@ -715,15 +716,152 @@ example27 =
         }
 
 
+example28 :: Example
+example28 =
+    Example
+        { caption:
+            """
+            makeCollage 300 300
+                ( alpha 0.6 ( ngon 4 75.0
+                    # filled clearGrey
+                    # move {x: -10.0, y: 0.0}
+                  )
+                : alpha 0.6 ( ngon 5 50.0
+                    # filled clearGrey
+                    # move {x: 50.0, y: 10.0}
+                  )
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example19.png"
+        , collage:
+            makeCollage 300 300
+                ( alpha 0.6 ( ngon 4 75.0
+                    # filled clearGrey
+                    # move {x: -10.0, y: 0.0}
+                  )
+                : alpha 0.6 ( ngon 5 50.0
+                    # filled clearGrey
+                    # move {x: 50.0, y: 10.0}
+                  )
+                : Nil
+                )
+        }
+
+    where
+        clearGrey =
+            rgb 111 111 111
+
+
+example29 :: Example
+example29 =
+    Example
+        { caption:
+            """
+            makeCollage 300 300
+                ( moveY   140.0  (text plainText)
+                : moveY   120.0  (text biggerText)
+                : moveY   100.0  (text redText)
+                : moveY    80.0  (text boldText)
+                : moveY    60.0  (text italicText)
+                : moveY    40.0  (text monospaceText)
+                : moveY    20.0  (text underlinedText)
+                : moveY     0.0  (text overlinedText)
+                : moveY  (-20.0) (text strikethroughText)
+                : moveY  (-40.0) (text comboText)
+                : moveY  (-60.0) (outlinedText (solid red) biggerText)
+                : moveY  (-80.0) (outlinedText (dotted red) biggerText)
+                : moveY (-100.0) (outlinedText (dashed red) biggerText)
+                : moveY (-120.0) (outlinedText (defaultLine {width = 4.0}) biggerText)
+
+                : ( (text rotatedAndScaled)
+                    |> moveX (-140.0)
+                    |> scale 2.0
+                    |> rotate (degrees 90.0)
+                  )
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example29.png"
+        , collage:
+            makeCollage 300 300
+                ( moveY   140.0  (text plainText)
+                : moveY   120.0  (text biggerText)
+                : moveY   100.0  (text redText)
+                : moveY    80.0  (text boldText)
+                : moveY    60.0  (text italicText)
+                : moveY    40.0  (text monospaceText)
+                : moveY    20.0  (text underlinedText)
+                : moveY     0.0  (text overlinedText)
+                : moveY  (-20.0) (text strikethroughText)
+                : moveY  (-40.0) (text comboText)
+                : moveY  (-60.0) (outlinedText (solid red) biggerText)
+                : moveY  (-80.0) (outlinedText (dotted red) biggerText)
+                : moveY (-100.0) (outlinedText (dashed red) biggerText)
+                : moveY (-120.0) (outlinedText (defaultLine {width = 4.0}) biggerText)
+
+                : ( (text rotatedAndScaled)
+                    |> moveX (-140.0)
+                    |> scale 2.0
+                    |> rotate (degrees 90.0)
+                  )
+                : Nil
+                )
+        }
+
+    where
+        typeface =
+            Text.typeface ("sans-serif" : Nil)
+
+        plainText =
+            typeface $
+                Text.fromString "A plain old string"
+
+        rotatedAndScaled =
+            typeface $
+                Text.fromString "Rotated and scaled"
+
+        biggerText =
+            typeface $
+                Text.height 20.0 (Text.fromString "Bigger")
+
+        redText =
+            typeface $
+                Text.color red (Text.fromString "Some red text")
+
+        boldText =
+            typeface $
+                Text.bold (Text.fromString "Some bold text")
+
+        italicText =
+            typeface $
+                Text.italic (Text.fromString "Some italic text")
+
+        monospaceText =
+            Text.monospace (Text.fromString "Some monospace text")
+
+        underlinedText =
+            typeface $
+                Text.line Text.Under (Text.fromString "Some underlined text")
+
+        overlinedText =
+            typeface $
+                Text.line Text.Over (Text.fromString "Some overlined text")
+
+        strikethroughText =
+            typeface $
+                Text.line Text.Through (Text.fromString "Some strikethrough text")
+
+        comboText =
+            typeface $
+                Text.join (Text.fromString ", ") (redText : boldText : italicText : Nil)
+
+
 -- Still to test
 --
 -- sprite
 -- toForm
 -- group
 -- groupTransform
--- alpha
--- text
--- outlinedText
--- try scale and rotate together
 -- Turning collage into an `Element`
 -- groups that mix Collage and Element

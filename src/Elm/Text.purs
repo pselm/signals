@@ -28,7 +28,7 @@ import Data.Array (catMaybes)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (for)
 import Graphics.Canvas (Context2D, Canvas)
-import Graphics.Canvas (setFillStyle, setFont, measureText, scale) as Canvas
+import Graphics.Canvas (setFillStyle, setFont, measureText, scale, save, restore) as Canvas
 import Control.Monad.Eff (Eff)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, modifySTRef, runST)
 import Control.Alt ((<|>))
@@ -563,9 +563,15 @@ defaultHeight :: Number
 defaultHeight = 12.0
 
 
-drawCanvas :: ∀ e. (∀ eff. Context2D -> String -> Number -> Number -> Eff (canvas :: Canvas | eff) Context2D) -> Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+drawCanvas :: ∀ e.
+    (∀ eff. Context2D -> String -> Number -> Number -> Eff (canvas :: Canvas | eff) Context2D) ->
+    Text ->
+    Context2D ->
+    Eff (canvas :: Canvas | e) Context2D
+
 drawCanvas draw text ctx =
     runST do
+        Canvas.save ctx
         Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
 
         -- To avoid multiple iterations ...
@@ -612,6 +618,7 @@ drawCanvas draw text ctx =
             draw ctx m.chunk.text x (maxHeight / 2.0)
             writeSTRef xRef $ x + m.width
 
+        Canvas.restore ctx
         pure ctx
 
 

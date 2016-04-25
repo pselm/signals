@@ -853,7 +853,7 @@ drawShape style closed points = do
 -- TEXT RENDERING
 
 -- Returns true if setLineDash was available, false if not.
-foreign import setLineDash :: ∀ e. List Int -> Context2D -> Eff (canvas :: Canvas | e) Boolean
+foreign import setLineDash :: ∀ e. Array Int -> Context2D -> Eff (canvas :: Canvas | e) Boolean
 
 
 fillText :: ∀ e. Text -> UpdateEffects e Context2D
