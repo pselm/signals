@@ -160,11 +160,12 @@ toCanvasGradient :: ∀ e. Gradient -> Context2D -> Eff (canvas :: Canvas | e) C
 toCanvasGradient grad ctx =
     case grad of
         Linear p0 p1 stops ->
+            -- Note that I seem to have to swap the beginning and the end
             createLinearGradient
-                { x0: p0.x
-                , y0: p0.y
-                , x1: p1.x
-                , y1: p1.y
+                { x1: p0.x
+                , y1: p0.y
+                , x0: p1.x
+                , y0: p1.y
                 }
                 ctx
             >>= addStops stops

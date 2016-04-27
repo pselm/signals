@@ -22,6 +22,12 @@ A matrix representing a 2D transformation.
 
 Equivalent to Purescript's `Graphics.Canvas.Transform`.
 
+#### `toCSS`
+
+``` purescript
+toCSS :: Transform2D -> String
+```
+
 #### `identity`
 
 ``` purescript

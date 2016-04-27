@@ -23,14 +23,14 @@ module Elm.Graphics.Element
     ) where
 
 
-import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform)
+import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure)
 import Elm.Basics (Float, truncate)
 import Elm.Color (Color)
 import Elm.Text (Text, renderHtml)
 
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.List (List(..), null, (:), reverse, length, index)
-import Data.Int (round, toNumber)
+import Data.Int (ceil, toNumber)
 import Data.Ord (max)
 import Data.Foldable (maximum, sum, for_)
 import Data.Traversable (for)
@@ -41,13 +41,12 @@ import Data.Array (catMaybes)
 import DOM (DOM)
 import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
 import DOM.Renderable (render, update) as Renderable
-import DOM.HTML.Document (body)
-import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToNode)
+import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
 import DOM.Node.Element (setId, setAttribute, tagName)
-import DOM.Node.Node (firstChild, appendChild, removeChild, parentNode, parentElement, replaceChild, nodeType)
+import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild, nodeType)
 import DOM.Node.NodeType (NodeType(ElementNode))
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
@@ -75,9 +74,6 @@ import Prelude
 
 -- Inner HTML
 foreign import setInnerHtml :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
-
--- Dimensions
-foreign import getDimensions :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) {width :: Int, height :: Int}
 
 -- Image width
 foreign import getImageWidth :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Int
@@ -253,10 +249,10 @@ width newWidth (Element {element, props}) =
         newHeight =
             case element of
                 Image _ w h _ ->
-                    round (toNumber h / toNumber w * toNumber newWidth)
+                    ceil (toNumber h / toNumber w * toNumber newWidth)
 
                 RawHtml html _ ->
-                    _.height $ runHtmlHeight newWidth html
+                    ceil $ _.height $ runHtmlHeight newWidth html
 
                 _ ->
                     props.height
@@ -1436,7 +1432,7 @@ block align text =
         pos = runHtmlHeight 0 html
 
     in
-        newElement pos.width pos.height $
+        newElement (ceil pos.width) (ceil pos.height) $
             RawHtml html align
 
 
@@ -1446,7 +1442,7 @@ markdown text =
         pos = runHtmlHeight 0 text
 
     in
-        newElement pos.width pos.height $
+        newElement (ceil pos.width) (ceil pos.height) $
             RawHtml text ""
 
 
@@ -1454,49 +1450,28 @@ markdown text =
 -- puts the div in the DOM but then immediately takes it out again, it's reasonable
 -- to run this "unsafely" -- the effect is undone. And, of course, it makes the
 -- API work as Elm expects it to.
-runHtmlHeight :: Int -> String -> {width :: Int, height :: Int}
+runHtmlHeight :: Int -> String -> {width :: Number, height :: Number}
 runHtmlHeight w html =
     unsafePerformEff $ htmlHeight w html
 
 
-htmlHeight :: ∀ e. Int -> String -> Eff (dom :: DOM | e) {width :: Int, height :: Int}
+htmlHeight :: ∀ e. Int -> String -> Eff (dom :: DOM | e) {width :: Number, height :: Number}
 htmlHeight w html = do
     -- Because of runHtmlHeight, we double-check whether we really have a document or not.
     nullableDoc <- nullableDocument
     case toMaybe nullableDoc of
         Nothing ->
             pure
-                { width: 0
-                , height: 0
+                { width: 0.0
+                , height: 0.0
                 }
 
         Just doc -> do
             temp <- createElement "div" (htmlDocumentToDocument doc)
-            let tempNode = elementToNode temp
 
             setInnerHtml html temp
 
             when (w > 0) $
                 setStyle "width" ((Prelude.show w) <> "px") temp
 
-            setStyle "visibility" "hidden" temp
-            setStyle "styleFloat" "left" temp
-            setStyle "cssFloat" "left" temp
-
-            nullableBody <- body doc
-
-            case toMaybe nullableBody of
-                Just b -> do
-                    let bodyDoc = htmlElementToNode b
-                    appendChild tempNode bodyDoc
-                    dim <- getDimensions temp
-                    removeChild tempNode bodyDoc
-                    pure dim
-
-                Nothing ->
-                    pure
-                        { width: 0
-                        , height: 0
-                        }
-
-
+            measure (elementToNode temp)

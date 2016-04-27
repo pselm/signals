@@ -15,12 +15,14 @@ module Elm.Transform2D
     , identity, matrix, multiply
     , rotation, translation
     , scale, scaleX, scaleY
+    , toCSS
     ) where
 
 
 import Graphics.Canvas (Transform)
+import Data.String (joinWith)
 import Math (cos, sin)
-import Prelude ((*), (+), negate)
+import Prelude ((*), (+), negate, (<), (>), (<>), (&&), show)
 import Elm.Basics (Float)
 
 
@@ -28,6 +30,28 @@ import Elm.Basics (Float)
 -- |
 -- | Equivalent to Purescript's `Graphics.Canvas.Transform`.
 type Transform2D = Transform
+
+
+toCSS :: Transform2D -> String
+toCSS t =
+    "matrix(" <>
+    ( joinWith ", "
+        [ str t.m11
+        , str t.m21
+        , str (t.m12)
+        , str (-t.m22)
+        , str t.m31
+        , str t.m32
+        ]
+    ) <>
+    ")"
+
+
+str :: Number -> String
+str n =
+    if n < 0.00001 && n > (-0.00001)
+        then "0"
+        else show n
 
 
 -- | Create an identity transform. Transforming by the identity does

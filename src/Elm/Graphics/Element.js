@@ -3,19 +3,6 @@
 
 // module Elm.Graphics.Element
 
-exports.getDimensions = function (node) {
-    return function () {
-        var style = window.getComputedStyle(node, null);
-        var w = Math.ceil(style.getPropertyValue('width').slice(0, -2) - 0);
-        var h = Math.ceil(style.getPropertyValue('height').slice(0, -2) - 0);
-
-        return {
-            width: w,
-            height: h
-        };
-    }
-};
-
 exports.getImageWidth = function (image) {
     return function () {
         return image.width || 0;

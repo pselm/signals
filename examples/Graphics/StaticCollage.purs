@@ -8,8 +8,9 @@ module Examples.Graphics.StaticCollage where
 
 
 import Elm.Graphics.Collage
+import Elm.Graphics.Element (Element, flow, down, spacer, color)
 import Elm.Graphics.Internal (setStyle)
-import Elm.Color (red, linear, radial, rgb, rgba, hsl, white, blue, purple, green)
+import Elm.Color (red, linear, radial, rgb, rgba, hsl, white, blue, purple, green, yellow)
 import Elm.Basics ((|>), degrees)
 import Elm.Text (Line(..), typeface, join, line, fromString, height, color, bold, italic, monospace) as Text
 
@@ -167,7 +168,7 @@ instance renderableExample :: Renderable Example where
 examples :: List Example
 examples =
     ( example1 : example2 : example3 : example4 : example5 : example6
-    : example7 : example8 : example9
+    : example7 : example8 : example9 : example10
     : example15 : example16 : example17 : example18
     : example19 : example20 : example21 : example22 : example23 : example24
     : example25 : example26 : example27 : example28 : example29
@@ -415,6 +416,52 @@ example9 =
                 : moveX 100.0 (traced defaultLine { width = 8.0, cap = Flat, color = blue } hook)
                 : moveX 120.0 (traced defaultLine { width = 8.0, cap = Padded, color = blue } hook)
                 : moveX 140.0 (traced defaultLine { width = 8.0, cap = Round, color = blue } hook)
+                : Nil
+                )
+        }
+
+
+smallBlueBox :: Element
+smallBlueBox = color blue (spacer 20 20)
+
+
+smallRedBox :: Element
+smallRedBox = color red (spacer 20 20)
+
+
+smallYellowBox :: Element
+smallYellowBox = color yellow (spacer 20 20)
+
+
+boxes :: Element
+boxes =
+    flow down (smallRedBox : smallBlueBox : smallYellowBox : Nil)
+
+
+example10 :: Example
+example10 =
+    Example
+        { caption:
+            """
+            makeCollage 300 300
+                ( toForm boxes
+                , ( toForm boxes
+                    |> rotate (degrees 45)
+                    |> moveX -40.0
+                    |> moveY -40.0
+                  )
+                : Nil
+                )
+            """
+        , reference: "StaticCollage/example10.png"
+        , collage:
+            makeCollage 300 300
+                ( toForm boxes
+                : ( toForm boxes
+                    |> rotate (degrees 45.0)
+                    |> moveX (-40.0)
+                    |> moveY (-40.0)
+                  )
                 : Nil
                 )
         }

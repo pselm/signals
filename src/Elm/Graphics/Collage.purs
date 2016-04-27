@@ -22,10 +22,10 @@ import Elm.Color (Color, Gradient, black, toCss, toCanvasGradient)
 import Elm.Basics (Float)
 import Elm.Text (Text, drawCanvas)
 import Elm.Transform2D (Transform2D)
-import Elm.Transform2D (identity, multiply, rotation, matrix) as T2D
+import Elm.Transform2D (identity, multiply, rotation, matrix, toCSS) as T2D
 import Elm.Graphics.Element (Element)
 import Elm.Graphics.Element (fromRenderable) as Element
-import Elm.Graphics.Internal (createNode, setStyle)
+import Elm.Graphics.Internal (createNode, setStyle, getDimensions, measure, addTransform)
 
 import Data.List (List(..), (..), (:), snoc, fromList, head, tail, reverse)
 import Data.List.Zipper (Zipper(..), down)
@@ -37,10 +37,10 @@ import Data.Nullable (toMaybe)
 
 import Unsafe.Coerce (unsafeCoerce)
 import Math (pi, cos, sin, sqrt, (%))
+import Global (isNaN)
 
 import DOM (DOM)
-import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
-import DOM.Renderable (render) as DR
+import DOM.Renderable (class Renderable, DynamicRenderable, Position(..), toDynamic, renderIntoDOM)
 import DOM.Node.Node (childNodes, nodeName, removeChild, appendChild, insertBefore)
 import DOM.Node.NodeList (item)
 import DOM.Node.Types (Element) as DOM
@@ -72,7 +72,7 @@ import Prelude
     ( class Eq, eq, not, (<<<), Unit, unit, (||)
     , bind, (>>=), pure, void
     , (*), (/), ($), map, (<$>), (+), (-), (<>)
-    , show, (<), (>), (&&), negate, (/=), (==)
+    , show, (<), negate, (/=), (==)
     )
 
 
@@ -842,11 +842,13 @@ drawShape :: ∀ e. FillStyle -> Boolean -> List Point -> UpdateEffects e Contex
 drawShape style closed points = do
     ctx <- getContext
 
+    liftEff $
+        Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+
     trace closed points
     setFillStyle style
 
-    liftEff do
-        Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+    liftEff $
         Canvas.fill ctx
 
 
@@ -888,13 +890,6 @@ formToMatrix (Form f) =
         if f.theta == 0.0
             then matrix
             else T2D.multiply matrix (T2D.rotation f.theta)
-
-
-str :: Number -> String
-str n =
-    if n < 0.00001 && n > (-0.00001)
-        then "0"
-        else show n
 
 
 foreign import devicePixelRatio :: ∀ e. Window -> Eff (dom :: DOM | e) Number
@@ -957,11 +952,24 @@ getGroupAlpha =
         fromMaybe 1.0 (_.alpha <$> head s.groupSettings)
 
 
-makeTransform :: ∀ e. Number -> Number -> Form -> UpdateEffects e String
-makeTransform w h (Form formRec) =
--- This is another one that actually knows about the structure of an `Element`.
--- So, I might actually need to specialize for that.
-    pure "matrix ()"
+makeTransform :: ∀ e. {width :: Number, height :: Number} -> Form -> UpdateEffects e String
+makeTransform dim f = do
+    c <-
+        reader \(UpdateEnv {collage: Collage c}) ->
+            c
+
+    let
+        m =
+            T2D.matrix
+                1.0 0.0 0.0 (-1.0)
+                (((toNumber c.w) - dim.width) / 2.0)
+                (((toNumber c.h) - dim.height) / 2.0)
+
+        m2 =
+            T2D.multiply m (formToMatrix f)
+
+    pure (T2D.toCSS m2)
+
 
 {-
 	function makeTransform(w, h, form, matrices)
@@ -1033,28 +1041,53 @@ renderForm f@(Form innerForm) = do
             div <-
                 getDiv
 
-            newNode <-
+            wrapper <-
                 liftEff
                     case kid of
-                        Just k -> do
-                            n <- if isCanvasElement k
-                                then DR.render renderable
-                                else DR.render renderable
-                                -- The Javascript code hanngs the renderable on the node, and possibly does
-                                -- an update ... should do that!
+                        Just k ->
+                            case nodeToDiv k of
+                                Just divKid -> do
+                                    -- We've got a previous wrapper. Should check for
+                                    -- an old renderable ...
+                                    renderIntoDOM ReplacingChildren (elementToNode divKid) renderable
+                                    pure divKid
 
-                            insertBefore n k div
+                                Nothing -> do
+                                    -- It wasn't a div, so insert ...
+                                    w <- createNode "div"
+                                    insertBefore (elementToNode w) k div
+                                    renderIntoDOM AfterLastChild (elementToNode w) renderable
+                                    pure w
 
                         Nothing -> do
-                            n <- DR.render renderable
-                            appendChild n div
+                            -- There were no more children, so append
+                            w <- createNode "div"
+                            appendChild (elementToNode w) div
+                            renderIntoDOM AfterLastChild (elementToNode w) renderable
+                            pure w
 
-            moveToNextChild
-            pure ctx
+            dim <-
+                liftEff do
+                    -- If it's already in the document, getDimensions should work
+                    inDoc <-
+                        getDimensions wrapper
+
+                    -- Otherwise, we'll have to measure it
+                    if isNaN inDoc.width
+                        then measure (elementToNode wrapper)
+                        else pure inDoc
+
+            -- Have to delay this until after getting the dimensions ...
+            liftEff $
+                setStyle "position" "absolute" wrapper
+
+            trans <-
+                makeTransform dim f
+
+            liftEff $
+                addTransform trans wrapper
 
             -- groupAlpha <- getGroupAlpha
-
-            -- setStyle "position" "absolute" newNode
 
             -- The original Javascript code also takes into account the opacity of the
             -- `Element`. Of course, I don't know that it is an `Element`, since I've
@@ -1063,7 +1096,9 @@ renderForm f@(Form innerForm) = do
             -- Actually, using a wrapper probably makes the most sense ... TODO.
             -- setStyle "opacity" (show (groupAlpha * form.alpha)) newNode
 
-            -- addTransform newNode (makeTransform w h form)
+            moveToNextChild
+            pure ctx
+
 			
         FGroup transform forms -> do
             -- First, we figure out what our transform should be. It combines the
@@ -1169,6 +1204,16 @@ nodeToCanvasElement :: Node -> Maybe CanvasElement
 nodeToCanvasElement node =
     case nodeName node of
         "CANVAS" ->
+            Just $ unsafeCoerce node
+
+        _ ->
+            Nothing
+
+
+nodeToDiv :: Node -> Maybe DOM.Element
+nodeToDiv node =
+    case nodeName node of
+        "DIV" ->
             Just $ unsafeCoerce node
 
         _ ->
