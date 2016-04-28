@@ -449,6 +449,7 @@ example10 =
                     |> rotate (degrees 45)
                     |> moveX -40.0
                     |> moveY -40.0
+                    |> scale 1.5
                   )
                 : Nil
                 )
@@ -461,6 +462,7 @@ example10 =
                     |> rotate (degrees 45.0)
                     |> moveX (-40.0)
                     |> moveY (-40.0)
+                    |> scale 1.5
                   )
                 : Nil
                 )
