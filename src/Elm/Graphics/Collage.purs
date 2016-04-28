@@ -1087,14 +1087,16 @@ renderForm f@(Form innerForm) = do
             liftEff $
                 addTransform trans wrapper
 
-            -- groupAlpha <- getGroupAlpha
+            groupAlpha <-
+                getGroupAlpha
 
             -- The original Javascript code also takes into account the opacity of the
             -- `Element`. Of course, I don't know that it is an `Element`, since I've
             -- generalized it to `Renderable`. But, I guess I could read back the
             -- current opacity from the style? Or, set these properties on a wrapper?
             -- Actually, using a wrapper probably makes the most sense ... TODO.
-            -- setStyle "opacity" (show (groupAlpha * form.alpha)) newNode
+            liftEff $
+                setStyle "opacity" (show (groupAlpha * innerForm.alpha)) wrapper
 
             moveToNextChild
             pure ctx

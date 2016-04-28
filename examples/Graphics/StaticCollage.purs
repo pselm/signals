@@ -463,6 +463,7 @@ example10 =
                     |> moveX (-40.0)
                     |> moveY (-40.0)
                     |> scale 1.5
+                    |> alpha 0.5
                   )
                 : Nil
                 )
@@ -946,7 +947,6 @@ example29 =
 -- Still to test
 --
 -- sprite
--- toForm
 -- group
 -- groupTransform
 -- Turning collage into an `Element`
