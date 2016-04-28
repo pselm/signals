@@ -41,10 +41,9 @@ import Global (isNaN)
 
 import DOM (DOM)
 import DOM.Renderable (class Renderable, DynamicRenderable, Position(..), toDynamic, renderIntoDOM)
-import DOM.Node.Node (childNodes, nodeName, removeChild, appendChild, insertBefore)
-import DOM.Node.NodeList (item)
+import DOM.Node.Node (nodeName, removeChild, appendChild, insertBefore, firstChild, nextSibling)
 import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (Node, NodeList, elementToNode)
+import DOM.Node.Types (Node, elementToNode)
 import DOM.Node.Element (setAttribute)
 import DOM.HTML.Types (Window)
 import DOM.HTML (window)
@@ -58,6 +57,7 @@ import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (reader)
 import Control.Comonad (extract)
 import Control.Monad (when)
+import Control.Bind ((=<<))
 
 import Graphics.Canvas (Context2D, Canvas, CanvasElement, PatternRepeat(Repeat))
 
@@ -535,11 +535,11 @@ render model@(Collage {w, h}) = do
 -- the same structure. So, ultimately I'll need to test it against example code
 -- to see that it produces the same results.
 update :: ∀ e. Boolean -> Node -> Collage -> Eff (dom :: DOM, canvas :: Canvas | e) Node
-update redoWhenImageLoads div c@(Collage {forms}) = do
-    evalUpdate redoWhenImageLoads div c $
+update redoWhenImageLoads parent c@(Collage {forms}) = do
+    evalUpdate redoWhenImageLoads parent c $
         traverse renderForm forms
 
-    pure div
+    pure parent
 
 
 -- There are a bunch of inter-related functions used in the `update` process that all want
@@ -547,9 +547,8 @@ update redoWhenImageLoads div c@(Collage {forms}) = do
 -- reason, it seemed to solve some problems to make them a newtype instead of a type ...
 -- I didn't make a note of exactly what the problems were.
 newtype UpdateState = UpdateState
-    -- An index into the `kids` NodeList. We use it to keep track of what we're currently
-    -- "pointed" at (in the case where we've rendered to this div before).
-    { index :: Int
+    -- The child we should currently use, or Nothing if we're at the end
+    { currentChild :: Maybe Node
 
     -- Remember a context that we should be drawing into right now. If `Nothing`, it means
     -- that we'll need to construct a new context next time we need one. (At which point,
@@ -582,11 +581,7 @@ newtype UpdateEnv = UpdateEnv
     , collage :: Collage
 
     -- The node we're rending into
-    , div :: Node
-
-    -- The children of the `div`. Note that a NodeList is "live", so it's always the current
-    -- children of the `div`, even if we add or remove children.
-    , kids :: NodeList
+    , parent :: Node
 
     -- The devicePixelRatio
     , devicePixelRatio :: Float
@@ -598,28 +593,27 @@ type UpdateEffects e a = Update (Eff (canvas :: Canvas, dom :: DOM | e)) a
 
 
 evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> Eff (canvas :: Canvas, dom :: DOM | e) a
-evalUpdate redoWhenImageLoads div c cb = do
+evalUpdate redoWhenImageLoads parent c cb = do
     ratio <-
         liftEff $
             window >>= devicePixelRatio
 
-    kids <-
+    current <-
         liftEff $
-            childNodes div
+            toMaybe <$> firstChild parent
 
     let
         env =
             UpdateEnv
                 { redoWhenImageLoads
                 , collage: c
-                , div
-                , kids
+                , parent
                 , devicePixelRatio: ratio
                 }
 
         state =
             UpdateState
-                { index: 0
+                { currentChild: current
                 , context: Nothing
                 , groupSettings: Nil
                 }
@@ -905,7 +899,7 @@ redo = do
     when env.redoWhenImageLoads $
         liftEff $
             void $
-                update false env.div env.collage
+                update false env.parent env.collage
 
 
 drawInContext :: ∀ e a. Form -> UpdateEffects e a -> UpdateEffects e a
@@ -1038,8 +1032,8 @@ renderForm f@(Form innerForm) = do
             kid <-
                 currentChild
 
-            div <-
-                getDiv
+            parent <-
+                getParent
 
             wrapper <-
                 liftEff
@@ -1055,14 +1049,14 @@ renderForm f@(Form innerForm) = do
                                 Nothing -> do
                                     -- It wasn't a div, so insert ...
                                     w <- createNode "div"
-                                    insertBefore (elementToNode w) k div
+                                    insertBefore (elementToNode w) k parent
                                     renderIntoDOM AfterLastChild (elementToNode w) renderable
                                     pure w
 
                         Nothing -> do
                             -- There were no more children, so append
                             w <- createNode "div"
-                            appendChild (elementToNode w) div
+                            appendChild (elementToNode w) parent
                             renderIntoDOM AfterLastChild (elementToNode w) renderable
                             pure w
 
@@ -1223,29 +1217,36 @@ nodeToDiv node =
 
 
 currentChild :: ∀ e. UpdateEffects e (Maybe Node)
-currentChild = do
-    index <-
-        gets \(UpdateState s) -> s.index
-
-    kids <-
-        reader \(UpdateEnv e) -> e.kids
-
-    liftEff $
-        toMaybe <$>
-            item index kids
+currentChild =
+    gets \(UpdateState s) ->
+        s.currentChild
 
 
 moveToNextChild :: ∀ e. UpdateEffects e Unit
-moveToNextChild =
+moveToNextChild = do
+    current <-
+        currentChild
+
+    setNextChild =<<
+        case current of
+            Just node ->
+                liftEff $ toMaybe <$> nextSibling node
+
+            Nothing ->
+                pure Nothing
+
+
+setNextChild :: ∀ e. Maybe Node -> UpdateEffects e Unit
+setNextChild node = do
     modify \(UpdateState s) ->
         UpdateState $
-            s { index = s.index + 1 }
+            s { currentChild = node }
 
 
-getDiv :: ∀ e. UpdateEffects e Node
-getDiv =
+getParent :: ∀ e. UpdateEffects e Node
+getParent =
     reader \(UpdateEnv env) ->
-        env.div
+        env.parent
 
 
 getContext :: ∀ e. UpdateEffects e Context2D
@@ -1253,8 +1254,8 @@ getContext = do
     state <-
         gets \(UpdateState s) -> s
 
-    div <-
-        getDiv
+    parent <-
+        getParent
 
     case state.context of
         Just c ->
@@ -1282,24 +1283,25 @@ getContext = do
                             useContext ctx
 
                         Nothing -> do
-                            -- Not a canvas, so remove it. And, we don't iterate the index,
-                            -- since we've removed it, so it will already point to the next thing.
+                            -- Move to the next child before we remove our reference point ...
+                            moveToNextChild
+
+                            -- Not a canvas, so remove it.
                             liftEff $
-                                removeChild node div
+                                removeChild node parent
 
                             -- And we recurse. Should figure out how to use purescript-tailrec
                             getContext
 
                 Nothing -> do
-                    -- We've run out of children. So, we make a new one, and increment
-                    -- the index to point *past* it.
+                    -- We've run out of children. So, we make a new one.
+                    -- We don't need to move the index, because we'll still need to make
+                    -- a new one the next time.
                     canvas <- makeCanvas
 
                     ctx <- liftEff do
-                        appendChild (elementToNode (canvasElementToElement canvas)) div
+                        appendChild (elementToNode (canvasElementToElement canvas)) parent
                         Canvas.getContext2D canvas
-
-                    moveToNextChild
 
                     useContext ctx
 
@@ -1360,12 +1362,15 @@ clearRest = do
 
     case child of
         Just c -> do
-            div <-
+            parent <-
                 reader \(UpdateEnv env) ->
-                    env.div
+                    env.parent
+
+            -- Advance the index before we lose our reference point
+            moveToNextChild
 
             liftEff $
-                removeChild c div
+                removeChild c parent
 
             -- And recurse ... should investigate purescript-tailrec
             clearRest
