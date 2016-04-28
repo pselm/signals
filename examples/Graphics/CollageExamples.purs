@@ -12,8 +12,10 @@ import Elm.Basics ((|>), degrees)
 import Elm.Text (Line(..), typeface, join, line, fromString, height, color, bold, italic, monospace) as Text
 
 import Control.Monad (when)
+import Test.QuickCheck.Arbitrary (class Arbitrary)
+import Test.QuickCheck.Gen (elements)
 import Math (sin, cos)
-import Data.List (List(..), (..), (:))
+import Data.List (List(..), (..), (:), fromList)
 import Data.Tuple (Tuple(..))
 import Data.Int (toNumber)
 
@@ -112,6 +114,16 @@ instance renderableExample :: Renderable Example where
     --
     -- ... but the compiler complains.
     update rendered = render
+
+
+instance arbitraryExample :: Arbitrary Example where
+    arbitrary =
+        case examples of
+            Cons head tail ->
+                elements head (fromList tail)
+
+            Nil ->
+                pure example1
 
 
 examples :: List Example

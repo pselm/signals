@@ -50,6 +50,10 @@ var bundles = [{
     purs: "examples/Graphics/StaticCollage.purs",
     html: "examples/Graphics/StaticCollage.html"
 },{
+    module: "Examples.Graphics.UpdateCollage",
+    purs: "examples/Graphics/UpdateCollage.purs",
+    html: "examples/Graphics/UpdateCollage.html"
+},{
     module: "Examples.Keyboard.Console",
     purs: "examples/Keyboard/Console.purs",
     html: "examples/Keyboard/Console.html"
