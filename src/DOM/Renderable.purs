@@ -67,18 +67,19 @@ module DOM.Renderable
     ( class Renderable, render, update, defaultUpdate
     , Rendered, Position(..), renderIntoDOM, updateDOM
     , DynamicRenderable, toDynamic, makeDynamic
+    , renderOrUpdate
     ) where
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff, untilE)
 import DOM (DOM)
-import DOM.Node.Types (Node)
+import DOM.Node.Types (Element, Node, elementToNode)
 import DOM.Node.Node (parentNode, firstChild, appendChild, replaceChild, removeChild, insertBefore)
-import Data.Nullable (toMaybe)
+import Data.Nullable (Nullable, toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.Exists (Exists, runExists, mkExists)
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude (Unit, bind, pure, not, void, ($), (#))
+import Prelude (Unit, bind, pure, not, void, ($), (#), (<$>))
 import Graphics.Canvas (Canvas)
 
 -- | A `Renderable` is somethng that knows how to render some data type as a DOM
@@ -288,4 +289,40 @@ updateDOM rendered value = do
         replaceNode rendered.result result
 
     pure { value, result }
+
+
+foreign import setRenderable :: ∀ e. Element -> DynamicRenderable -> Eff (dom :: DOM | e) Unit
+
+foreign import getRenderable :: ∀ e. Element -> Eff (dom :: DOM | e) (Nullable DynamicRenderable)
+
+
+-- | Renders the provided `Renderable` and inserts the result as a child of the
+-- | provided `Element`, replacing all other chidlren.
+-- |
+-- } This stores the provided `Renderable` on the `Element`. So, when you call this again
+-- | with the same `Element`, we can use the renderable's `update` method if it is the same type
+-- | of renderable.
+renderOrUpdate :: ∀ e a. (Renderable a) => Element -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Unit
+renderOrUpdate element renderable = do
+    let
+        new =
+            toDynamic renderable
+
+    old <-
+        toMaybe <$> getRenderable element
+
+    node <-
+        toMaybe <$> firstChild (elementToNode element)
+
+    case {old, node} of
+        {old: Just value, node: Just result} ->
+            -- We've got both an old value and a child, so try an update
+            updateDOM {value, result} new
+
+        _ ->
+            -- Otherwise, we need a render
+            renderIntoDOM ReplacingChildren (elementToNode element) new
+
+    -- In either case, remember the dynamicRenderable
+    setRenderable element new
 

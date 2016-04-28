@@ -178,4 +178,16 @@ updateDOM :: forall e a. Renderable a => Rendered a -> a -> Eff (canvas :: Canva
 
 Updates previously rendered data, replacing the originally rendered node in the DOM.
 
+#### `renderOrUpdate`
+
+``` purescript
+renderOrUpdate :: forall e a. Renderable a => Element -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Unit
+```
+
+Renders the provided `Renderable` and inserts the result as a child of the
+provided `Element`, replacing all other chidlren.
+
+with the same `Element`, we can use the renderable's `update` method if it is the same type
+of renderable.
+
 
