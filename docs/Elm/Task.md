@@ -129,12 +129,11 @@ Equivalent to Purescript's `withExceptT`.
 toMaybe :: forall x y a. Task x a -> Task y (Maybe a)
 ```
 
-Helps with handling failure. Instead of having a task fail with some value
-of type `x` it promotes the failure to a `Nothing` and turns all successes into
-`Just` something.
+Translate a task that can fail into a task that can never fail, by
+converting any failure into `Nothing` and any success into `Just` something.
 
-    toMaybe (fail "file not found") == succeed Nothing
-    toMaybe (succeed 42)            == succeed (Just 42)
+    toMaybe (fail "file not found") -- succeed Nothing
+    toMaybe (succeed 42)            -- succeed (Just 42)
 
 This means you can handle the error with the `Maybe` module instead.
 
@@ -147,8 +146,8 @@ fromMaybe :: forall x a. x -> Maybe a -> Task x a
 If you are chaining together a bunch of tasks, it may be useful to treat
 a maybe value like a task.
 
-    fromMaybe "file not found" Nothing   == fail "file not found"
-    fromMaybe "file not found" (Just 42) == succeed 42
+    fromMaybe "file not found" Nothing   -- fail "file not found"
+    fromMaybe "file not found" (Just 42) -- succeed 42
 
 #### `toResult`
 
@@ -156,12 +155,11 @@ a maybe value like a task.
 toResult :: forall x y a. Task x a -> Task y (Result x a)
 ```
 
-Helps with handling failure. Instead of having a task fail with some value
-of type `x` it promotes the failure to an `Err` and turns all successes into
-`Ok` something.
+Translate a task that can fail into a task that can never fail, by
+converting any failure into `Err` something and any success into `Ok` something.
 
-    toResult (fail "file not found") == succeed (Err "file not found")
-    toResult (succeed 42)            == succeed (Ok 42)
+    toResult (fail "file not found") -- succeed (Err "file not found")
+    toResult (succeed 42)            -- succeed (Ok 42)
 
 This means you can handle the error with the `Result` module instead.
 
@@ -174,8 +172,8 @@ fromResult :: forall x a. Result x a -> Task x a
 If you are chaining together a bunch of tasks, it may be useful to treat
 a result like a task.
 
-    fromResult (Err "file not found") == fail "file not found"
-    fromResult (Ok 42)                == succeed 42
+    fromResult (Err "file not found") -- fail "file not found"
+    fromResult (Ok 42)                -- succeed 42
 
 #### `ThreadID`
 
