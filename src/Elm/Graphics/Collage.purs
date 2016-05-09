@@ -34,6 +34,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Foldable (for_)
 import Data.Traversable (traverse)
 import Data.Nullable (toMaybe)
+import Data.Tuple (Tuple(..), fst, snd)
+import Data.Bifunctor (bimap)
 
 import Unsafe.Coerce (unsafeCoerce)
 import Math (pi, cos, sin, sqrt, (%))
@@ -71,7 +73,7 @@ import Graphics.Canvas
 import Prelude
     ( class Eq, eq, not, (<<<), Unit, unit, (||)
     , bind, (>>=), pure, void
-    , (*), (/), ($), map, (<$>), (+), (-), (<>)
+    , (*), (/), ($), (#), map, (<$>), (+), (-), (<>)
     , show, (<), negate, (/=), (==)
     )
 
@@ -197,10 +199,7 @@ dotted clr =
         }
 
 
-type Point =
-    { x :: Float
-    , y :: Float
-    }
+type Point = Tuple Float Float
 
 
 data BasicForm
@@ -296,8 +295,8 @@ groupTransform matrix fs =
 
 -- | Move a form by the given amount (x, y). This is a relative translation so
 -- | `(move (5,10) form)` would move `form` five pixels to the right and ten pixels up.
-move :: Point -> Form -> Form
-move {x, y} (Form f) =
+move :: Tuple Float Float -> Form -> Form
+move (Tuple x y) (Form f) =
     Form $ f
         { x = f.x + x
         , y = f.y + y
@@ -389,29 +388,29 @@ toElement c@(Collage props) =
 
 
 -- | A 2D path. Paths are a sequence of points. They do not have a color.
-newtype Path = Path (List Point)
+newtype Path = Path (List (Tuple Float Float))
 
 
 -- | Create a path that follows a sequence of points.
-path :: List Point -> Path
-path ps = Path ps
+path :: List (Tuple Float Float) -> Path
+path = Path
 
 
 -- | Create a path along a given line segment.
-segment :: Point -> Point -> Path
+segment :: Tuple Float Float -> Tuple Float Float -> Path
 segment p1 p2 =
     Path (p1 : p2 : Nil)
 
 
 -- | A 2D shape. Shapes are closed polygons. They do not have a color or
 -- | texture, that information can be filled in later.
-newtype Shape = Shape (List Point)
+newtype Shape = Shape (List (Tuple Float Float))
 
 
 -- | Create an arbitrary polygon by specifying its corners in order.
 -- | `polygon` will automatically close all shapes, so the given list
 -- | of points does not need to start and end with the same position.
-polygon :: List Point -> Shape
+polygon :: List (Tuple Float Float) -> Shape
 polygon = Shape
 
 
@@ -424,10 +423,10 @@ rect w h =
 
     in
         Shape
-            ( { x: 0.0 - hw, y: 0.0 - hh }
-            : { x: 0.0 - hw, y: hh }
-            : { x: hw, y: hh }
-            : { x: hw, y: 0.0 - hh }
+            ( Tuple (-hw) (-hh)
+            : Tuple (-hw) hh
+            : Tuple hw hh
+            : Tuple hw (-hh)
             : Nil
             )
 
@@ -451,9 +450,9 @@ oval w h =
                 ti = t * toNumber i
 
             in
-                { x: hw * cos ti
-                , y: hh * sin ti
-                }
+                Tuple
+                    (hw * cos ti)
+                    (hh * sin ti)
 
     in
         Shape $
@@ -475,9 +474,9 @@ ngon n r =
     let
         t = 2.0 * pi / (toNumber n)
         f i =
-            { x: r * cos (t * (toNumber i))
-            , y: r * sin (t * (toNumber i))
-            }
+            Tuple
+                (r * cos (t * (toNumber i)))
+                (r * sin (t * (toNumber i)))
 
     in
         Shape $
@@ -659,14 +658,14 @@ trace closed list = do
 
     liftEff
         case list of
-            Cons first rest -> do
-                Canvas.moveTo ctx first.x first.y
+            Cons (Tuple firstX firstY) rest -> do
+                Canvas.moveTo ctx firstX firstY
 
-                for_ rest \point ->
-                    Canvas.lineTo ctx point.x point.y
+                for_ rest \(Tuple nextX nextY) ->
+                    Canvas.lineTo ctx nextX nextY
 
                 if closed
-                    then Canvas.lineTo ctx first.x first.y
+                    then Canvas.lineTo ctx firstX firstY
                     else pure ctx
 
             _ ->
@@ -681,7 +680,7 @@ line style closed pointList = do
         -- Note that elm draws from the last point to the first, whereas we're
         -- drawing from the first to the last. If this turns out to matter, we
         -- can always start by reversing the list.
-        Cons firstPoint remainingPoints -> do
+        Cons firstPoint@(Tuple firstX firstY) remainingPoints -> do
 
             -- We have some points. So, check the dashing.
             case style.dashing of
@@ -721,7 +720,7 @@ line style closed pointList = do
                         position <- newSTRef firstPoint
 
                         -- First, move to our first point
-                        Canvas.moveTo ctx firstPoint.x firstPoint.y
+                        Canvas.moveTo ctx firstX firstY
 
                         let
                             -- If we're closed, we add the first point to those remaining
@@ -731,15 +730,15 @@ line style closed pointList = do
                                     else remainingPoints
 
                         -- Now, we iterate over the points
-                        for_ points \destination ->
+                        for_ points \(Tuple nextX nextY) ->
                             untilE do
                                 currentPosition <- readSTRef position
                                 currentlyDrawing <- readSTRef drawing
                                 currentSegment <- readSTRef leftInPattern
 
                                 let
-                                    dx = destination.x - currentPosition.x
-                                    dy = destination.y - currentPosition.y
+                                    dx = nextX - (fst currentPosition)
+                                    dy = nextY - (snd currentPosition)
                                     distance = sqrt ((dx * dx) + (dy * dy))
                                     operation = if currentlyDrawing then Canvas.lineTo else Canvas.moveTo
 
@@ -748,14 +747,14 @@ line style closed pointList = do
                                         -- Aha, we'll complete this point with the current
                                         -- segment. So, first we draw or move, to our
                                         -- destination.
-                                        operation ctx destination.x destination.y
+                                        operation ctx nextX nextY
 
                                         -- Now, we'll remain with our current segment ... but
                                         -- we've used some of it, so we decrement
                                         writeSTRef leftInPattern (currentSegment - distance)
 
                                         -- And record our new position
-                                        writeSTRef position destination
+                                        writeSTRef position (Tuple nextX nextY)
 
                                         -- And, we tell the untilE that we're done with this point,
                                         -- so move to the next destination
@@ -767,12 +766,13 @@ line style closed pointList = do
                                         -- end up with for this segment.
                                         let
                                             nextPosition =
-                                                { x: currentPosition.x + (dx * currentSegment / distance)
-                                                , y: currentPosition.y + (dy * currentSegment / distance)
-                                                }
+                                                currentPosition #
+                                                    bimap
+                                                        (\x -> x + (dx * currentSegment / distance))
+                                                        (\y -> y + (dy * currentSegment / distance))
 
                                         -- So, actually do the operation
-                                        operation ctx nextPosition.x nextPosition.y
+                                        operation ctx (fst nextPosition) (snd nextPosition)
 
                                         -- And record our new position
                                         writeSTRef position nextPosition

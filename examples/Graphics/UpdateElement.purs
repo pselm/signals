@@ -3,8 +3,12 @@ module Examples.Graphics.UpdateElement where
 
 import Elm.Graphics.Element
 import Elm.Text (fromString)
+
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
+import Control.Comonad (extract)
+import Graphics.Canvas (Canvas)
+
 import DOM (DOM)
 import DOM.Renderable (Position(..), renderIntoDOM, updateDOM)
 import DOM.HTML (window)
@@ -15,7 +19,7 @@ import DOM.Node.ParentNode (firstElementChild) as ParentNode
 import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
 import DOM.Event.EventTarget (eventListener, addEventListener)
 import DOM.Event.EventTypes (keydown)
-import Prelude (bind, Unit, unit, (>>=), ($), (>>>), pure)
+
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
@@ -23,8 +27,9 @@ import Data.Either (Either(..))
 import Data.Foreign (toForeign)
 import Data.Foreign.Class (readProp)
 import Data.List.Zipper (Zipper(..), up, down, beginning) as Zipper
-import Control.Comonad (extract)
-import Graphics.Canvas (Canvas)
+import Data.Tuple (Tuple(..))
+
+import Prelude (bind, Unit, unit, (>>=), ($), (>>>), pure)
 
 
 main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM, ref :: REF | e) Unit
@@ -313,7 +318,7 @@ scene26 :: Element
 scene26 =
     flow down
         ( title "Change to a cropped image"
-        : croppedImage {top: 100, left: 50} 75 50 "library.png"
+        : croppedImage (Tuple 100 50) 75 50 "library.png"
         : Nil
         )
 
@@ -322,7 +327,7 @@ scene27 :: Element
 scene27 =
     flow down
         ( title "Change the cropping"
-        : croppedImage {top: 50, left: 100} 75 50 "library.png"
+        : croppedImage (Tuple 50 100) 75 50 "library.png"
         : Nil
         )
 

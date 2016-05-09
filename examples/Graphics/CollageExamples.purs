@@ -269,8 +269,8 @@ example7 =
     where
         grad =
             linear
-                {x: 0.0, y: 60.0}
-                {x: 0.0, y: -60.0}
+                (Tuple 0.0 60.0)
+                (Tuple 0.0 (-60.0))
                 ( Tuple 0.0 (rgb 0 171 235)
                 : Tuple 0.79 white
                 : Tuple 0.8 (rgb 38 192 0)
@@ -288,10 +288,10 @@ example8 =
         , reference: "StaticCollage/example8.png"
         , collage:
             makeCollage 300 300
-                ( move {x: -55.0, y: -55.0} (gradient grad1 (circle 100.0))
-                : move {x:  40.0, y:  85.0} (gradient grad2 (circle 100.0))
-                : move {x:  50.0, y: -10.0} (gradient grad3 (circle 100.0))
-                : move {x: -10.0, y:  50.0} (gradient grad4 (circle 100.0))
+                ( move (Tuple (-55.0) (-55.0)) (gradient grad1 (circle 100.0))
+                : move (Tuple   40.0    85.0)  (gradient grad2 (circle 100.0))
+                : move (Tuple   50.0  (-10.0)) (gradient grad3 (circle 100.0))
+                : move (Tuple (-10.0)   50.0)  (gradient grad4 (circle 100.0))
                 : Nil
                 )
         }
@@ -299,8 +299,8 @@ example8 =
     where
         grad1 =
             radial
-                {x: 0.0, y:  0.0} 50.0
-                {x: 0.0, y: 10.0} 90.0
+                (Tuple 0.0  0.0) 50.0
+                (Tuple 0.0 10.0) 90.0
                 ( Tuple 0.0 (rgb  244 242 1)
                 : Tuple 0.8 (rgb  228 199 0)
                 : Tuple 1.0 (rgba 228 199 0 0.0)
@@ -309,8 +309,8 @@ example8 =
 
         grad2 =
             radial
-                {x: 0.0, y:  0.0} 15.0
-                {x: 7.0, y: -5.0} 40.0
+                (Tuple 0.0  0.0)   15.0
+                (Tuple 7.0 (-5.0)) 40.0
                 ( Tuple 0.0 (rgb  0 201 255)
                 : Tuple 0.8 (rgb  0 181 226)
                 : Tuple 1.0 (rgba 0 181 226 0.0)
@@ -319,8 +319,8 @@ example8 =
 
         grad3 =
             radial
-                {x: 0.0, y:   0.0} 20.0
-                {x: 7.0, y: -15.0} 50.0
+                (Tuple 0.0    0.0)  20.0
+                (Tuple 7.0 (-15.0)) 50.0
                 ( Tuple  0.0 (rgb  255 95 152)
                 : Tuple 0.75 (rgb  255 1 136)
                 : Tuple  1.0 (rgba 255 1 136 0.0)
@@ -329,8 +329,8 @@ example8 =
 
         grad4 =
             radial
-                {x: 0.0, y:  0.0} 10.0
-                {x: 7.0, y: -5.0} 30.0
+                (Tuple 0.0   0.0)  10.0
+                (Tuple 7.0 (-5.0)) 30.0
                 ( Tuple 0.0 (rgb  167 211 12)
                 : Tuple 0.9 (rgb  1 159 98)
                 : Tuple 1.0 (rgba 1 159 98 0.0)
@@ -341,9 +341,9 @@ example8 =
 hook :: Path
 hook =
     path
-        ( {x: (-100.0), y: 20.0}
-        : {x: (-70.0), y: 0.0}
-        : {x: (-100.0), y: (-20.0)}
+        ( Tuple (-100.0)   20.0
+        : Tuple ( -70.0)    0.0
+        : Tuple (-100.0) (-20.0)
         : Nil
         )
 
@@ -495,8 +495,8 @@ example18 =
         , reference: "StaticCollage/example18.png"
         , collage:
             makeCollage 200 420
-                ( move {x: 0.0, y: -55.0} blueSquare
-                : move {x: 0.0, y:  55.0} redSquare
+                ( move (Tuple 0.0 (-55.0)) blueSquare
+                : move (Tuple 0.0  (55.0)) redSquare
                 : Nil
                 )
         }
@@ -510,11 +510,11 @@ example18 =
 
         square =
             path
-                ( {x:  50.0, y:  50.0}
-                : {x:  50.0, y: -50.0}
-                : {x: -50.0, y: -50.0}
-                : {x: -50.0, y:  50.0}
-                : {x:  50.0, y:  50.0}
+                ( (Tuple   50.0    50.0)
+                : (Tuple   50.0  (-50.0))
+                : (Tuple (-50.0) (-50.0))
+                : (Tuple (-50.0)   50.0)
+                : (Tuple   50.0    50.0)
                 : Nil
                 )
 
@@ -528,11 +528,11 @@ example19 =
             makeCollage 300 300
                 ( ( ngon 4 75.0
                     # filled clearGrey
-                    # move {x: -10.0, y: 0.0}
+                    # move (Tuple (-10.0) 0.0)
                   )
                 : ( ngon 5 50.0
                     # filled clearGrey
-                    # move {x: 50.0, y: 10.0}
+                    # move (Tuple 50.0 10.0)
                   )
                 : Nil
                 )
@@ -555,7 +555,7 @@ example20 =
                     |> scale 2.0
                   )
                 : ( hexagon green
-                    |> move {x: 100.0, y: 0.0}
+                    |> move (Tuple 100.0 0.0)
                   )
                 : ( hexagon blue
                     |> rotate (degrees 30.0)
@@ -586,10 +586,7 @@ example21 =
             in
                 circle 10.0
                 |> filled (hsl angle 0.7 0.5)
-                |> move
-                    { x: 45.0 * cos angle
-                    , y: 45.0 * sin angle
-                    }
+                |> move (Tuple (45.0 * cos angle) (45.0 * sin angle))
 
 
 example22 :: Example
@@ -644,11 +641,11 @@ example23 =
             makeCollage 100 100
                 ( outlined defaultLine
                     ( polygon
-                        ( {x:  50.0, y:  50.0}
-                        : {x:  50.0, y: -50.0}
-                        : {x: -50.0, y: -50.0}
-                        : {x: -50.0, y:  50.0}
-                        : {x:  50.0, y:  50.0}
+                        ( (Tuple   50.0    50.0)
+                        : (Tuple   50.0  (-50.0))
+                        : (Tuple (-50.0) (-50.0))
+                        : (Tuple (-50.0)   50.0)
+                        : (Tuple   50.0    50.0)
                         : Nil
                         )
                     )
@@ -660,11 +657,11 @@ example23 =
             makeCollage 100 100
                 ( outlined defaultLine
                     ( polygon
-                        ( {x:  50.0, y:  50.0}
-                        : {x:  50.0, y: -50.0}
-                        : {x: -50.0, y: -50.0}
-                        : {x: -50.0, y:  50.0}
-                        : {x:  50.0, y:  50.0}
+                        ( (Tuple   50.0    50.0)
+                        : (Tuple   50.0  (-50.0))
+                        : (Tuple (-50.0) (-50.0))
+                        : (Tuple (-50.0)   50.0)
+                        : (Tuple   50.0    50.0)
                         : Nil
                         )
                     )
@@ -680,10 +677,10 @@ example24 =
             makeCollage 100 100
                 ( outlined defaultLine
                     ( polygon
-                        ( {x:  50.0, y:  50.0}
-                        : {x:  50.0, y: -50.0}
-                        : {x: -50.0, y: -50.0}
-                        : {x: -50.0, y:  50.0}
+                        ( (Tuple   50.0    50.0)
+                        : (Tuple   50.0  (-50.0))
+                        : (Tuple (-50.0) (-50.0))
+                        : (Tuple (-50.0)   50.0)
                         : Nil
                         )
                     )
@@ -695,10 +692,10 @@ example24 =
             makeCollage 100 100
                 ( outlined defaultLine
                     ( polygon
-                        ( {x:  50.0, y:  50.0}
-                        : {x:  50.0, y: -50.0}
-                        : {x: -50.0, y: -50.0}
-                        : {x: -50.0, y:  50.0}
+                        ( (Tuple   50.0    50.0)
+                        : (Tuple   50.0  (-50.0))
+                        : (Tuple (-50.0) (-50.0))
+                        : (Tuple (-50.0)   50.0)
                         : Nil
                         )
                     )
@@ -751,14 +748,14 @@ example27 =
         { caption:
             """
             makeCollage 100 100
-                ( traced (solid red) (segment {x: 10.0, y: 5.0} {y: 10.0, x: 5.0})
+                ( traced (solid red) (segment (Tuple 10.0 40.0) (Tuple 5.0 40.0))
                 : Nil
                 )
             """
         , reference: "StaticCollage/example27.png"
         , collage:
             makeCollage 100 100
-                ( traced (solid red) (segment {x: 10.0, y: 40.0} {y: 10.0, x: 40.0})
+                ( traced (solid red) (segment (Tuple 10.0 40.0) (Tuple 40.0 10.0))
                 : Nil
                 )
         }
@@ -772,11 +769,11 @@ example28 =
             makeCollage 300 300
                 ( alpha 0.6 ( ngon 4 75.0
                     # filled clearGrey
-                    # move {x: -10.0, y: 0.0}
+                    # move (Tuple (-10.0) 0.0)
                   )
                 : alpha 0.6 ( ngon 5 50.0
                     # filled clearGrey
-                    # move {x: 50.0, y: 10.0}
+                    # move (Tuple 50.0 10.0)
                   )
                 : Nil
                 )
@@ -786,11 +783,11 @@ example28 =
             makeCollage 300 300
                 ( alpha 0.6 ( ngon 4 75.0
                     # filled clearGrey
-                    # move {x: -10.0, y: 0.0}
+                    # move (Tuple (-10.0) 0.0)
                   )
                 : alpha 0.6 ( ngon 5 50.0
                     # filled clearGrey
-                    # move {x: 50.0, y: 10.0}
+                    # move (Tuple 50.0 10.0)
                   )
                 : Nil
                 )

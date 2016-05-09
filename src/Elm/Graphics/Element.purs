@@ -37,6 +37,7 @@ import Data.Traversable (for)
 import Data.Nullable (Nullable, toMaybe)
 import Data.String (joinWith)
 import Data.Array (catMaybes)
+import Data.Tuple (Tuple(..))
 
 import DOM (DOM)
 import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
@@ -335,10 +336,10 @@ fittedImage w h src =
 -- | at the given top left coordinate. If you have a 140-by-140 image,
 -- | the following will cut a 100-by-100 square out of the middle of it.
 -- |
--- |     croppedImage {top: 20, left: 20} 100 100 "yogi.jpg"
-croppedImage :: {top :: Int, left :: Int} -> Int -> Int -> String -> Element
-croppedImage pos w h src =
-    newElement w h (Image (Cropped pos) w h src)
+-- |     croppedImage (Tuple 20 20) 100 100 "yogi.jpg"
+croppedImage :: Tuple Int Int -> Int -> Int -> String -> Element
+croppedImage (Tuple t l) w h src =
+    newElement w h (Image (Cropped {top: t, left: l}) w h src)
 
 
 -- | Create a tiled image. Repeat the image to fill the given width and height.

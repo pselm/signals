@@ -4,7 +4,7 @@
 -- | the whole window.
 
 module Elm.Window
-    ( Dimensions, dimensions, width, height
+    ( dimensions, width, height
     -- The rest are subject to change
     , WindowCallback, WindowState
     , setupWindow, setupGlobalWindow
@@ -17,6 +17,7 @@ import Prelude (pure, ($), bind, unit, const, (<<<), (>>=), (==), (&&))
 import Data.Date (Now)
 import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Partial.Unsafe (unsafeCrashWith)
 
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
@@ -50,13 +51,6 @@ import DOM.Event.EventTarget (eventListener, addEventListener)
 
 -- | The Window API uses some hidden state, managed by this type.
 type WindowCallback m a = ReaderT WindowState (StateT Graph m) a
-
-
--- Window dimensions
-type Dimensions =
-    { width :: Int
-    , height :: Int
-    }
 
 
 {- In `Elm.Mouse`, we treated the "fullscreen" case as if one had embedded with
@@ -94,7 +88,7 @@ In any event, for now `node` is a `Maybe` ... eventually, I'll need to rejig
 this in concert with an actual `Elm.Runtime` module.
 -}
 type WindowState =
-    { dimensions :: Signal Dimensions
+    { dimensions :: Signal (Tuple Int Int)
     , node :: Maybe HTMLElement
     }
 
@@ -136,10 +130,7 @@ makeWindowState node = do
     initialWidth <- liftEff $ getWidth
     initialHeight <- liftEff $ getHeight
 
-    mbox <- mailbox
-        { width: initialWidth
-        , height: initialHeight
-        }
+    mbox <- mailbox (Tuple 0 0)
 
     let
         listener =
@@ -150,7 +141,7 @@ makeWindowState node = do
                     newHeight <- getHeight
                     old <- current mbox.signal
 
-                    if newWidth == old.width && newHeight == old.height
+                    if newWidth == (fst old) && newHeight == (snd old)
                         then pure unit
                         else
                             -- Even if it appears to have changed, check
@@ -159,13 +150,9 @@ makeWindowState node = do
                                 evenNewerWidth <- getWidth
                                 evenNewerHeight <- getHeight
 
-                                if evenNewerWidth == old.width && evenNewerHeight == old.height
+                                if evenNewerWidth == (fst old) && evenNewerHeight == (snd old)
                                     then pure unit
-                                    else
-                                        send mbox.address
-                                            { width: evenNewerWidth
-                                            , height: evenNewerHeight
-                                            }
+                                    else send mbox.address (Tuple evenNewerWidth evenNewerHeight)
 
 
     liftEff $
@@ -197,15 +184,15 @@ setupGlobalWindow cb = do
 
 -- | The current width and height of the window (i.e. the area viewable to the
 -- | user, not including scroll bars).
-dimensions :: ∀ e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal Dimensions)
+dimensions :: ∀ e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal (Tuple Int Int))
 dimensions = reader _.dimensions
 
 
 -- | The current width of the window.
 width :: ∀ e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal Int)
-width = dimensions >>= lift <<< map _.width
+width = dimensions >>= lift <<< map fst
 
 
 -- | The current height of the window.
 height :: ∀ e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal Int)
-height = dimensions >>= lift <<< map _.height
+height = dimensions >>= lift <<< map snd

@@ -32,7 +32,7 @@ import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Context2D, Canvas, CanvasGradient, createLinearGradient, createRadialGradient, addColorStop)
 import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
 import Prelude (class Eq, eq, (==), (&&), ($), (*), (/), bind, (>>=), pure)
-import Data.Tuple (Tuple, fst, snd)
+import Data.Tuple (Tuple(..))
 import Data.Foldable (for_)
 import Elm.Basics (Float, degrees)
 import Elm.List (List)
@@ -142,8 +142,11 @@ instance eqGradient :: Eq Gradient where
 -- | &ldquo;color stops&rdquo; that indicate how to interpolate between the start and
 -- | end points. See [this example](http://elm-lang.org/examples/linear-gradient) for a
 -- | more visual explanation.
-linear :: Point -> Point -> List (Tuple Float Color) -> Gradient
-linear = Linear
+linear :: Tuple Float Float -> Tuple Float Float -> List (Tuple Float Color) -> Gradient
+linear (Tuple startX startY) (Tuple endX endY) =
+    Linear
+        { x: startX, y: startY }
+        { x: endX,   y: endY   }
 
 
 -- | Create a radial gradient. First takes a start point and inner radius.  Then
@@ -151,8 +154,12 @@ linear = Linear
 -- | stops&rdquo; that indicate how to interpolate between the inner and outer
 -- | circles. See [this example](http://elm-lang.org/examples/radial-gradient) for a
 -- | more visual explanation.
-radial :: Point -> Float -> Point -> Float -> List (Tuple Float Color) -> Gradient
-radial = Radial
+radial :: Tuple Float Float -> Float -> Tuple Float Float -> Float -> List (Tuple Float Color) -> Gradient
+radial (Tuple startX startY) radius (Tuple endX endY) =
+    Radial
+        { x: startX, y: startY }
+        radius
+        { x: endX, y: endY }
 
 
 -- | Make a CanvasGradient from a Gradient.
@@ -185,8 +192,8 @@ toCanvasGradient grad ctx =
 
 addStops :: ∀ e. List (Tuple Float Color) -> CanvasGradient -> Eff (canvas :: Canvas | e) CanvasGradient
 addStops list grad = do
-    for_ list \tuple ->
-        addColorStop (fst tuple) (toCss $ snd tuple) grad
+    for_ list \(Tuple stop color) ->
+        addColorStop stop (toCss color) grad
 
     pure grad
 

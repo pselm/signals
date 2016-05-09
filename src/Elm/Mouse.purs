@@ -14,10 +14,11 @@ module Elm.Mouse
 import Elm.Basics (Bool)
 import Elm.Signal (Signal, DELAY, GraphState, Graph, send, mailbox, map)
 
-import Prelude (Unit, pure, ($), bind, unit, const, (<<<), (>>=))
+import Prelude (Unit, pure, ($), bind, unit, const, (<<<), (>>=), (<$>))
 import Data.Date (Now)
 import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Partial.Unsafe (unsafeCrashWith)
 
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
@@ -50,8 +51,12 @@ type MousePosition =
     }
 
 
+mousePositionToTuple :: MousePosition -> Tuple Int Int
+mousePositionToTuple pos = Tuple pos.x pos.y
+
+
 type MouseState =
-    { position :: Signal MousePosition
+    { position :: Signal (Tuple Int Int)
     , node :: EventTarget
     }
 
@@ -66,12 +71,12 @@ makeMouseState :: ∀ e m.
     EventTarget -> GraphState m MouseState
 
 makeMouseState node = do
-    mbox <- mailbox {x: 0, y: 0}
+    mbox <- mailbox (Tuple 0 0)
 
     let
         listener =
             eventListener $ \event ->
-                getOffsetXY event >>= send mbox.address
+                mousePositionToTuple <$> getOffsetXY event >>= send mbox.address
 
     liftEff $
         addEventListener mousemove listener false node
@@ -112,18 +117,18 @@ setupGlobalMouse cb = do
 
 
 -- | The current mouse position.
-position :: ∀ e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal MousePosition)
+position :: ∀ e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal (Tuple Int Int))
 position = reader _.position
 
 
 -- | The current x-coordinate of the mouse.
 x :: ∀ e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal Int)
-x = position >>= lift <<< map _.x
+x = position >>= lift <<< map fst
 
 
 -- | The current y-coordinate of the mouse.
 y :: ∀ e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal Int)
-y = position >>= lift <<< map _.y
+y = position >>= lift <<< map snd
 
 
 -- | The current state of the mouse.

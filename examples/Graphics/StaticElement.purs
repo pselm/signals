@@ -3,7 +3,10 @@ module Examples.Graphics.StaticElement where
 
 import Elm.Graphics.Element
 import Elm.Text (bold, fromString)
+
 import Control.Monad.Eff (Eff)
+import Graphics.Canvas (Canvas)
+
 import DOM (DOM)
 import DOM.Renderable (render)
 import DOM.HTML (window)
@@ -12,11 +15,13 @@ import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..))
 import DOM.Node.Node (appendChild)
-import Prelude (bind, Unit, (>>=), ($), (<>), (<$>))
+
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
-import Graphics.Canvas (Canvas)
+import Data.Tuple (Tuple(..))
+
+import Prelude (bind, Unit, (>>=), ($), (<>), (<$>))
 
 
 main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
@@ -172,7 +177,7 @@ testCroppedImage :: Element
 testCroppedImage =
     flow down
         ( title "14. A cropped image, starting at top 20, left 10 and using width 40, height 60"
-        : croppedImage {top: 20, left: 10} 40 60 "head.png"
+        : croppedImage (Tuple 20 10) 40 60 "head.png"
         : Nil
         )
 
@@ -181,7 +186,7 @@ testCroppedImage2 :: Element
 testCroppedImage2 =
     flow down
         ( title "15. Like 14, but height subsequently increased to 120"
-        : height 120 (croppedImage {top: 20, left: 10} 40 60 "head.png")
+        : height 120 (croppedImage (Tuple 20 10) 40 60 "head.png")
         : Nil
         )
 
