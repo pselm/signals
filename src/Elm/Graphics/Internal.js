@@ -32,7 +32,7 @@ exports.setStyle = function (key) {
 exports.removeStyle = function (key) {
     return function (element) {
         return function () {
-            element.style.removeProperty(key);
+            element.style[key] = "";
             return {};
         }
     }
