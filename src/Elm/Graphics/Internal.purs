@@ -4,6 +4,7 @@
 
 module Elm.Graphics.Internal
     ( createNode
+    , removePaddingAndMargin
     , setStyle, removeStyle
     , addTransform, removeTransform
     , getDimensions, measure
@@ -20,6 +21,8 @@ import DOM.Node.Types (Element, Node, elementToNode)
 import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode)
 import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
+import Data.List (List(..), (:))
+import Data.Foldable (for_)
 import Control.Monad.Eff (Eff)
 import Prelude (Unit, bind, (>>=), (>>>), pure)
 
@@ -38,28 +41,43 @@ foreign import getDimensions :: ∀ e. Element -> Eff (dom :: DOM | e) {width ::
 
 createNode :: ∀ e. String -> Eff (dom :: DOM | e) Element
 createNode elementType = do
-    node <- window >>= document >>= htmlDocumentToDocument >>> createElement elementType
-    setStyle "padding" "0px" node
-    setStyle "margin" "0px" node
+    node <-
+        window >>=
+        document >>=
+        htmlDocumentToDocument >>>
+        createElement elementType
+
+    removePaddingAndMargin node
     pure node
 
 
+removePaddingAndMargin :: ∀ e. Element -> Eff (dom :: DOM | e) Unit
+removePaddingAndMargin element = do
+    setStyle "padding" "0px" element
+    setStyle "margin" "0px" element
+
+
+vendorTransforms :: List String
+vendorTransforms =
+    ( "transform"
+    : "msTransform"
+    : "MozTransform"
+    : "webkitTransform"
+    : "OTransform"
+    : Nil
+    )
+
+
 addTransform :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
-addTransform transform node = do
-    setStyle "transform" transform node
-    setStyle "msTransform" transform node
-    setStyle "MozTransform" transform node
-    setStyle "webkitTransform" transform node
-    setStyle "OTransform" transform node
+addTransform transform node =
+    for_ vendorTransforms \t ->
+        setStyle t transform node
 
 
 removeTransform :: ∀ e. Element -> Eff (dom :: DOM | e) Unit
-removeTransform node = do
-    removeStyle "transform" node
-    removeStyle "msTransform" node
-    removeStyle "MozTransform" node
-    removeStyle "webkitTransform" node
-    removeStyle "OTransform" node
+removeTransform node =
+    for_ vendorTransforms \t ->
+        removeStyle t node
 
 
 -- Note that if the node is already in a document, you can just run getDimensions.

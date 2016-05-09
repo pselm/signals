@@ -3,18 +3,6 @@
 
 // module Elm.Graphics.Element
 
-exports.getImageWidth = function (image) {
-    return function () {
-        return image.width || 0;
-    };
-};
-
-exports.getImageHeight = function (image) {
-    return function () {
-        return image.height || 0;
-    };
-};
-
 exports.setInnerHtml = function (html) {
     return function (element) {
         return function () {

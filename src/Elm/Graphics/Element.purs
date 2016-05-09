@@ -23,7 +23,7 @@ module Elm.Graphics.Element
     ) where
 
 
-import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure)
+import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure, removePaddingAndMargin)
 import Elm.Basics (Float, truncate)
 import Elm.Color (Color)
 import Elm.Text (Text, renderHtml)
@@ -41,7 +41,8 @@ import Data.Array (catMaybes)
 import DOM (DOM)
 import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
 import DOM.Renderable (render, update) as Renderable
-import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument)
+import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToElement, htmlImageElementToHTMLElement)
+import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLImageElement
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
@@ -74,12 +75,6 @@ import Prelude
 
 -- Inner HTML
 foreign import setInnerHtml :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
-
--- Image width
-foreign import getImageWidth :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Int
-
--- Image height
-foreign import getImageHeight :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) Int
 
 -- Unsafe document
 foreign import nullableDocument :: ∀ e. Eff (dom :: DOM | e) (Nullable HTMLDocument)
@@ -875,13 +870,24 @@ makeImage props imageStyle imageWidth imageHeight src =
             e <- createNode "div"
             setStyle "overflow" "hidden" e
 
-            img <- createNode "img"
+            imgElement <- HTMLImageElement.create unit
+
+            let
+                img =
+                    htmlElementToElement (htmlImageElementToHTMLElement imgElement)
+
+            removePaddingAndMargin img
 
             let
                 listener =
                     eventListener \event -> do
-                        intrinsicWidth <- toNumber <$> getImageWidth img
-                        intrinsicHeight <- toNumber <$> getImageHeight img
+                        intrinsicWidth <-
+                            toNumber <$>
+                                HTMLImageElement.naturalWidth imgElement
+
+                        intrinsicHeight <-
+                            toNumber <$>
+                                HTMLImageElement.naturalHeight imgElement
 
                         let
                             sw =
