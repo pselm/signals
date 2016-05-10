@@ -180,7 +180,7 @@ applyFn :: forall a b. (a -> b) -> a -> b
 ```
 
 Backward function application `f <| x == f x`. This function is useful for
-avoiding parenthesis. Consider the following code to create a text element:
+avoiding parentheses. Consider the following code to create a text element:
 
     leftAligned (monospace (fromString "code"))
 
@@ -197,7 +197,7 @@ applyFnFlipped :: forall a b. a -> (a -> b) -> b
 ```
 
 Forward function application `x |> f == f x`. This function is useful
-for avoiding parenthesis and writing code in a more natural way.
+for avoiding parentheses and writing code in a more natural way.
 Consider the following code to create a pentagon:
 
     scale 2 (move (10,10) (filled blue (ngon 5 30)))
@@ -362,17 +362,16 @@ less than the argument. Values outside the `Int` range are clamped.
 #### `fromPolar`
 
 ``` purescript
-fromPolar :: { r :: Float, theta :: Float } -> { x :: Float, y :: Float }
+fromPolar :: Tuple Float Float -> Tuple Float Float
 ```
 
-Convert polar coordinates `{r, theta}` to Cartesian coordinates `{x, y}`.
+Convert polar coordinates `Tuple r theta` to Cartesian coordinates `Tuple x y`.
 
-Note that the Elm version uses tuples ... it seemed like this was a good
-candidate for records instead. (Since Purescript does not have tuple
-literals, Elm code using Tuples nees some modification in any event).
+*Note that it would normally be better to use a record type here, rather than
+tuples. However, it seems best to match the Elm API as closely as possible.*
 
-If you want some more sophisticated handling of complex numbers, see
-[purescript-complex](http://pursuit.purescript.org/packages/purescript-complex).
+*If you want some more sophisticated handling of complex numbers, see
+[purescript-complex](http://pursuit.purescript.org/packages/purescript-complex).*
 
 #### `fst`
 
@@ -569,17 +568,16 @@ Equivalent to Purescript's `toNumber`.
 #### `toPolar`
 
 ``` purescript
-toPolar :: { x :: Float, y :: Float } -> { r :: Float, theta :: Float }
+toPolar :: Tuple Float Float -> Tuple Float Float
 ```
 
-Convert Cartesian coordinates `{x, y}` to polar coordinates `{r, theta}`.
+Convert Cartesian coordinates `Tuple x y` to polar coordinates `Tuple r theta`.
 
-Note that the Elm version uses tuples ... it seemed like this was a good
-candidate for records instead. (Since Purescript does not have tuple
-literals, Elm code using Tuples nees some modification in any event).
+*Note that it would normally be better to use a record type here, rather than
+tuples. However, it seems best to match the Elm API as closely as possible.*
 
-If you want some more sophisticated handling of complex numbers, see
-[purescript-complex](http://pursuit.purescript.org/packages/purescript-complex).
+*If you want some more sophisticated handling of complex numbers, see
+[purescript-complex](http://pursuit.purescript.org/packages/purescript-complex).*
 
 #### `toString`
 

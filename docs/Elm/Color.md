@@ -107,7 +107,7 @@ Eq Gradient
 #### `linear`
 
 ``` purescript
-linear :: Point -> Point -> List (Tuple Float Color) -> Gradient
+linear :: Tuple Float Float -> Tuple Float Float -> List (Tuple Float Color) -> Gradient
 ```
 
 Create a linear gradient. Takes a start and end point and then a series of
@@ -118,7 +118,7 @@ more visual explanation.
 #### `radial`
 
 ``` purescript
-radial :: Point -> Float -> Point -> Float -> List (Tuple Float Color) -> Gradient
+radial :: Tuple Float Float -> Float -> Tuple Float Float -> Float -> List (Tuple Float Color) -> Gradient
 ```
 
 Create a radial gradient. First takes a start point and inner radius.  Then

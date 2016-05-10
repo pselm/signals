@@ -19,7 +19,7 @@ type MousePosition = { x :: Int, y :: Int }
 #### `MouseState`
 
 ``` purescript
-type MouseState = { position :: Signal MousePosition, node :: EventTarget }
+type MouseState = { position :: Signal (Tuple Int Int), node :: EventTarget }
 ```
 
 #### `setupMouse`
@@ -47,7 +47,7 @@ Setup mouse signals, where the mouse is relative to the window.
 #### `position`
 
 ``` purescript
-position :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal MousePosition)
+position :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal (Tuple Int Int))
 ```
 
 The current mouse position.

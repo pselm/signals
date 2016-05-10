@@ -172,7 +172,7 @@ transformation. Forms will be drawn in the order that they are listed, as in
 #### `move`
 
 ``` purescript
-move :: Point -> Form -> Form
+move :: Tuple Float Float -> Form -> Form
 ```
 
 Move a form by the given amount (x, y). This is a relative translation so
@@ -282,7 +282,7 @@ A 2D path. Paths are a sequence of points. They do not have a color.
 #### `path`
 
 ``` purescript
-path :: List Point -> Path
+path :: List (Tuple Float Float) -> Path
 ```
 
 Create a path that follows a sequence of points.
@@ -290,7 +290,7 @@ Create a path that follows a sequence of points.
 #### `segment`
 
 ``` purescript
-segment :: Point -> Point -> Path
+segment :: Tuple Float Float -> Tuple Float Float -> Path
 ```
 
 Create a path along a given line segment.
@@ -307,7 +307,7 @@ texture, that information can be filled in later.
 #### `polygon`
 
 ``` purescript
-polygon :: List Point -> Shape
+polygon :: List (Tuple Float Float) -> Shape
 ```
 
 Create an arbitrary polygon by specifying its corners in order.
