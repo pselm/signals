@@ -59,15 +59,15 @@ import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (reader)
 import Control.Comonad (extract)
 import Control.Monad (when)
-import Control.Bind ((=<<))
+import Control.Bind ((=<<), (>=>))
 
 import Graphics.Canvas (Context2D, Canvas, CanvasElement, PatternRepeat(Repeat))
 
 import Graphics.Canvas
-    ( LineCap(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore
+    ( LineCap(..), LineJoin(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore
     , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath, getContext2D
     , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate, save, transform
-    , withImage, createPattern, fill, translate, drawImageFull
+    , withImage, createPattern, fill, translate, drawImageFull, setLineJoin, setMiterLimit
     ) as Canvas
 
 import Prelude
@@ -136,14 +136,20 @@ instance eqLineJoin :: Eq LineJoin where
     eq _ _ = false
 
 
--- TODO: Should suggest adding something like this to Graphics.Canvas
-foreign import setLineJoinImpl :: ∀ e. String -> Number -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-
 -- | Set the current line join type.
 setLineJoin :: ∀ e. LineJoin -> Context2D -> Eff (canvas :: Canvas | e) Context2D
-setLineJoin Smooth = setLineJoinImpl "round" 10.0
-setLineJoin (Sharp limit) = setLineJoinImpl "miter" limit
-setLineJoin Clipped = setLineJoinImpl "bevel" 10.0
+
+setLineJoin Smooth =
+    Canvas.setLineJoin Canvas.RoundJoin >=>
+    Canvas.setMiterLimit 10.0
+
+setLineJoin (Sharp limit) =
+    Canvas.setLineJoin Canvas.MiterJoin >=>
+    Canvas.setMiterLimit limit
+
+setLineJoin Clipped =
+    Canvas.setLineJoin Canvas.BevelJoin >=>
+    Canvas.setMiterLimit 10.0
 
 
 -- | All of the attributes of a line style. This lets you build up a line style
