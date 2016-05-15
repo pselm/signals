@@ -20,8 +20,8 @@
 -- | it into the real DOM.
 -- |
 -- | If you can implement the `render` and `update` methods, but it's awkward to
--- | create an instance, then you can use the `makeDynamic` function to create a
--- | `DynamicRenderable`.
+-- | create an instance, then you can use the `makeAnyRenderable` function to create
+-- | an `AnyRenderable`.
 -- |
 -- | Note that the best architecture is often not to go straight from your
 -- | own specialized data types to `Renderable`, but instead to have a kind of
@@ -67,15 +67,15 @@
 -- | a virtual DOM structure, want to use `updateDOM` in a situation where the previous
 -- | `Renderable` may or may not have had the same underlying type.
 -- |
--- | To facilitate this sort of thing, we also have a `DynamicRenderable` type
+-- | To facilitate this sort of thing, we also have an `AnyRenderable` type
 -- | which, in effect, "erases" the type of the underlying `Renderable` data. This
--- | leaves you with a "simple" `DynamicRenderable` type that you can use in lists
--- | etc. Even better, the `DynamicRenderable` is itself an instance of
--- | `Renderable`. So you can use the usual functions, even if the underlying data
+-- | leaves you with a "simple" `AnyRenderable` type that you can use in lists
+-- | etc. Even better, the `AnyRenderable` is itself an instance of `Renderable`.
+-- | So you can use the usual functions, even if the underlying data
 -- | type doesn't match.
 -- |
--- | To get a `DynamicRenderable` from a `Renderable`, take a look at `toDynamic`.
--- | Alternative, you can also use `makeDynamic`, if it's awkward to make an instance.
+-- | To get an `AnyRenderable` from a `Renderable`, take a look at `toAnyRenderable`.
+-- | Alternatively, you can also use `makeAnyRenderable`, if it's awkward to use an instance.
 -- |
 -- | ### Automatically remembering the previous data
 -- |
@@ -88,7 +88,7 @@
 module DOM.Renderable
     ( class Renderable, render, update, defaultUpdate
     , Rendered, Position(..), renderIntoDOM, updateDOM
-    , DynamicRenderable, toDynamic, makeDynamic
+    , AnyRenderable, toAnyRenderable, makeAnyRenderable
     , renderOrUpdate
     ) where
 
@@ -191,28 +191,28 @@ instance renderableRenderableValue :: Renderable (RenderableValue a) where
             new.value
 
 
--- | Makes a `Renderable` dynamic by stripping the underlying type.
+-- | Strips the underlying type from a `Renderable`.
 -- |
--- | You can create a `DynamicRenderable` via `toDynamic` or `makeDynamic`.
+-- | You can create an `AnyRenderable` via `toAnyRenderable` or `makeAnyRenerable`.
 -- |
 -- | It's useful if you want to keep values in a `List` (so they need to
 -- | to have the same type), or if you are remembering previous values
 -- | for use via `update`, and they may or may not have the same underlying
 -- | type.
 -- |
--- | There is a `Renderable` instance for `DynamicRenderable`, so you can
+-- | There is a `Renderable` instance for `AnyRenderable`, so you can
 -- | use it with the regular functions.
-newtype DynamicRenderable = DynamicRenderable (Exists RenderableValue)
+newtype AnyRenderable = AnyRenderable (Exists RenderableValue)
 
 
 -- Now, to heap perversity upon perversity, make a renderable instance for that!
-instance renderableDynamicRenderable :: Renderable DynamicRenderable where
-    render (DynamicRenderable dynamicRenderable) =
-        runExists render dynamicRenderable
+instance renderableAnyRenderable :: Renderable AnyRenderable where
+    render (AnyRenderable anyRenderable) =
+        runExists render anyRenderable
 
     -- This is the interesting bit ... since we've stripped the underlying type, we don't
     -- know whether we can use the `update` optimization ... or do we?
-    update {value: (DynamicRenderable oldValue), result} (DynamicRenderable newValue) =
+    update {value: (AnyRenderable oldValue), result} (AnyRenderable newValue) =
         newValue #
             runExists \(RenderableValue new) ->
                 oldValue #
@@ -242,22 +242,22 @@ instance renderableDynamicRenderable :: Renderable DynamicRenderable where
 foreign import same :: ∀ a b. a -> b -> Boolean
 
 
--- | Given a `Renderable` value, return a dynamic value that can be used
--- | without knowing the type of the original value.
-toDynamic :: ∀ a. (Renderable a) => a -> DynamicRenderable
-toDynamic = makeDynamic render update
+-- | Given a `Renderable` value, return a value that can be used
+-- | without knowing the type of the original data.
+toAnyRenderable :: ∀ a. (Renderable a) => a -> AnyRenderable
+toAnyRenderable = makeAnyRenderable render update
 
 
--- | An alternative to `toDynamic`, in cases where you don't have a
+-- | An alternative to `toAnyRenderable`, in cases where you don't have a
 -- | `Renderable` instance, but you do have the necessary functions.
-makeDynamic :: ∀ a.
+makeAnyRenderable :: ∀ a.
     (∀ e. a -> Eff (canvas :: Canvas, dom :: DOM | e) Node) ->
     (∀ e. Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node) ->
     a ->
-    DynamicRenderable
+    AnyRenderable
 
-makeDynamic render update value =
-    DynamicRenderable $
+makeAnyRenderable render update value =
+    AnyRenderable $
         mkExists $
             RenderableValue {value, render, update}
 
@@ -350,9 +350,9 @@ updateDOM rendered value = do
     pure { value, result }
 
 
-foreign import setRenderable :: ∀ e. Element -> DynamicRenderable -> Eff (dom :: DOM | e) Unit
+foreign import setRenderable :: ∀ e. Element -> AnyRenderable -> Eff (dom :: DOM | e) Unit
 
-foreign import getRenderable :: ∀ e. Element -> Eff (dom :: DOM | e) (Nullable DynamicRenderable)
+foreign import getRenderable :: ∀ e. Element -> Eff (dom :: DOM | e) (Nullable AnyRenderable)
 
 
 -- | Renders the provided `Renderable` and inserts the result as a child of the
@@ -365,7 +365,7 @@ renderOrUpdate :: ∀ e a. (Renderable a) => Element -> a -> Eff (canvas :: Canv
 renderOrUpdate element renderable = do
     let
         new =
-            toDynamic renderable
+            toAnyRenderable renderable
 
     old <-
         toMaybe <$> getRenderable element
@@ -384,6 +384,6 @@ renderOrUpdate element renderable = do
             -- Otherwise, we need a render
             renderIntoDOM ReplacingChildren (elementToNode element) new
 
-    -- In either case, remember the dynamicRenderable
+    -- In either case, remember the anyRenderable
     setRenderable element new
 

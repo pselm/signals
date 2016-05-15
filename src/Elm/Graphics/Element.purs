@@ -40,7 +40,7 @@ import Data.Array (catMaybes)
 import Data.Tuple (Tuple(..))
 
 import DOM (DOM)
-import DOM.Renderable (class Renderable, DynamicRenderable, toDynamic)
+import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, update) as Renderable
 import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToElement, htmlImageElementToHTMLElement)
 import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLImageElement
@@ -135,7 +135,7 @@ data ElementPrim
     | Flow Direction (List Element)
     | Spacer
     | RawHtml String String -- html align
-    | Custom DynamicRenderable
+    | Custom AnyRenderable
 
 
 data ImageStyle
@@ -355,7 +355,7 @@ tiledImage w h src =
 -- | Create an `Element` from a custom type that is `Renderable`.
 fromRenderable :: ∀ a. (Renderable a) => Int -> Int -> a -> Element
 fromRenderable w h renderable =
-    newElement w h (Custom (toDynamic renderable))
+    newElement w h (Custom (toAnyRenderable renderable))
 
 -- Perhaps should have another variant that doesn't take a fixed width and height,
 -- and instead measures it, anaologous to htmlHeight?

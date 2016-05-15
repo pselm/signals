@@ -42,7 +42,7 @@ import Math (pi, cos, sin, sqrt, (%))
 import Global (isNaN)
 
 import DOM (DOM)
-import DOM.Renderable (class Renderable, DynamicRenderable, Position(..), toDynamic, renderIntoDOM)
+import DOM.Renderable (class Renderable, AnyRenderable, Position(..), toAnyRenderable, renderIntoDOM)
 import DOM.Node.Node (nodeName, removeChild, appendChild, insertBefore, firstChild, nextSibling)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, elementToNode)
@@ -214,7 +214,7 @@ data BasicForm
     | FOutlinedText LineStyle Text
     | FText Text
     | FImage Int Int {top :: Int, left :: Int} String
-    | FElement DynamicRenderable
+    | FElement AnyRenderable
     | FGroup Transform2D (List Form)
 
 
@@ -280,7 +280,7 @@ sprite a b c d = form $ FImage a b c d
 -- |
 -- | In fact, this works with any `Renderable`, not just Elements.
 toForm :: ∀ a. (Renderable a) => a -> Form
-toForm = form <<< FElement <<< toDynamic
+toForm = form <<< FElement <<< toAnyRenderable
 
 
 -- | Flatten many forms into a single `Form`. This lets you move and rotate them
