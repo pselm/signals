@@ -47,7 +47,7 @@ import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLIm
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
-import DOM.Node.Element (setId, setAttribute, tagName)
+import DOM.Node.Element (setId, setAttribute, tagName, removeAttribute)
 import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild, nodeType)
 import DOM.Node.NodeType (NodeType(ElementNode))
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
@@ -84,9 +84,6 @@ foreign import nullableDocument :: ∀ e. Eff (dom :: DOM | e) (Nullable HTMLDoc
 -- Note that we allow the types to differ, since the compiler might think of them as different
 -- types for one reason or another.
 foreign import same :: ∀ a b. a -> b -> Boolean
-
--- This should probably be in DOM.Node.Element ... remember to suggest that.
-foreign import removeAttribute :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
 
 
 -- PRIMITIVES
