@@ -1,6 +1,6 @@
 
 module Examples.Graphics.CollageExamples
-    ( Example, examples
+    ( Example, examples, collages
     ) where
 
 
@@ -28,7 +28,7 @@ import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Element (setAttribute)
 import DOM.Node.Node (appendChild)
 
-import Prelude (bind, pure, unit, (>>=), ($), (<$>), negate, (/=), (#), (*))
+import Prelude (bind, pure, unit, (>>=), ($), (<$>), negate, (/=), (#), (*), map)
 
 
 newtype Example = Example
@@ -135,6 +135,14 @@ examples =
     : example25 : example26 : example27 : example28 : example29
     : Nil
     )
+
+
+-- | Just pull the collages themselves out of the example
+collages :: List Collage
+collages =
+    examples #
+        map \(Example example) ->
+            example.collage
 
 
 example1 :: Example

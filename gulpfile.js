@@ -46,6 +46,10 @@ var bundles = [{
     purs: "examples/Graphics/UpdateElement.purs",
     html: "examples/Graphics/UpdateElement.html"
 },{
+    module: "Examples.Graphics.UpdateRandomRenderable",
+    purs: "examples/Graphics/UpdateRandomRenderable.purs",
+    html: "examples/Graphics/UpdateRandomRenderable.html"
+},{
     module: "Examples.Graphics.StaticCollage",
     purs: "examples/Graphics/StaticCollage.purs",
     html: "examples/Graphics/StaticCollage.html"

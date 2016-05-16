@@ -1,5 +1,6 @@
-module Examples.Graphics.StaticElement where
-
+module Examples.Graphics.StaticElement
+    ( elements
+    ) where
 
 import Elm.Graphics.Element
 import Elm.Text (bold, fromString)
@@ -39,32 +40,36 @@ main = do
 
 scene :: Element
 scene =
-    flow down
-        ( helloWorld
-        : testLink
-        : testEmpty
-        : testWidthOfHeightOfSizeOf
-        : testHeight
-        : testSize
-        : testWidth
-        : testOpacity
-        : testTag
-        : testColor
-        : testImage
-        : testFittedImage
-        : testTiledImage
-        : testCroppedImage
-        : testCroppedImage2
-        : testTextAlignment
-        : testShow
-        : testContainer
-        : testAboveBelowBeside
-        : testLayers
-        : testPositions
-        : testBigPositions
-        : testFlowDirections
-        : Nil
-        )
+    flow down elements
+
+
+elements :: List Element
+elements =
+    ( helloWorld
+    : testLink
+    : testEmpty
+    : testWidthOfHeightOfSizeOf
+    : testHeight
+    : testSize
+    : testWidth
+    : testOpacity
+    : testTag
+    : testColor
+    : testImage
+    : testFittedImage
+    : testTiledImage
+    : testCroppedImage
+    : testCroppedImage2
+    : testTextAlignment
+    : testShow
+    : testContainer
+    : testAboveBelowBeside
+    : testLayers
+    : testPositions
+    : testBigPositions
+    : testFlowDirections
+    : Nil
+    )
 
 
 title :: String -> Element
