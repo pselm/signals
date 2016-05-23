@@ -7,7 +7,7 @@ exports.setInnerHtml = function (html) {
     return function (element) {
         return function () {
             element.innerHTML = html;
-            return {};
+            return element;
         }
     }
 };

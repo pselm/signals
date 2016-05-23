@@ -23,7 +23,7 @@ exports.setStyle = function (key) {
         return function (element) {
             return function () {
                 element.style[key] = value;
-                return {};
+                return element;
             }
         }
     }
@@ -33,7 +33,7 @@ exports.removeStyle = function (key) {
     return function (element) {
         return function () {
             element.style[key] = "";
-            return {};
+            return element;
         }
     }
 };

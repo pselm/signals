@@ -24,15 +24,16 @@ import Data.Maybe (Maybe(..))
 import Data.List (List(..), (:))
 import Data.Foldable (for_)
 import Control.Monad.Eff (Eff)
-import Prelude (Unit, bind, (>>=), (>>>), pure)
+import Control.Bind ((>=>))
+import Prelude (bind, (>>=), (>>>), pure)
 
 
 -- Sets the style named in the first param to the value of the second param
-foreign import setStyle :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import setStyle :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Element
 
 
 -- Removes the style
-foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Element
 
 
 -- Dimensions
@@ -51,10 +52,10 @@ createNode elementType = do
     pure node
 
 
-removePaddingAndMargin :: ∀ e. Element -> Eff (dom :: DOM | e) Unit
-removePaddingAndMargin element = do
-    setStyle "padding" "0px" element
-    setStyle "margin" "0px" element
+removePaddingAndMargin :: ∀ e. Element -> Eff (dom :: DOM | e) Element
+removePaddingAndMargin =
+    setStyle "padding" "0px" >=>
+    setStyle "margin" "0px"
 
 
 vendorTransforms :: List String
@@ -68,16 +69,20 @@ vendorTransforms =
     )
 
 
-addTransform :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
-addTransform transform node =
+addTransform :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Element
+addTransform transform node = do
     for_ vendorTransforms \t ->
         setStyle t transform node
 
+    pure node
 
-removeTransform :: ∀ e. Element -> Eff (dom :: DOM | e) Unit
-removeTransform node =
+
+removeTransform :: ∀ e. Element -> Eff (dom :: DOM | e) Element
+removeTransform node = do
     for_ vendorTransforms \t ->
         removeStyle t node
+
+    pure node
 
 
 -- Note that if the node is already in a document, you can just run getDimensions.

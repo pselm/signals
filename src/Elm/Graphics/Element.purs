@@ -58,6 +58,7 @@ import DOM.Event.EventTypes (load)
 import Control.Monad.Eff (Eff, forE)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad (when, unless)
+import Control.Bind ((>=>))
 
 import Text.Format (format, precision)
 import Graphics.Canvas (Canvas)
@@ -66,7 +67,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import Prelude
     ( class Show, class Eq, Unit, unit
     , flip, map, (<$>), ($), (>>>)
-    , bind, (>>=), pure
+    , bind, (>>=), pure, void
     , (+), (-), (/), (*), (<>)
     , (==), (/=), (>), (||), (&&), negate
     )
@@ -75,7 +76,7 @@ import Prelude
 -- FOREIGN
 
 -- Inner HTML
-foreign import setInnerHtml :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) Unit
+foreign import setInnerHtml :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) DOM.Element
 
 -- Unsafe document
 foreign import nullableDocument :: ∀ e. Eff (dom :: DOM | e) (Nullable HTMLDocument)
@@ -743,7 +744,7 @@ setProps (Element {props, element}) node = do
     setStyle "width" (Prelude.show w <> "px") node
     setStyle "height" (Prelude.show h <> "px") node
 
-    when (props.opacity /= 1.0) $
+    when (props.opacity /= 1.0) $ void $
         setStyle "opacity" (Prelude.show props.opacity) node
 
     for props.color \c ->
@@ -768,10 +769,12 @@ setProps (Element {props, element}) node = do
     if props.href == ""
         then pure node
         else do
-            anchor <- createNode "a"
+            anchor <-
+                createNode "a" >>=
+                setStyle "display" "block" >>=
+                setStyle "pointerEvents" "auto"
+
             setAttribute "href" props.href anchor
-            setStyle "display" "block" anchor
-            setStyle "pointerEvents" "auto" anchor
             appendChild (elementToNode node) (elementToNode anchor)
             pure anchor
 
@@ -844,6 +847,23 @@ setProps (Element {props, element}) node = do
 
 -- IMAGES
 
+setBackgroundSize :: ∀ e. String -> DOM.Element -> Eff (dom :: DOM | e) DOM.Element
+setBackgroundSize backgroundSize elem = do
+    for_ backgroundSizeStyles \style ->
+        setStyle style backgroundSize elem
+
+    pure elem
+
+
+backgroundSizeStyles :: List String
+backgroundSizeStyles =
+    ( "webkitBackgroundSize"
+    : "MozBackgroundSize"
+    : "OBackgroundSize"
+    : "backgroundSize"
+    : Nil
+    )
+
 makeImage :: ∀ e. Properties -> ImageStyle -> Int -> Int -> String -> Eff (dom :: DOM | e) DOM.Element
 makeImage props imageStyle imageWidth imageHeight src =
     case imageStyle of
@@ -852,23 +872,23 @@ makeImage props imageStyle imageWidth imageHeight src =
             setAttribute "src" src img
             setAttribute "name" src img
             setStyle "display" "block" img
-            pure img
 
-        Fitted -> do
-            div <- createNode "div"
-            let s = "url('" <> src <> "') no-repeat center"
-            setStyle "background" s div
-            setStyle "webkitBackgroundSize" "cover" div
-            setStyle "MozBackgroundSize" "cover" div
-            setStyle "OBackgroundSize" "cover" div
-            setStyle "backgroundSize" "cover" div
-            pure div
+        Fitted ->
+            let
+                s = "url('" <> src <> "') no-repeat center"
+
+            in
+                createNode "div" >>=
+                setStyle "background" s >>=
+                setBackgroundSize "cover"
 
         Cropped pos -> do
-            e <- createNode "div"
-            setStyle "overflow" "hidden" e
+            e <-
+                createNode "div" >>=
+                setStyle "overflow" "hidden"
 
-            imgElement <- HTMLImageElement.create unit
+            imgElement <-
+                HTMLImageElement.create unit
 
             let
                 img =
@@ -923,15 +943,12 @@ makeImage props imageStyle imageWidth imageHeight src =
             div <- createNode "div"
             let s = "url(" <> src <> ")"
             setStyle "backgroundImage" s div
-            pure div
 
 
 -- FLOW
 
 goOut :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) DOM.Element
-goOut node = do
-    setStyle "position" "absolute" node
-    pure node
+goOut = setStyle "position" "absolute"
 
 
 goDown :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) DOM.Element
@@ -939,10 +956,9 @@ goDown = pure
 
 
 goRight :: ∀ e. DOM.Element -> Eff (dom :: DOM | e) DOM.Element
-goRight node = do
-    setStyle "styleFloat" "left" node
-    setStyle "cssFloat" "left" node
-    pure node
+goRight =
+    setStyle "styleFloat" "left" >=>
+    setStyle "cssFloat" "left"
 
 
 directionTable :: Direction -> (∀ e. DOM.Element -> Eff (dom :: DOM | e) DOM.Element)
@@ -970,7 +986,7 @@ makeFlow dir elist = do
     case dir of
         DIn -> setStyle "pointerEvents" "none" parent
         DOut -> setStyle "pointerEvents" "none" parent
-        _ -> pure unit
+        _ -> pure parent
 
     let
         possiblyReversed =
@@ -996,7 +1012,7 @@ toPos (Relative pos) = format (precision 2) (pos * 100.0) <> "%"
 
 
 setPos :: ∀ e. RawPosition -> Element -> DOM.Element -> Eff (dom :: DOM | e) DOM.Element
-setPos pos (Element {element, props}) e = do
+setPos pos (Element {element, props}) =
     let
         w = props.width
         h = props.height
@@ -1005,28 +1021,6 @@ setPos pos (Element {element, props}) e = do
         -- var w = props.width + (element.adjustWidth ? element.adjustWidth : 0);
         -- var h = props.height + (element.adjustHeight ? element.adjustHeight : 0);
 
-    setStyle "position" "absolute" e
-    setStyle "margin" "auto" e
-
-    case pos.horizontal of
-        P -> do
-            setStyle "right" (toPos pos.x) e
-            removeStyle "left" e
-
-        _ -> do
-            setStyle "left" (toPos pos.x) e
-            removeStyle "right" e
-
-    case pos.vertical of
-        N -> do
-            setStyle "bottom" (toPos pos.y) e
-            removeStyle "top" e
-
-        _ -> do
-            setStyle "top" (toPos pos.y) e
-            removeStyle "bottom" e
-
-    let
         translateX =
             case pos.horizontal of
                 Z -> Just $ "translateX(" <> Prelude.show ((-w) / 2) <> "px)"
@@ -1040,21 +1034,49 @@ setPos pos (Element {element, props}) e = do
         transform =
             joinWith " " $ catMaybes [translateX, translateY]
 
-    if transform == ""
-        then removeTransform e
-        else addTransform transform e
+        applyTransform =
+            if transform == ""
+                then removeTransform
+                else addTransform transform
 
-    pure e
+        horizontal =
+            case pos.horizontal of
+                P ->
+                    setStyle "right" (toPos pos.x) >=>
+                    removeStyle "left"
+
+                _ ->
+                    setStyle "left" (toPos pos.x) >=>
+                    removeStyle "right"
+
+        vertical =
+            case pos.vertical of
+                N ->
+                    setStyle "bottom" (toPos pos.y) >=>
+                    removeStyle "top"
+
+                _ ->
+                    setStyle "top" (toPos pos.y) >=>
+                    removeStyle "bottom"
+
+    in
+        setStyle "position" "absolute" >=>
+        setStyle "margin" "auto" >=>
+        horizontal >=>
+        vertical >=>
+        applyTransform
 
 
 makeContainer :: ∀ e. RawPosition -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
 makeContainer pos elem = do
-    e <- render elem
-    setPos pos elem e
+    e <-
+        render elem >>=
+        setPos pos elem
 
-    div <- createNode "div"
-    setStyle "position" "relative" div
-    setStyle "overflow" "hidden" div
+    div <-
+        createNode "div" >>=
+        setStyle "position" "relative" >>=
+        setStyle "overflow" "hidden"
 
     appendChild (elementToNode e) (elementToNode div)
     pure div
@@ -1062,18 +1084,16 @@ makeContainer pos elem = do
 
 rawHtml :: ∀ e. String -> String -> Eff (dom :: DOM | e) DOM.Element
 rawHtml html align = do
-    div <- createNode "div"
+    div <-
+        createNode "div" >>=
+        setInnerHtml html >>=
+        setStyle "visibility" "hidden"
 
-    setInnerHtml html div
-    setStyle "visibility" "hidden" div
-
-    when (align /= "") $
+    when (align /= "") $ void $
         setStyle "textAlign" align div
 
     setStyle "visibility" "visible" div
     setStyle "pointerEvents" "auto" div
-
-    pure div
 
 
 -- RENDER
@@ -1188,7 +1208,7 @@ update outerNode (Element curr) (Element next) = do
                 { nextE: RawHtml html _
                 , currE: RawHtml oldHtml _
                 } -> do
-                    when (html /= oldHtml) $
+                    when (html /= oldHtml) $ void $
                         setInnerHtml html innerNode
 
                     updateProps innerNode (Element curr) (Element next)
@@ -1326,16 +1346,16 @@ updateProps node (Element curr) (Element next) = do
         -- var width = nextProps.width - (element.adjustWidth || 0);
         -- var height = nextProps.height - (element.adjustHeight || 0);
 
-    when (w /= currProps.width) $
+    when (w /= currProps.width) $ void $
         setStyle "width" ((Prelude.show w) <> "px") node
 
-    when (h /= currProps.height) $
+    when (h /= currProps.height) $ void $
         setStyle "height" ((Prelude.show h) <> "px") node
 
-    when (nextProps.opacity /= currProps.opacity) $
+    when (nextProps.opacity /= currProps.opacity) $ void $
         setStyle "opacity" (Prelude.show nextProps.opacity) node
 
-    when (nextProps.color /= currProps.color) $
+    when (nextProps.color /= currProps.color) $ void $
         case nextProps.color of
             Just c -> setStyle "backgroundColor" (Elm.Color.toCss c) node
             Nothing -> removeStyle "backgroundColor" node
@@ -1348,10 +1368,12 @@ updateProps node (Element curr) (Element next) = do
     when (nextProps.href /= currProps.href) $
         if currProps.href == ""
             then do
-                anchor <- createNode "a"
+                anchor <-
+                    createNode "a" >>=
+                    setStyle "display" "block" >>=
+                    setStyle "pointerEvents" "auto"
+
                 setAttribute "href" nextProps.href anchor
-                setStyle "display" "block" anchor
-                setStyle "pointerEvents" "auto" anchor
 
                 nullableParent <- parentNode (elementToNode node)
                 for_ (toMaybe nullableParent) \parent -> do
@@ -1475,7 +1497,7 @@ htmlHeight w html = do
 
             setInnerHtml html temp
 
-            when (w > 0) $
+            when (w > 0) $ void $
                 setStyle "width" ((Prelude.show w) <> "px") temp
 
             measure (elementToNode temp)
