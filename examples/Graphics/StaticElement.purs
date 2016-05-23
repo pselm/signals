@@ -1,5 +1,6 @@
 module Examples.Graphics.StaticElement
     ( elements
+    , main
     ) where
 
 import Elm.Graphics.Element
