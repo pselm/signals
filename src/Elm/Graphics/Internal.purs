@@ -23,20 +23,17 @@ import DOM.Node.Types (Element, Node, elementToNode)
 import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode)
 import Data.Nullable (Nullable, toMaybe)
 import Data.Maybe (Maybe(..))
-import Data.List (List(..), (:))
-import Data.Foldable (for_)
 import Data.Foreign (Foreign)
-import Control.Monad.Eff (Eff)
-import Control.Bind ((>=>))
+import Control.Monad.Eff (Eff, foreachE)
 import Prelude (bind, (>>=), (>>>), pure, Unit)
 
 
 -- Sets the style named in the first param to the value of the second param
-foreign import setStyle :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Element
+foreign import setStyle :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
 
 
 -- Removes the style
-foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Element
+foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
 
 
 -- Dimensions
@@ -44,11 +41,11 @@ foreign import getDimensions :: ∀ e. Element -> Eff (dom :: DOM | e) {width ::
 
 
 -- Set arbitrary property. TODO: Should suggest for purescript-dom
-foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Element
+foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
 
 
 -- Set if not already equal. A bit of a hack ... not suitable for general use.
-foreign import setPropertyIfDifferent :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Element
+foreign import setPropertyIfDifferent :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
 
 
 -- TODO: Should suggest these for purescript-dom
@@ -69,37 +66,34 @@ createNode elementType = do
     pure node
 
 
-removePaddingAndMargin :: ∀ e. Element -> Eff (dom :: DOM | e) Element
-removePaddingAndMargin =
-    setStyle "padding" "0px" >=>
-    setStyle "margin" "0px"
+removePaddingAndMargin :: ∀ e. Element -> Eff (dom :: DOM | e) Unit
+removePaddingAndMargin elem =
+    foreachE
+        [ setStyle "padding" "0px"
+        , setStyle "margin" "0px"
+        ] \op -> op elem
 
 
-vendorTransforms :: List String
+vendorTransforms :: Array String
 vendorTransforms =
-    ( "transform"
-    : "msTransform"
-    : "MozTransform"
-    : "webkitTransform"
-    : "OTransform"
-    : Nil
-    )
+    [ "transform"
+    , "msTransform"
+    , "MozTransform"
+    , "webkitTransform"
+    , "OTransform"
+    ]
 
 
-addTransform :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Element
-addTransform transform node = do
-    for_ vendorTransforms \t ->
+addTransform :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
+addTransform transform node =
+    foreachE vendorTransforms \t ->
         setStyle t transform node
 
-    pure node
 
-
-removeTransform :: ∀ e. Element -> Eff (dom :: DOM | e) Element
-removeTransform node = do
-    for_ vendorTransforms \t ->
+removeTransform :: ∀ e. Element -> Eff (dom :: DOM | e) Unit
+removeTransform node =
+    foreachE vendorTransforms \t ->
         removeStyle t node
-
-    pure node
 
 
 -- Note that if the node is already in a document, you can just run getDimensions.

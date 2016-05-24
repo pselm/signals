@@ -23,7 +23,7 @@ exports.setStyle = function (key) {
         return function (element) {
             return function () {
                 element.style[key] = value;
-                return element;
+                return {};
             }
         }
     }
@@ -33,7 +33,7 @@ exports.removeStyle = function (key) {
     return function (element) {
         return function () {
             element.style[key] = "";
-            return element;
+            return {};
         }
     }
 };
@@ -43,7 +43,7 @@ exports.setProperty = function (key) {
         return function (element) {
             return function () {
                 element[key] = value;
-                return element;
+                return {};
             };
         };
     };
@@ -57,7 +57,7 @@ exports.setPropertyIfDifferent = function (key) {
                     element[key] = value;
                 }
 
-                return element;
+                return {};
             };
         };
     };
