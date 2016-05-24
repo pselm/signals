@@ -8,6 +8,8 @@ module Elm.Graphics.Internal
     , setStyle, removeStyle
     , addTransform, removeTransform
     , getDimensions, measure
+    , setProperty, setPropertyIfDifferent
+    , setAttributeNS, getAttributeNS, removeAttributeNS
     ) where
 
 
@@ -19,13 +21,14 @@ import DOM.HTML.Document (body)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element, Node, elementToNode)
 import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode)
-import Data.Nullable (toMaybe)
+import Data.Nullable (Nullable, toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.List (List(..), (:))
 import Data.Foldable (for_)
+import Data.Foreign (Foreign)
 import Control.Monad.Eff (Eff)
 import Control.Bind ((>=>))
-import Prelude (bind, (>>=), (>>>), pure)
+import Prelude (bind, (>>=), (>>>), pure, Unit)
 
 
 -- Sets the style named in the first param to the value of the second param
@@ -38,6 +41,20 @@ foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) E
 
 -- Dimensions
 foreign import getDimensions :: ∀ e. Element -> Eff (dom :: DOM | e) {width :: Number, height :: Number}
+
+
+-- Set arbitrary property. TODO: Should suggest for purescript-dom
+foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Element
+
+
+-- Set if not already equal. A bit of a hack ... not suitable for general use.
+foreign import setPropertyIfDifferent :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Element
+
+
+-- TODO: Should suggest these for purescript-dom
+foreign import setAttributeNS :: ∀ e. String -> String -> String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import getAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) (Nullable String)
+foreign import removeAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
 
 
 createNode :: ∀ e. String -> Eff (dom :: DOM | e) Element

@@ -14,19 +14,33 @@ module Elm.VirtualDom
 
 import Elm.Json.Decode (Decoder, Value) as Json
 import Elm.Basics (Bool)
+import Elm.Graphics.Internal (setStyle, setProperty, setPropertyIfDifferent, setAttributeNS, removeAttributeNS)
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
+import Control.Monad.Eff (Eff)
 import Unsafe.Coerce (unsafeCoerce)
+import Partial.Unsafe (unsafeCrashWith)
 
 import Data.Tuple (Tuple(..))
 import Data.List (List, length)
 import Data.Foldable (foldl, for_)
-import Data.StrMap (StrMap, freezeST)
+import Data.StrMap (StrMap, freezeST, foldM)
 import Data.StrMap.ST (new, poke)
 import Data.Maybe (Maybe(..))
 import Data.Exists (Exists, runExists, mkExists)
+import Data.Foreign (readString)
+import Data.Either (Either(..))
 
-import Prelude (flip, (+), void, pure, bind, ($), (<<<), (==), (#))
+import DOM (DOM)
+import DOM.Node.Types (Element, textToNode)
+import DOM.Node.Types (Node) as DOM
+import DOM.Node.Document (createTextNode)
+import DOM.Node.Element (setAttribute, removeAttribute)
+import DOM.HTML (window)
+import DOM.HTML.Window (document)
+import DOM.HTML.Types (htmlDocumentToDocument)
+
+import Prelude (class Eq, flip, (+), void, pure, bind, (>>=), ($), (<#>), (<<<), (==), (#))
 
 
 -- Will suggest these for Data.Exists if they work
@@ -80,22 +94,21 @@ newtype TaggerRecord msg sub = TaggerRecord
 -- implications of real equality on a possibly-deep subtree may not be
 -- as desired.
 newtype ThunkRecord1 msg a = ThunkRecord1
-    { func :: a -> Node msg
-    , arg :: a
+    { func :: (Eq a) => a -> Node msg
+    , arg :: (Eq a) => a
     }
 
 newtype ThunkRecord2 msg a b = ThunkRecord2
-    { func :: a -> b -> Node msg
-    , arg1 :: a
-    , arg2 :: b
+    { func :: (Eq a, Eq b) => a -> b -> Node msg
+    , arg1 :: (Eq a) => a
+    , arg2 :: (Eq b) => b
     }
 
-
 newtype ThunkRecord3 msg a b c = ThunkRecord3
-    { func :: a -> b -> c -> Node msg
-    , arg1 :: a
-    , arg2 :: b
-    , arg3 :: c
+    { func :: (Eq a, Eq b, Eq c) => a -> b -> c -> Node msg
+    , arg1 :: (Eq a) => a
+    , arg2 :: (Eq b) => b
+    , arg3 :: (Eq c) => c
     }
 
 
@@ -161,9 +174,9 @@ function custom(factList, model, impl)
 
 
 type OrganizedFacts msg =
-    { namespace :: Maybe Json.Value
-    , attributes :: StrMap String
-    , attributesNS :: StrMap (Tuple Namespace String)
+    { namespace :: Maybe String
+    , attributes :: StrMap (Maybe String)
+    , attributesNS :: StrMap (Tuple Namespace (Maybe String))
     , events :: StrMap (Tuple Options (Json.Decoder msg))
     , styles :: StrMap String
     , custom :: StrMap Json.Value
@@ -209,8 +222,18 @@ organizeFacts factList =
 
                 CustomProperty key value ->
                     if key == "namespace"
-                        then void $ writeSTRef mutableNamespace (Just value)
-                        else void $ poke mutableCustom key value
+                        then
+                            case readString value of
+                                Left _ ->
+                                    -- It wasn't a string, so don't handle specially
+                                    void $ poke mutableCustom key value
+
+                                Right s ->
+                                    -- It was a string, so store as the namespace
+                                    void $ writeSTRef mutableNamespace (Just s)
+
+                        else
+                            void $ poke mutableCustom key value
 
         attributes <- freezeST mutableAttributes
         attributesNS <- freezeST mutableAttributesNS
@@ -261,7 +284,6 @@ map tagger child =
 
 -- PROPERTIES
 
-
 -- | When using HTML and JS, there are two ways to specify parts of a DOM node.
 -- |
 -- |   1. Attributes &mdash; You can set things in HTML itself. So the `class`
@@ -279,8 +301,8 @@ map tagger child =
 -- | attribute can be used in HTML, but there is no corresponding property!
 data Property msg
     = CustomProperty Key Json.Value
-    | Attribute Key String
-    | AttributeNS Key (Tuple Namespace String)
+    | Attribute Key (Maybe String)
+    | AttributeNS Key (Tuple Namespace (Maybe String))
     | Styles (List (Tuple String String))
     | OnEvent Key (Tuple Options (Json.Decoder msg))
 
@@ -317,7 +339,8 @@ property = CustomProperty
 -- | Notice that you must give the *attribute* name, so we use `class` as it would
 -- | be in HTML, not `className` as it would appear in JS.
 attribute :: ∀ msg. String -> String -> Property msg
-attribute = Attribute
+attribute key =
+    Attribute key <<< Just
 
 
 -- | Would you believe that there is another way to do this?! This corresponds
@@ -326,7 +349,7 @@ attribute = Attribute
 -- | attributes. This is used in some SVG stuff at least.
 attributeNS :: ∀ msg. String -> String -> String -> Property msg
 attributeNS ns key value =
-    AttributeNS key (Tuple ns value)
+    AttributeNS key (Tuple ns (Just value))
 
 
 -- | Specify a list of styles.
@@ -406,19 +429,19 @@ defaultOptions =
 -- | can check to see if `model` is referentially equal to the previous value used,
 -- | and if so, we just stop. No need to build up the tree structure and diff it,
 -- | we know if the input to `view` is the same, the output must be the same!
-lazy :: ∀ a msg. (a -> Node msg) -> a -> Node msg
+lazy :: ∀ a msg. (Eq a) => (a -> Node msg) -> a -> Node msg
 lazy func arg =
     Thunk (mkExists (ThunkRecord1 {func, arg}))
 
 
 -- | Same as `lazy` but checks on two arguments.
-lazy2 :: ∀ a b msg. (a -> b -> Node msg) -> a -> b -> Node msg
+lazy2 :: ∀ a b msg. (Eq a, Eq b) => (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2 func arg1 arg2 =
     Thunk2 (mkExists2 (ThunkRecord2 {func, arg1, arg2}))
 
 
 -- | Same as `lazy` but checks on three arguments.
-lazy3 :: ∀ a b c msg. (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
+lazy3 :: ∀ a b c msg. (Eq a, Eq b, Eq c) => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3 func arg1 arg2 arg3 =
     Thunk3 (mkExists3 (ThunkRecord3 {func, arg1, arg2, arg3}))
 
@@ -427,8 +450,9 @@ lazy3 func arg1 arg2 arg3 =
 
 -- This one is going to be a bit tricky, because I've implemented Json.Decode in a
 -- way that isn't going to be great for testing equality for Json.Decoder. I might
--- have to switch Json.Decode to more of a free monad approach.
-{-
+-- have to switch Json.Decode to more of a free monad approach. Which, in fact, would
+-- roughly correspond to some changes in Json.Decode for Elm 0.17.
+
 function equalEvents(a, b)
 {
 	if (!a.options === b.options)
@@ -441,11 +465,18 @@ function equalEvents(a, b)
 	return _elm_lang$core$Native_Json.equality(a.decoder, b.decoder);
 }
 
+-}
 
 
-////////////  RENDERER  ////////////
+--  RENDERER
+
+newtype EventNode = EventNode
+    { tagger :: Int
+    , parent :: Maybe EventNode
+    }
 
 
+{-
 function renderer(parent, tagger, initialVirtualNode)
 {
 	var eventNode = { tagger: tagger, parent: null };
@@ -502,35 +533,42 @@ var rAF =
 		? requestAnimationFrame
 		: function(cb) { setTimeout(cb, 1000 / 60); };
 
+-}
 
+-- RENDER
 
-////////////  RENDER  ////////////
+render :: ∀ e msg. Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+render vNode eventNode =
+    case vNode of
+        Thunk t ->
+            unsafeCrashWith "TODO"
 
-
-function render(vNode, eventNode)
-{
-	switch (vNode.type)
-	{
-		case 'thunk':
+{-
 			if (!vNode.node)
 			{
 				vNode.node = vNode.thunk();
 			}
 			return render(vNode.node, eventNode);
+-}
 
-		case 'tagger':
-			var subEventRoot = {
-				tagger: vNode.tagger,
-				parent: eventNode
-			};
-			var domNode = render(vNode.node, subEventRoot);
-			domNode.elm_event_node_ref = subEventRoot;
-			return domNode;
+        Thunk2 t ->
+            unsafeCrashWith "TODO"
 
-		case 'text':
-			return document.createTextNode(vNode.text);
+        Thunk3 t ->
+            unsafeCrashWith "TODO"
 
-		case 'node':
+        Text string ->
+            -- TODO: The document should probably be handled via state
+            window
+            >>= document
+            <#> htmlDocumentToDocument
+            >>= createTextNode string
+            <#> textToNode
+
+        PlainNode rec ->
+            unsafeCrashWith "TODO"
+
+{-
 			var domNode = vNode.namespace
 				? document.createElementNS(vNode.namespace, vNode.tag)
 				: document.createElement(vNode.tag);
@@ -545,67 +583,79 @@ function render(vNode, eventNode)
 			}
 
 			return domNode;
+-}
 
+        Tagger rec ->
+            unsafeCrashWith "TODO"
+
+{-
+            var subEventRoot = {
+				tagger: vNode.tagger,
+				parent: eventNode
+			};
+			var domNode = render(vNode.node, subEventRoot);
+			domNode.elm_event_node_ref = subEventRoot;
+			return domNode;
+-}
+
+{-
 		case 'custom':
 			var domNode = vNode.impl.render(vNode.model);
 			applyFacts(domNode, eventNode, vNode.facts);
 			return domNode;
-	}
-}
+-}
 
 
+-- APPLY FACTS
 
-////////////  APPLY FACTS  ////////////
+applyFacts :: ∀ e msg. EventNode -> OrganizedFacts msg -> Element -> Eff (dom :: DOM | e) Element
+applyFacts eventNode facts domNode = do
+    foldM applyStyle domNode facts.styles
+    foldM applyCustom domNode facts.custom
+--    applyEvents facts.events eventNode domNode
+    foldM applyAttr domNode facts.attributes
+    foldM applyAttrNS domNode facts.attributesNS
 
 
-function applyFacts(domNode, eventNode, facts)
-{
-	for (var key in facts)
-	{
-		var value = facts[key];
+applyStyle :: ∀ e. Element -> Key -> String -> Eff (dom :: DOM | e) Element
+applyStyle elem key value =
+    setStyle key value elem
 
-		switch (key)
-		{
-			case STYLE_KEY:
-				applyStyles(domNode, value);
-				break;
 
-			case EVENT_KEY:
-				applyEvents(domNode, eventNode, value);
-				break;
+applyCustom :: ∀ e. Element -> Key -> Json.Value -> Eff (dom :: DOM | e) Element
+applyCustom elem key value =
+    -- I think this is trying to avoid setting the "value" property if it is not
+    -- changing, probably to avoid some kind of browser issue.
+    if key == "value"
+        then setPropertyIfDifferent key value elem
+        else setProperty key value elem
 
-			case ATTR_KEY:
-				applyAttrs(domNode, value);
-				break;
 
-			case ATTR_NS_KEY:
-				applyAttrsNS(domNode, value);
-				break;
+applyAttr :: ∀ e. Element -> Key -> Maybe String -> Eff (dom :: DOM | e) Element
+applyAttr elem key value = do
+    case value of
+        Just attr ->
+            setAttribute key attr elem
 
-			case 'value':
-				if (domNode[key] !== value)
-				{
-					domNode[key] = value;
-				}
-				break;
+        Nothing ->
+            removeAttribute key elem
 
-			default:
-				domNode[key] = value;
-				break;
-		}
-	}
-}
+    pure elem
 
-function applyStyles(domNode, styles)
-{
-	var domNodeStyle = domNode.style;
 
-	for (var key in styles)
-	{
-		domNodeStyle[key] = styles[key];
-	}
-}
+applyAttrNS :: ∀ e. Element -> Key -> Tuple Namespace (Maybe String) -> Eff (dom :: DOM | e) Element
+applyAttrNS elem key (Tuple ns value) = do
+    case value of
+        Just attr ->
+            setAttributeNS ns key attr elem
 
+        Nothing ->
+            removeAttributeNS ns key elem
+
+    pure elem
+
+
+{-
 function applyEvents(domNode, eventNode, events)
 {
 	var allHandlers = domNode.elm_handlers || {};
@@ -680,42 +730,6 @@ function makeEventHandler(eventNode, info)
 
 	return eventHandler;
 }
-
-function applyAttrs(domNode, attrs)
-{
-	for (var key in attrs)
-	{
-		var value = attrs[key];
-		if (typeof value === 'undefined')
-		{
-			domNode.removeAttribute(key);
-		}
-		else
-		{
-			domNode.setAttribute(key, value);
-		}
-	}
-}
-
-function applyAttrsNS(domNode, nsAttrs)
-{
-	for (var key in nsAttrs)
-	{
-		var pair = nsAttrs[key];
-		var namespace = pair.namespace;
-		var value = pair.value;
-
-		if (typeof value === 'undefined')
-		{
-			domNode.removeAttributeNS(namespace, key);
-		}
-		else
-		{
-			domNode.setAttributeNS(namespace, key, value);
-		}
-	}
-}
-
 
 
 ////////////  DIFF  ////////////
