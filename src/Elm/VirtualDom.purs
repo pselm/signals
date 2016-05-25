@@ -14,7 +14,11 @@ module Elm.VirtualDom
 
 import Elm.Json.Decode (Decoder, Value) as Json
 import Elm.Basics (Bool)
-import Elm.Graphics.Internal (setStyle, setProperty, setPropertyIfDifferent, setAttributeNS, removeAttributeNS)
+import Elm.Graphics.Internal
+    ( setStyle, removeStyle
+    , setProperty, setPropertyIfDifferent, removeProperty
+    , setAttributeNS, removeAttributeNS
+    )
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import Control.Monad.Eff (Eff)
@@ -22,10 +26,11 @@ import Unsafe.Coerce (unsafeCoerce)
 import Partial.Unsafe (unsafeCrashWith)
 
 import Data.Tuple (Tuple(..))
-import Data.List (List, length)
+import Data.List (List, length, singleton)
 import Data.Foldable (foldl, for_)
-import Data.StrMap (StrMap, freezeST, foldM)
-import Data.StrMap.ST (new, poke)
+import Data.StrMap (StrMap, foldM, foldMap)
+import Data.StrMap.ST (new, poke, peek)
+import Data.StrMap.ST.Unsafe (unsafeGet)
 import Data.Maybe (Maybe(..))
 import Data.Exists (Exists, runExists, mkExists)
 import Data.Foreign (readString)
@@ -40,7 +45,7 @@ import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Types (htmlDocumentToDocument)
 
-import Prelude (class Eq, flip, (+), void, pure, bind, (>>=), ($), (<#>), (<<<), (==), (#))
+import Prelude (class Eq, Unit, flip, (+), void, pure, bind, (>>=), ($), (<#>), (==), (#), (<>))
 
 
 -- Will suggest these for Data.Exists if they work
@@ -74,6 +79,7 @@ data Node msg
 
 type NodeRecord msg =
     { tag :: String
+    , namespace :: Maybe String
     , facts :: OrganizedFacts msg
     , children :: List (Node msg)
     , descendantsCount :: Int
@@ -148,13 +154,18 @@ descendants n =
 node :: ∀ msg. String -> List (Property msg) -> List (Node msg) -> Node msg
 node tag properties children =
     PlainNode $
-        { tag, children, descendantsCount, facts }
+        { tag
+        , namespace: organized.namespace
+        , children
+        , descendantsCount
+        , facts: organized.facts
+        }
 
     where
         descendantsCount =
             (foldl (\memo n -> memo + (descendants n)) 0 children) + (length children)
 
-        facts =
+        organized =
             organizeFacts properties
 
 
@@ -171,78 +182,6 @@ function custom(factList, model, impl)
 	};
 }
 -}
-
-
-type OrganizedFacts msg =
-    { namespace :: Maybe String
-    , attributes :: StrMap (Maybe String)
-    , attributesNS :: StrMap (Tuple Namespace (Maybe String))
-    , events :: StrMap (Tuple Options (Json.Decoder msg))
-    , styles :: StrMap String
-    , custom :: StrMap Json.Value
-    }
-
-
--- Basically, this seems to take a list of properties and group
--- them according to their subtypes. Also, if properties of the
--- same subtype have the same key, it would only retain one of
--- the properties.
---
--- One alternative would be a foldl, with the OrganizedFacts as
--- the memo. But that might be more inefficient. I should
--- profile the overall code sometime and see where optimizations
--- might be wise.
-organizeFacts :: ∀ msg. List (Property msg) -> OrganizedFacts msg
-organizeFacts factList =
-    pureST do
-        mutableAttributes <- new
-        mutableAttributesNS <- new
-        mutableEvents <- new
-        mutableStyles <- new
-        mutableCustom <- new
-        mutableNamespace <- newSTRef Nothing
-
-        for_ factList \fact -> do
-            case fact of
-                Attribute key value ->
-                    void $ poke mutableAttributes key value
-
-                -- TODO: There is a bug here from the original Elm code, where two
-                -- namespaced attributes with the same name will clobber each other
-                -- even if they have different namespaces. I should fix that.
-                AttributeNS key value ->
-                    void $ poke mutableAttributesNS key value
-
-                OnEvent key value ->
-                    void $ poke mutableEvents key value
-
-                Styles list ->
-                    for_ list \(Tuple key value) ->
-                        void $ poke mutableStyles key value
-
-                CustomProperty key value ->
-                    if key == "namespace"
-                        then
-                            case readString value of
-                                Left _ ->
-                                    -- It wasn't a string, so don't handle specially
-                                    void $ poke mutableCustom key value
-
-                                Right s ->
-                                    -- It was a string, so store as the namespace
-                                    void $ writeSTRef mutableNamespace (Just s)
-
-                        else
-                            void $ poke mutableCustom key value
-
-        attributes <- freezeST mutableAttributes
-        attributesNS <- freezeST mutableAttributesNS
-        events <- freezeST mutableEvents
-        styles <- freezeST mutableStyles
-        custom <- freezeST mutableCustom
-        namespace <- readSTRef mutableNamespace
-
-        pure {namespace, attributes, attributesNS, events, styles, custom}
 
 
 -- | Just put plain text in the DOM. It will escape the string so that it appears
@@ -301,14 +240,179 @@ map tagger child =
 -- | attribute can be used in HTML, but there is no corresponding property!
 data Property msg
     = CustomProperty Key Json.Value
-    | Attribute Key (Maybe String)
-    | AttributeNS Key (Tuple Namespace (Maybe String))
+    | Attribute Key String
+    | AttributeNS Namespace Key String
     | Styles (List (Tuple String String))
-    | OnEvent Key (Tuple Options (Json.Decoder msg))
+    | OnEvent Key Options (Json.Decoder msg)
+
+
+-- This represents the properties that should be applied to a node, organized for
+-- quick lookup (since the API supplies them as a list).
+type OrganizedFacts msg =
+    { attributes :: StrMap String
+    , attributesNS :: StrMap (StrMap String)
+    , events :: StrMap (Tuple Options (Json.Decoder msg))
+    , styles :: StrMap String
+    , properties :: StrMap Json.Value
+    }
+
+
+data FactChange msg
+    = AddAttribute String String
+    | RemoveAttribute String
+    | AddAttributeNS String String String
+    | RemoveAttributeNS String String
+    | AddEvent String Options (Json.Decoder msg)
+    | RemoveEvent String Options
+    | AddStyle String String
+    | RemoveStyle String
+    | AddProperty String Json.Value
+    | RemoveProperty String
 
 
 type Namespace = String
 type Key = String
+
+
+-- Could optimize this stage out by writing a function that went straight
+-- from OrganizedFacts to effects ... should try profiling at some point.
+-- Also, there is probably a more efficient way to do this without all
+-- the singleton list creation.
+initialFactChanges :: ∀ msg. OrganizedFacts msg -> List (FactChange msg)
+initialFactChanges facts =
+    attributeChanges <>
+    attributeNsChanges <>
+    eventChanges <>
+    styleChanges <>
+    propertyChanges
+
+    where
+        attributeChanges =
+            facts.attributes #
+                foldMap \k v ->
+                    singleton (AddAttribute k v)
+
+        attributeNsChanges =
+            facts.attributesNS #
+                foldMap \ns ->
+                    foldMap \k v ->
+                        singleton (AddAttributeNS ns k v)
+
+        eventChanges =
+            facts.events #
+                foldMap \k (Tuple options decoder) ->
+                    singleton (AddEvent k options decoder)
+
+        styleChanges =
+            facts.styles #
+                foldMap \k v ->
+                    singleton (AddStyle k v)
+
+        propertyChanges =
+            facts.properties #
+                foldMap \k v ->
+                    singleton (AddProperty k v)
+
+
+-- Basically, this seems to take a list of properties and group
+-- them according to their subtypes. Also, if properties of the
+-- same subtype have the same key, it would only retain one of
+-- the properties.
+--
+-- One alternative would be a foldl, with the OrganizedFacts as
+-- the memo. But that might be more inefficient. I should
+-- profile the overall code sometime and see where optimizations
+-- might be wise.
+organizeFacts :: ∀ msg. List (Property msg) -> {namespace :: Maybe String, facts :: OrganizedFacts msg}
+organizeFacts factList =
+    pureST do
+        -- Create a bunch of accumulators for StrMap
+        mutableAttributes <- new
+        mutableAttributesNS <- new
+        mutableEvents <- new
+        mutableStyles <- new
+        mutableProperties <- new
+
+        -- And a reference for the namespace
+        mutableNamespace <- newSTRef Nothing
+
+        -- Iterate through the facts
+        for_ factList \fact -> do
+            case fact of
+                Attribute key value ->
+                    void $ poke mutableAttributes key value
+
+                -- We make mutableAttributesNS a map of maps, where the outer map
+                -- is keyed by the namespace. This fixes a bug in the original
+                -- Elm Javascript ... see https://github.com/elm-lang/virtual-dom/issues/16
+                AttributeNS ns key value -> void do
+                    submap <-
+                        peek mutableAttributesNS ns >>=
+                            case _ of
+                                Just existing ->
+                                    pure existing
+
+                                Nothing ->
+                                    new
+
+                    poke submap key value
+                    poke mutableAttributesNS ns submap
+
+                OnEvent key options decoder ->
+                    void $ poke mutableEvents key (Tuple options decoder)
+
+                Styles list ->
+                    for_ list \(Tuple key value) ->
+                        poke mutableStyles key value
+
+                CustomProperty key value ->
+                    -- So, the normal case here is that we're setting an arbitrary property
+                    -- on the node. However, the original Elm code also allows you to use
+                    -- a special "namespace" property, to specify the namespace of the node
+                    -- itself. This seems a bit odd ... would probably be better to have an
+                    -- explicit API for namespaced nodes.
+                    if key == "namespace"
+                        then
+                            case readString value of
+                                Left _ ->
+                                    -- It wasn't a string, so don't handle specially
+                                    void $ poke mutableProperties key value
+
+                                Right s ->
+                                    -- It was a string, so store as the namespace
+                                    void $ writeSTRef mutableNamespace (Just s)
+
+                        else
+                            void $ poke mutableProperties key value
+
+        -- These are unsafe in the sense that further modifications to the mutable
+        -- versions would also modify the pure. So, we won't do that ...
+        -- The alternative is freezeST, but that actually does a copy, which in
+        -- this context isn't really necessary.
+        attributes <- unsafeGet mutableAttributes
+        events <- unsafeGet mutableEvents
+        styles <- unsafeGet mutableStyles
+        properties <- unsafeGet mutableProperties
+
+        -- I also need to iterate over all of the submaps and "freeze" them ...
+        -- and then freeze the resulting outer map
+        pureOuterMap <- unsafeGet mutableAttributesNS
+        accumulator <- new
+
+        foldM (\accum key submap ->
+            unsafeGet submap >>= poke accum key
+        ) accumulator pureOuterMap
+
+        attributesNS <- unsafeGet accumulator
+
+        -- And read the namespace
+        namespace <- readSTRef mutableNamespace
+
+        pure
+            { namespace
+            , facts: { attributes, attributesNS, events, styles, properties }
+            }
+
 
 
 -- | Create arbitrary *properties*.
@@ -339,8 +443,7 @@ property = CustomProperty
 -- | Notice that you must give the *attribute* name, so we use `class` as it would
 -- | be in HTML, not `className` as it would appear in JS.
 attribute :: ∀ msg. String -> String -> Property msg
-attribute key =
-    Attribute key <<< Just
+attribute = Attribute
 
 
 -- | Would you believe that there is another way to do this?! This corresponds
@@ -348,8 +451,7 @@ attribute key =
 -- | much the same thing as `attribute` but you are able to have "namespaced"
 -- | attributes. This is used in some SVG stuff at least.
 attributeNS :: ∀ msg. String -> String -> String -> Property msg
-attributeNS ns key value =
-    AttributeNS key (Tuple ns (Just value))
+attributeNS = AttributeNS
 
 
 -- | Specify a list of styles.
@@ -392,8 +494,7 @@ on =
 
 -- | Same as `on` but you can set a few options.
 onWithOptions :: ∀ msg. String -> Options -> Json.Decoder msg -> Property msg
-onWithOptions key options =
-    OnEvent key <<< Tuple options
+onWithOptions = OnEvent
 
 
 -- | Options for an event listener. If `stopPropagation` is true, it means the
@@ -608,51 +709,43 @@ render vNode eventNode =
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e msg. EventNode -> OrganizedFacts msg -> Element -> Eff (dom :: DOM | e) Element
-applyFacts eventNode facts domNode = do
-    foldM applyStyle domNode facts.styles
-    foldM applyCustom domNode facts.custom
---    applyEvents facts.events eventNode domNode
-    foldM applyAttr domNode facts.attributes
-    foldM applyAttrNS domNode facts.attributesNS
+applyFacts :: ∀ e msg. EventNode -> List (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts eventNode operations elem = do
+    for_ operations \operation ->
+        case operation of
+            AddAttribute key value ->
+                setAttribute key value elem
 
+            RemoveAttribute key ->
+                removeAttribute key elem
 
-applyStyle :: ∀ e. Element -> Key -> String -> Eff (dom :: DOM | e) Element
-applyStyle elem key value =
-    setStyle key value elem
+            AddAttributeNS ns key value ->
+                setAttributeNS ns key value elem
 
+            RemoveAttributeNS ns key ->
+                removeAttributeNS ns key elem
 
-applyCustom :: ∀ e. Element -> Key -> Json.Value -> Eff (dom :: DOM | e) Element
-applyCustom elem key value =
-    -- I think this is trying to avoid setting the "value" property if it is not
-    -- changing, probably to avoid some kind of browser issue.
-    if key == "value"
-        then setPropertyIfDifferent key value elem
-        else setProperty key value elem
+            AddEvent key options decoder ->
+                unsafeCrashWith "TODO"
 
+            RemoveEvent key options ->
+                unsafeCrashWith "TODO"
 
-applyAttr :: ∀ e. Element -> Key -> Maybe String -> Eff (dom :: DOM | e) Element
-applyAttr elem key value = do
-    case value of
-        Just attr ->
-            setAttribute key attr elem
+            AddStyle key value ->
+                setStyle key value elem
 
-        Nothing ->
-            removeAttribute key elem
+            RemoveStyle key ->
+                removeStyle key elem
 
-    pure elem
+            AddProperty key value ->
+                if key == "value"
+                    -- I think this is trying to avoid setting the "value" property if it is not
+                    -- changing, probably to avoid some kind of browser issue.
+                    then setPropertyIfDifferent key value elem
+                    else setProperty key value elem
 
-
-applyAttrNS :: ∀ e. Element -> Key -> Tuple Namespace (Maybe String) -> Eff (dom :: DOM | e) Element
-applyAttrNS elem key (Tuple ns value) = do
-    case value of
-        Just attr ->
-            setAttributeNS ns key attr elem
-
-        Nothing ->
-            removeAttributeNS ns key elem
-
-    pure elem
+            RemoveProperty key ->
+                removeProperty key elem
 
 
 {-
@@ -914,10 +1007,14 @@ function pairwiseRefEqual(as, bs)
 	return true;
 }
 
+-}
 
-// TODO Instead of creating a new diff object, it's possible to just test if
-// there *is* a diff. During the actual patch, do the diff again and make the
-// modifications directly. This way, there's no new allocations. Worth it?
+diffFacts :: ∀ msg. OrganizedFacts msg -> OrganizedFacts msg -> OrganizedFacts msg
+diffFacts a b =
+    unsafeCrashWith "TODO"
+
+{-
+
 function diffFacts(a, b, category)
 {
 	var diff;

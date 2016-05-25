@@ -49,6 +49,19 @@ exports.setProperty = function (key) {
     };
 };
 
+exports.removeProperty = function (key) {
+    return function (element) {
+        return function () {
+            // This is really a special-case for VirtualDOM -- it's
+            // what the original Javascript does. One might prefer
+            // `delete element[key]`, but perhaps that causes trouble
+            // in some cases.
+            element[key] = (typeof element[key] === 'string') ? '' : null;
+            return {};
+        };
+    };
+};
+
 exports.setPropertyIfDifferent = function (key) {
     return function (value) {
         return function (element) {

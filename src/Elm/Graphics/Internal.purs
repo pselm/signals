@@ -8,7 +8,7 @@ module Elm.Graphics.Internal
     , setStyle, removeStyle
     , addTransform, removeTransform
     , getDimensions, measure
-    , setProperty, setPropertyIfDifferent
+    , setProperty, removeProperty, setPropertyIfDifferent
     , setAttributeNS, getAttributeNS, removeAttributeNS
     ) where
 
@@ -43,6 +43,8 @@ foreign import getDimensions :: ∀ e. Element -> Eff (dom :: DOM | e) {width ::
 -- Set arbitrary property. TODO: Should suggest for purescript-dom
 foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
 
+-- Remove a property.
+foreign import removeProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
 
 -- Set if not already equal. A bit of a hack ... not suitable for general use.
 foreign import setPropertyIfDifferent :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
