@@ -10,3 +10,4 @@
 /elm-stuff
 /elm-package.json
 /build
+/src/Elm/*.elm
