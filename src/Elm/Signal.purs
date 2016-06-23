@@ -30,10 +30,16 @@ module Elm.Signal
     ) where
 
 
-import Prelude
-    ( class Eq, class Monad, Unit, unit, ($), (++), bind, (+)
-    , pure, (==), (/=), (&&), (||), const, id
-    )
+import Elm.Task (TaskE)
+import Elm.Debug (crash)
+
+import Data.Array (cons)
+import Data.DateTime.Instant (Instant, unInstant)
+import Data.Time.Duration (Milliseconds(..))
+import Data.List (List(..), foldM, reverse)
+import Data.Exists (Exists, runExists, mkExists)
+import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff, foreachE)
@@ -41,19 +47,14 @@ import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef, modifyRef, newRef)
+import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.State.Trans (StateT, evalStateT)
 import Control.Monad.State.Class (gets, modify)
-import Data.Array (cons)
-import Elm.List (List(..))
-import Data.List (foldM, reverse)
-import Data.Exists (Exists, runExists, mkExists)
-import Data.Tuple (Tuple(..))
-import Elm.Maybe (Maybe(..))
-import Data.Maybe (fromMaybe)
-import Data.Date (Now, nowEpochMilliseconds)
-import Data.Time (Milliseconds(..))
-import Elm.Task (TaskE)
-import Elm.Debug (crash)
+
+import Prelude
+    ( class Eq, class Monad, Unit, unit, ($), (<>), bind, (+)
+    , pure, (==), (/=), (&&), (||), const, id
+    )
 
 
 {- This is a relatively crude or naive translation of the Elm `Signal`
@@ -84,7 +85,7 @@ type Time = Number
 
 
 {- Time since epoch, used to give timestamps to events. -}
-type Timestamp = Milliseconds
+type Timestamp = Instant
 
 
 {- An ID for each signal ... made unique by the `Graph`.
@@ -152,7 +153,7 @@ state again.
 newtype Graph = Graph
     { guid :: SignalID
     , inputs :: Ref (Array UntypedSignal)
-    , programStart :: Milliseconds
+    , programStart :: Instant
     , updateInProgress :: Ref Boolean
     }
 
@@ -164,23 +165,23 @@ type GraphState m a = StateT Graph m a
 
 
 -- | Setup the signal graph.
--- | 
+-- |
 -- | Basically, this provides a context in which you can do whatever you need to setup your
 -- | signal graph. So, you might have something like:
--- | 
+-- |
 -- |     main =
 -- |         setup do
 -- |             mbox <- mailbox "Initial value"
--- |             map <- map ((++) " concat") mbox
+-- |             map <- map ((<>) " concat") mbox
 -- |             ...
--- | 
+-- |
 -- | TODO: Write out a trivial working example once I have one!
--- | 
+-- |
 -- | Technically, this runs whatever commands you supply in the context of a newly initialized
 -- | signal graph, and returns whatever your commands return.
-setup :: forall e m a. (MonadEff (ref :: REF, now :: Now | e) m) => GraphState m a -> m a
+setup :: forall e m a. (MonadEff (ref :: REF, now :: NOW | e) m) => GraphState m a -> m a
 setup cb = do
-    programStart <- liftEff $ nowEpochMilliseconds
+    programStart <- liftEff $ now
     inputs <- liftEff $ newRef []
     updateInProgress <- liftEff $ newRef false
 
@@ -206,7 +207,7 @@ getInputs =
 
 
 -- Get the programStart
-getProgramStart :: forall m. (Monad m) => GraphState m Milliseconds
+getProgramStart :: forall m. (Monad m) => GraphState m Instant
 getProgramStart =
     gets \(Graph graph) -> graph.programStart
 
@@ -404,7 +405,7 @@ input name base = do
         node =
             Signal
                 { id
-                , name: "input-" ++ name
+                , name: "input-" <> name
                 , value
                 -- Not that parents not really needed ... should redesign
                 -- to reflect this.
@@ -424,14 +425,14 @@ input name base = do
 
 -- | Create a signal that never changes. This can be useful if you need
 -- | to pass a combination of signals and normal values to a function:
--- | 
+-- |
 -- |     map3 view Window.dimensions Mouse.position (constant initialModel)
 constant :: forall e m a. (MonadEff (ref :: REF | e) m) => a -> GraphState m (Signal a)
 constant = input "constant"
 
 
 output ::
-    forall e1 e2 m a. (MonadEff (ref :: REF | e1) m) => 
+    forall e1 e2 m a. (MonadEff (ref :: REF | e1) m) =>
     String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
 
 output name handler (Signal parent) = do
@@ -454,7 +455,7 @@ output name handler (Signal parent) = do
         node =
             Signal
                 { id
-                , name: "output-" ++ name
+                , name: "output-" <> name
                 , parents: [mkExists (Signal parent)]
                 , role: Output
                 , notifyKids
@@ -471,18 +472,18 @@ output name handler (Signal parent) = do
 -- | Create a past-dependent signal. Each update from the incoming signal will
 -- | be used to step the state forward. The outgoing signal represents the current
 -- | state.
--- | 
+-- |
 -- |     clickCount :: Signal Int
 -- |     clickCount =
 -- |         foldp (\click total -> total + 1) 0 Mouse.clicks
--- | 
+-- |
 -- |     timeSoFar :: Signal Time
 -- |     timeSoFar =
 -- |         foldp (+) 0 (fps 40)
--- | 
+-- |
 -- | So `clickCount` updates on each mouse click, incrementing by one. `timeSoFar`
 -- | is the time the program has been running, updated 40 times a second.
--- | 
+-- |
 -- | Note: The behavior of the outgoing signal is not influenced at all by
 -- | the initial value of the incoming signal, only by updates occurring on
 -- | the latter. So the initial value of `sig` is completely ignored in
@@ -525,8 +526,10 @@ foldp func state (Signal parent) = do
     pure node
 
 
-toTime :: Milliseconds -> Time
-toTime (Milliseconds millis) = millis
+toTime :: Instant -> Time
+toTime i =
+    case unInstant i of
+        Milliseconds millis -> millis
 
 
 -- | Add a timestamp to any signal. Timestamps increase monotonically. When you
@@ -548,7 +551,7 @@ timestamp (Signal parent) = do
 
     pv <- readRef' parent.value
     programStart <- getProgramStart
-    value <- newRef' $ Tuple (toTime $ programStart) pv
+    value <- newRef' $ Tuple (toTime programStart) pv
 
     let
         notifyKids :: NotifyKid
@@ -581,11 +584,11 @@ timestamp (Signal parent) = do
 -- | *keep* an update. If no updates ever flow through, we use the default value
 -- | provided. The following example only keeps even numbers and has an initial
 -- | value of zero.
--- | 
+-- |
 -- |     numbers :: Signal Int
--- | 
+-- |
 -- |     isEven :: Int -> Bool
--- | 
+-- |
 -- |     evens :: Signal Int
 -- |     evens =
 -- |         filter isEven 0 numbers
@@ -606,11 +609,11 @@ filter isOk base signal =
 -- | If the initial value of the incoming signal turns into `Nothing`, we use the
 -- | default value provided. The following example keeps only strings that can be
 -- | read as integers.
--- | 
+-- |
 -- |     userInput : Signal String
--- | 
+-- |
 -- |     toInt : String -> Maybe Int
--- | 
+-- |
 -- |     numbers : Signal Int
 -- |     numbers =
 -- |         filterMap toInt 0 userInput
@@ -664,11 +667,11 @@ filterMap pred base (Signal parent) = do
 
 
 -- | Apply a function to a signal.
--- | 
+-- |
 -- |     mouseIsUp :: Signal Boolean
 -- |     mouseIsUp =
 -- |         map not Mouse.isDown
--- |     
+-- |
 -- |     main :: Signal Element
 -- |     main =
 -- |         map Graphics.Element.show Mouse.position
@@ -753,13 +756,13 @@ applySignal (Signal funcs) (Signal parent) = do
                 when (parentID == parent.id) $
                     writeRef parentUpdated (Just update)
 
-                pu <- readRef parentUpdated
-                fu <- readRef funcsUpdated
+                mpu <- readRef parentUpdated
+                mfu <- readRef funcsUpdated
 
-                -- What we're doing is applying `(||)` to two `Maybe Boolean` values, and
-                -- it does what you'd expect, if you think about it ... kind of neat!
-                case pu || fu of
-                    Just reallyUpdate -> do
+                case {mpu, mfu} of
+                    {mpu: Just pu, mfu: Just fu} -> do
+                        let reallyUpdate = pu || fu
+
                         -- both sides have been notified, so update if either side has updated
                         when reallyUpdate do
                             parentValue <- readRef parent.value
@@ -774,7 +777,7 @@ applySignal (Signal funcs) (Signal parent) = do
                         writeRef parentUpdated Nothing
                         writeRef funcsUpdated Nothing
 
-                    Nothing ->
+                    _ ->
                         -- Wait for the other notification to come in
                         pure unit
 
@@ -801,11 +804,11 @@ applySignal (Signal funcs) (Signal parent) = do
 -- | is reevaluated whenever *either* signal changes. In the following example, we
 -- | figure out the `aspectRatio` of the window by combining the current width and
 -- | height.
--- | 
+-- |
 -- |     ratio : Int -> Int -> Float
 -- |     ratio width height =
 -- |         toFloat width / toFloat height
--- |     
+-- |
 -- |     aspectRatio : Signal Float
 -- |     aspectRatio =
 -- |         map2 ratio Window.width Window.height
@@ -885,11 +888,13 @@ sampleOn (Signal ticker) (Signal parent) = do
                     -- was notified (via the `Just`).
                     writeRef signalUpdated (Just false)
 
-                tu <- readRef tickerUpdated
-                su <- readRef signalUpdated
+                mtu <- readRef tickerUpdated
+                msu <- readRef signalUpdated
 
-                case tu || su of
-                    Just reallyUpdate -> do
+                case {mtu, msu} of
+                    {mtu: Just tu, msu: Just su} -> do
+                        let reallyUpdate = tu || su
+
                         when reallyUpdate do
                             parentValue <- readRef parent.value
                             writeRef value parentValue
@@ -899,7 +904,7 @@ sampleOn (Signal ticker) (Signal parent) = do
                         writeRef signalUpdated Nothing
                         writeRef tickerUpdated Nothing
 
-                    Nothing ->
+                    _ ->
                         pure unit
 
         node =
@@ -922,13 +927,13 @@ sampleOn (Signal ticker) (Signal parent) = do
 
 
 -- | Drop updates that repeat the current value of the signal.
--- | 
+-- |
 -- |     numbers : Signal Int
--- | 
+-- |
 -- |     noDups : Signal Int
 -- |     noDups =
 -- |         dropRepeats numbers
--- | 
+-- |
 -- |     --  numbers => 0 0 3 3 5 5 5 4 ...
 -- |     --  noDups  => 0   3   5     4 ...
 dropRepeats ::
@@ -977,15 +982,15 @@ dropRepeats (Signal parent) = do
 
 -- | Merge two signals into one. This function is extremely useful for bringing
 -- | together lots of different signals to feed into a `foldp`.
--- | 
+-- |
 -- |     type Update = MouseMove (Int,Int) | TimeDelta Float
--- | 
+-- |
 -- |     updates : Signal Update
 -- |     updates =
 -- |         merge
 -- |             (map MouseMove Mouse.position)
 -- |             (map TimeDelta (fps 40))
--- | 
+-- |
 -- | If an update comes from either of the incoming signals, it updates the outgoing
 -- | signal. If an update comes on both signals at the same time, the update provided
 -- | by the left input signal wins (i.e., the update from the second signal is discarded).
@@ -999,9 +1004,9 @@ merge = genericMerge const
 -- | Merge many signals into one. This is useful when you are merging more than
 -- | two signals. When multiple updates come in at the same time, the left-most
 -- | update wins, just like with `merge`.
--- | 
+-- |
 -- |     type Update = MouseMove (Int,Int) | TimeDelta Float | Click
--- | 
+-- |
 -- |     updates : Signal Update
 -- |     updates =
 -- |         mergeMany
@@ -1050,27 +1055,29 @@ genericMerge tieBreaker (Signal left) (Signal right) = do
                 when (parentID == right.id) $
                     writeRef rightUpdated (Just update)
 
-                lu <- readRef leftUpdated
-                ru <- readRef rightUpdated
+                mlu <- readRef leftUpdated
+                mru <- readRef rightUpdated
 
-                case lu || ru of
-                    Just reallyUpdate -> do
+                case {mlu, mru} of
+                    {mlu: Just lu, mru: Just ru} -> do
+                        let reallyUpdate = lu || ru
+
                         -- They have both been notified, so check which updated.
                         leftValue <- readRef left.value
                         rightValue <- readRef right.value
 
                         -- This is the Purescript equivalent of pattern-matching
                         -- on tuples, called "record punning" ... it's quite nice!
-                        case {lu, ru} of
-                            {lu: Just true, ru: Just true} ->
+                        case {mlu, mru} of
+                            {mlu: Just true, mru: Just true} ->
                                 -- Both updated, so apply the tie-breaker
                                 writeRef value $ tieBreaker leftValue rightValue
 
-                            {lu: Just true, ru: _} ->
+                            {mlu: Just true, mru: _} ->
                                 -- Just the left side updated
                                 writeRef value leftValue
 
-                            {lu: _, ru: Just true} ->
+                            {mlu: _, mru: Just true} ->
                                 -- Just the right side updated
                                 writeRef value rightValue
 
@@ -1083,7 +1090,7 @@ genericMerge tieBreaker (Signal left) (Signal right) = do
                         writeRef leftUpdated Nothing
                         writeRef rightUpdated Nothing
 
-                    Nothing ->
+                    _ ->
                         pure unit
 
         node =
@@ -1108,7 +1115,7 @@ genericMerge tieBreaker (Signal left) (Signal right) = do
 -- MAILBOXES
 
 -- | A `Mailbox` is a communication hub. It is made up of
--- | 
+-- |
 -- |   * an `Address` that you can send messages to
 -- |   * a `Signal` of messages sent to the mailbox
 type Mailbox a =
@@ -1119,22 +1126,22 @@ type Mailbox a =
 
 -- | An `Address` points to a specific signal. It allows you to feed values into
 -- | signals, so you can provide your own signal updates.
--- | 
+-- |
 -- | The primary use case is when a `Task` or UI element needs to talk back to the
 -- | main part of your application.
 newtype Address a =
-    Address (forall e. a -> Eff (ref :: REF, now :: Now, console :: CONSOLE, delay :: DELAY | e) Unit)
+    Address (forall e. a -> Eff (ref :: REF, now :: NOW, console :: CONSOLE, delay :: DELAY | e) Unit)
 
 
 {- Updates the current value of the specified input `Signal`, and then broadcasts the
 update throughout the signal graph.
 -}
-notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: Now, console :: CONSOLE, delay :: DELAY | e) Unit
+notify :: forall e a. Signal a -> a -> Eff (ref :: REF, now :: NOW, console :: CONSOLE, delay :: DELAY | e) Unit
 notify (Signal signal) value = do
     updateInProgress <- readRef signal.updateInProgress
-    
+
     if updateInProgress
-        then delay 0 $ notify (Signal signal) value 
+        then delay 0 $ notify (Signal signal) value
         else do
             -- Indicate we're in progress
             writeRef signal.updateInProgress true
@@ -1143,7 +1150,7 @@ notify (Signal signal) value = do
             writeRef signal.value value
 
             -- Notify all the inputs
-            timestep <- nowEpochMilliseconds
+            timestep <- now
             inputs <- readRef signal.inputs
 
             foreachE inputs (
@@ -1173,16 +1180,16 @@ mailbox base = do
 
 -- | Create a new address. This address will tag each message it receives
 -- | and then forward it along to some other address.
--- | 
+-- |
 -- |     type Action = Undo | Remove Int | NoOp
--- | 
+-- |
 -- |     actions : Mailbox Action
 -- |     actions = mailbox NoOp
--- | 
+-- |
 -- |     removeAddress : Address Int
 -- |     removeAddress =
 -- |         forwardTo actions.address Remove
--- | 
+-- |
 -- | In this case we have a general `address` that many people may send
 -- | messages to. The new `removeAddress` tags all messages with the `Remove` tag
 -- | before forwarding them along to the more general `address`. This means
@@ -1196,11 +1203,11 @@ forwardTo (Address actuallySend) f =
 -- | A `Message` is like an envelope that you have not yet put in a mailbox.
 -- | The address is filled out and the envelope is filled, but it will be sent at
 -- | some point in the future.
-newtype Message e = Message (TaskE (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit Unit)
+newtype Message e = Message (TaskE (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit Unit)
 
 
 -- | Create a message that may be sent to a `Mailbox` at a later time.
--- | 
+-- |
 -- | Most importantly, this lets us create APIs that can send values to ports
 -- | *without* allowing people to run arbitrary tasks.
 message :: forall e a. Address a -> a -> Message e
@@ -1209,33 +1216,33 @@ message (Address actuallySend) value =
 
 
 -- | Send a message to an `Address`.
--- | 
+-- |
 -- |     type Action = Undo | Remove Int
--- | 
+-- |
 -- |     address : Address Action
--- | 
+-- |
 -- |     requestUndo : Task x ()
 -- |     requestUndo =
 -- |         send address Undo
--- | 
+-- |
 -- | The `Signal` associated with `address` will receive the `Undo` message
 -- | and push it through the Elm program.
 -- TODO: Need to make this a `Task`, actually.
-send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit
+send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit
 send (Address actuallySend) value =
     actuallySend value
 
 
 -- | Gets the current value of a signal.
--- | 
+-- |
 -- | Note that the normal Elm program architecture is to map a (combination of) signals
 -- | to a signal of tasks, and then have those tasks executed. So, normally you don't
 -- | need to "get" the current value ... the values simply flow to the tasks that need
 -- | to be executed.
--- | 
+-- |
 -- | However, there are cases in which it is useful to get a signal's value, so we provide
 -- | for it here. (For instance, it's handy when testing ...)
--- | 
+-- |
 -- | Note that some signal operations are async -- for instance, sending a value to a
 -- | `Mailbox` occurs async. However, `current` is *not* async. So, you'll need to
 -- | delay applying `current` in some cases to get the results you expect.

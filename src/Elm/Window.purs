@@ -14,7 +14,6 @@ module Elm.Window
 import Elm.Signal (Signal, DELAY, GraphState, Graph, send, mailbox, map, current, delay)
 
 import Prelude (pure, ($), bind, unit, const, (<<<), (>>=), (==), (&&))
-import Data.Date (Now)
 import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
@@ -25,6 +24,7 @@ import Control.Monad.Reader.Class (reader)
 import Control.Monad.State.Trans (StateT)
 import Control.Monad.Trans (lift)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
@@ -34,7 +34,7 @@ import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (HTMLElement, windowToEventTarget)
-import DOM.Event.EventTypes (resize)
+import DOM.HTML.Event.EventTypes (resize)
 import DOM.Event.EventTarget (eventListener, addEventListener)
 
 
@@ -97,7 +97,7 @@ foreign import clientHeight :: ∀ e. HTMLElement -> Eff (dom :: DOM | e) Int
 foreign import innerHeight :: ∀ e. Eff (dom :: DOM | e) Int
 
 makeWindowState :: ∀ e m.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     Maybe HTMLElement -> GraphState m WindowState
 
 makeWindowState node = do
@@ -166,7 +166,7 @@ makeWindowState node = do
 
 -- | Setup window signals.
 setupWindow :: ∀ e m a.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     HTMLElement -> WindowCallback m a -> GraphState m a
 
 setupWindow node cb =
@@ -175,7 +175,7 @@ setupWindow node cb =
 
 -- | Setup window signals.
 setupGlobalWindow :: ∀ e m a.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     WindowCallback m a -> GraphState m a
 
 setupGlobalWindow cb = do

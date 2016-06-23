@@ -23,7 +23,7 @@ A computational context that tracks the state of the signal graph
 #### `setup`
 
 ``` purescript
-setup :: forall e m a. MonadEff (ref :: REF, now :: Now | e) m => GraphState m a -> m a
+setup :: forall e m a. MonadEff (ref :: REF, now :: NOW | e) m => GraphState m a -> m a
 ```
 
 Setup the signal graph.
@@ -34,7 +34,7 @@ signal graph. So, you might have something like:
     main =
         setup do
             mbox <- mailbox "Initial value"
-            map <- map ((++) " concat") mbox
+            map <- map ((<>) " concat") mbox
             ...
 
 TODO: Write out a trivial working example once I have one!
@@ -160,7 +160,7 @@ Apply a function to a signal.
     mouseIsUp :: Signal Boolean
     mouseIsUp =
         map not Mouse.isDown
-    
+
     main :: Signal Element
     main =
         map Graphics.Element.show Mouse.position
@@ -179,7 +179,7 @@ height.
     ratio : Int -> Int -> Float
     ratio width height =
         toFloat width / toFloat height
-    
+
     aspectRatio : Signal Float
     aspectRatio =
         map2 ratio Window.width Window.height
@@ -351,7 +351,7 @@ Most importantly, this lets us create APIs that can send values to ports
 #### `send`
 
 ``` purescript
-send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit
+send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit
 ```
 
 Send a message to an `Address`.

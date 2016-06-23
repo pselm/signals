@@ -1,10 +1,10 @@
 module Test.Elm.TaskTest (tests) where
 
-import Test.Unit (TestUnit, Assertion, test)
+import Test.Unit (TestSuite, Test, suite, test)
 import Test.Unit.Assert (equal)
 
 import Elm.Task
-import Prelude (flip, bind, class Eq, class Show, ($), (+), (<$>), (++), show, Unit)
+import Prelude (flip, bind, class Eq, class Show, ($), (+), (<$>), (<>), show, Unit)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Elm.Result (Result(..))
@@ -15,7 +15,7 @@ import Math (sqrt)
 
 infixl 9 equals as ===
 
-equals :: forall a e. (Eq a, Show a) => a -> a -> Assertion e
+equals :: forall a e. (Eq a, Show a) => a -> a -> Test e
 equals = flip equal
 
 
@@ -47,8 +47,8 @@ evenAfter50 int =
     )
 
 
-tests :: forall e. TestUnit e
-tests = test "Elm.Task\n" do
+tests :: forall e. TestSuite e
+tests = suite "Elm.Task" do
     test "Task.succeed" do
         result <- toAff (succeed 42)
         result === Right 42 :: Either String Int
@@ -73,7 +73,7 @@ tests = test "Elm.Task\n" do
         ff === Left "No1" :: Either String Int
 
     test "Task.map3" do
-        let func3 aa bb cc = aa ++ bb ++ cc
+        let func3 aa bb cc = aa <> bb <> cc
 
         ttt <- toAff (map3 func3 a b c)
         ttf <- toAff (map3 func3 a b no)
@@ -88,7 +88,7 @@ tests = test "Elm.Task\n" do
         fff === Left "No1"
 
     test "Task.map4" do
-        let func4 aa bb cc dd = aa ++ bb ++ cc ++ dd
+        let func4 aa bb cc dd = aa <> bb <> cc <> dd
 
         tttt <- toAff (map4 func4 a b c d)
         tttf <- toAff (map4 func4 a b c no)
@@ -105,7 +105,7 @@ tests = test "Elm.Task\n" do
         ffff === Left "No1"
 
     test "Task.map5" do
-        let func5 aa bb cc dd ee = aa ++ bb ++ cc ++ dd ++ ee
+        let func5 aa bb cc dd ee = aa <> bb <> cc <> dd <> ee
 
         ttttt <- toAff (map5 func5 a b c d e)
         ttttf <- toAff (map5 func5 a b c d no)
@@ -124,7 +124,7 @@ tests = test "Elm.Task\n" do
         fffff === Left "No1"
 
     test "Task.andMap" do
-        let func3 aa bb cc = aa ++ bb ++ cc
+        let func3 aa bb cc = aa <> bb <> cc
 
         ttt <- toAff do
             func3 `map` a `andMap` b `andMap` c
@@ -149,16 +149,16 @@ tests = test "Elm.Task\n" do
 
     test "Task.andThen" do
         tt <- toAff do
-            a `andThen` (\n -> succeed $ n ++ "b")
+            a `andThen` (\n -> succeed $ n <> "b")
 
         tf <- toAff do
-            a `andThen` (\n -> fail $ n ++ "b")
+            a `andThen` (\n -> fail $ n <> "b")
 
         ft <- toAff do
-            no `andThen` (\n -> succeed $ n ++ "b")
+            no `andThen` (\n -> succeed $ n <> "b")
 
         ff <- toAff do
-            no `andThen` (\n -> fail $ n ++ "b")
+            no `andThen` (\n -> fail $ n <> "b")
         
         tt === Right "ab" :: Either String String
         tf === Left "ab" :: Either String String
@@ -168,19 +168,19 @@ tests = test "Elm.Task\n" do
     test "Task.do notation" do
         tt <- toAff do
             n <- succeed "a"
-            succeed $ n ++ "b"
+            succeed $ n <> "b"
 
         tf <- toAff do
             n <- succeed "a"
-            fail $ n ++ "b"
+            fail $ n <> "b"
 
         ft <- toAff do
             n <- fail "No"
-            succeed $ n ++ "b"
+            succeed $ n <> "b"
 
         ff <- toAff do
             n <- fail "No"
-            fail $ n ++ "b"
+            fail $ n <> "b"
 
         tt === Right "ab" :: Either String String
         tf === Left "ab" :: Either String String

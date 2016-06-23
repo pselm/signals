@@ -25,7 +25,7 @@ type MouseState = { position :: Signal (Tuple Int Int), node :: EventTarget }
 #### `setupMouse`
 
 ``` purescript
-setupMouse :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => EventTarget -> Mouse m a -> GraphState m a
+setupMouse :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => EventTarget -> Mouse m a -> GraphState m a
 ```
 
 Setup mouse signals, where the mouse is relative to a particular node.
@@ -36,7 +36,7 @@ Setup mouse signals, where the mouse is relative to a particular node.
 #### `setupGlobalMouse`
 
 ``` purescript
-setupGlobalMouse :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Mouse m a -> GraphState m a
+setupGlobalMouse :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m a -> GraphState m a
 ```
 
 Setup mouse signals, where the mouse is relative to the window.
@@ -71,7 +71,7 @@ The current y-coordinate of the mouse.
 #### `isDown`
 
 ``` purescript
-isDown :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Mouse m (Signal Bool)
+isDown :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m (Signal Bool)
 ```
 
 The current state of the mouse.
@@ -80,7 +80,7 @@ True when any mouse button is down, and false otherwise.
 #### `clicks`
 
 ``` purescript
-clicks :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Mouse m (Signal Unit)
+clicks :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m (Signal Unit)
 ```
 
 Always equal to unit. Event triggers on every mouse click.

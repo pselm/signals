@@ -1,11 +1,11 @@
 module Test.Elm.TextTest (tests) where
 
-import Test.Unit (TestUnit, test)
+import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert (equal)
 
 import Elm.Text
 import Prelude (bind, ($), map)
-import Data.List (List(..), (:), toList)
+import Data.List (List(..), (:), fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), uncurry)
 import Data.Foldable (traverse_)
@@ -15,9 +15,9 @@ import Color (white)
 infixl 9 equal as ===
 
 
-tests :: ∀ e. TestUnit e
+tests :: ∀ e. TestSuite e
 tests =
-    test "Elm.Text\n" do
+    suite "Elm.Text" do
         let
             text =
                 fromString "Text"
@@ -70,7 +70,7 @@ tests =
                 renderHtml $
                     style defaultStyle text
 
-            let typefaceStyle = defaultStyle { typeface = toList ["Times", "Helvetica"] }
+            let typefaceStyle = defaultStyle { typeface = fromFoldable ["Times", "Helvetica"] }
 
             equal
                 "<span style=\"color:hsl(0.0, 0.0%, 0.0%);font-family:Times,Helvetica;\">Text</span>" $
@@ -127,7 +127,7 @@ tests =
         test "typefaceToCss" do
             let
                 typefaceStyle =
-                    defaultStyle { typeface = toList ["Times New Roman", "Helvetica"] }
+                    defaultStyle { typeface = fromFoldable ["Times New Roman", "Helvetica"] }
 
             equal
                 "<span style=\"color:hsl(0.0, 0.0%, 0.0%);font-family:'Times New Roman',Helvetica;\">Text</span>" $

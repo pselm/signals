@@ -18,21 +18,27 @@ import Elm.Basics (Float, Bool)
 import Elm.Color (Color, black, toCss)
 import Elm.List (List(..), intersperse)
 import Elm.Regex (Regex, regex, HowMany(All), replace) as ER
-import Elm.Maybe (Maybe (..))
 import Elm.String (repeat)
+
+import Data.List as List
 import Data.String (joinWith, contains, length, split)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (class Foldable, foldr)
 import Data.String.Regex (RegexFlags, noFlags, replace, regex)
 import Data.Array (catMaybes)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (for)
-import Graphics.Canvas (Context2D, Canvas)
+import Data.Either (fromRight)
+
+import Graphics.Canvas (Context2D, CANVAS)
 import Graphics.Canvas (setFillStyle, setFont, measureText, scale, save, restore) as Canvas
+
 import Control.Monad.Eff (Eff)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, modifySTRef, runST)
 import Control.Alt ((<|>))
-import Prelude (class Show, class Semigroup, ($), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, pure, negate)
+import Partial.Unsafe (unsafePartial)
+
+import Prelude (class Show, class Semigroup, ($), (<#>), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, pure, negate)
 
 
 -- | Represents styled text. It can be rendered with collages or with elements.
@@ -367,7 +373,7 @@ typefaceToCss list =
                 Tuple "font-family" $
                     joinWith "," $
                         map quoteSpaces $
-                            Data.List.fromList list
+                            List.toUnfoldable list
 
 
 global :: RegexFlags
@@ -377,10 +383,13 @@ global = noFlags { global = true }
 -- Compose the escapes together
 escapes :: String -> String
 escapes =
-    replace (regex "\"" global) "&#34;" >>>
-    replace (regex "'" global) "&#39;" >>>
-    replace (regex "<" global) "&#60;" >>>
-    replace (regex ">" global) "&#62;"
+    -- Should be safe, because the regexes are static
+    unsafePartial $
+        replace (fromRight $ regex "\"" global) "&#34;" >>>
+        replace (fromRight $ regex "'" global) "&#39;" >>>
+        replace (fromRight $ regex "<" global) "&#60;" >>>
+        replace (fromRight $ regex ">" global) "&#62;"
+
 
 
 makeLines :: String -> String
@@ -564,10 +573,10 @@ defaultHeight = 12.0
 
 
 drawCanvas :: ∀ e.
-    (∀ eff. Context2D -> String -> Number -> Number -> Eff (canvas :: Canvas | eff) Context2D) ->
+    (∀ eff. Context2D -> String -> Number -> Number -> Eff (canvas :: CANVAS | eff) Context2D) ->
     Text ->
     Context2D ->
-    Eff (canvas :: Canvas | e) Context2D
+    Eff (canvas :: CANVAS | e) Context2D
 
 drawCanvas draw text ctx =
     runST do
@@ -653,7 +662,7 @@ typefaceToFont Nil = "san-serif"
 typefaceToFont list =
     joinWith "," $
         map quoteSpaces $
-            Data.List.fromList list
+            List.toUnfoldable list
 
 
 type Chunk =
@@ -671,7 +680,7 @@ chunkText props text =
             chunkText props left <> chunkText props right
 
         Text text ->
-            Data.List.singleton { text, props }
+            List.singleton { text, props }
 
         Meta newProps text ->
             chunkText (combineProps props newProps) text

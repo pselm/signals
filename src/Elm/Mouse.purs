@@ -15,7 +15,6 @@ import Elm.Basics (Bool)
 import Elm.Signal (Signal, DELAY, GraphState, Graph, send, mailbox, map)
 
 import Prelude (Unit, pure, ($), bind, unit, const, (<<<), (>>=), (<$>))
-import Data.Date (Now)
 import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
@@ -28,6 +27,7 @@ import Control.Monad.Trans (lift)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
+import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 
 import DOM (DOM)
@@ -35,8 +35,8 @@ import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (htmlElementToEventTarget)
+import DOM.HTML.Event.EventTypes (mouseup, mousedown, mousemove, click)
 import DOM.Event.Types (EventTarget, Event)
-import DOM.Event.EventTypes (mouseup, mousedown, mousemove, click)
 import DOM.Event.EventTarget (eventListener, addEventListener)
 
 
@@ -67,7 +67,7 @@ foreign import getOffsetXY :: ∀ e. Event -> Eff (dom :: DOM | e) MousePosition
 
 
 makeMouseState :: ∀ e m.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     EventTarget -> GraphState m MouseState
 
 makeMouseState node = do
@@ -92,7 +92,7 @@ makeMouseState node = do
 -- |     setupMouse node do
 -- |         altSignal <- alt
 setupMouse :: ∀ e m a.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     EventTarget -> Mouse m a -> GraphState m a
 
 setupMouse node cb =
@@ -104,7 +104,7 @@ setupMouse node cb =
 -- |     setupMouse node do
 -- |         altSignal <- alt
 setupGlobalMouse :: ∀ e m a.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     Mouse m a -> GraphState m a
 
 setupGlobalMouse cb = do
@@ -134,7 +134,7 @@ y = position >>= lift <<< map snd
 -- | The current state of the mouse.
 -- | True when any mouse button is down, and false otherwise.
 isDown :: ∀ e m.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     Mouse m (Signal Bool)
 
 isDown = do
@@ -161,7 +161,7 @@ isDown = do
 
 -- | Always equal to unit. Event triggers on every mouse click.
 clicks :: ∀ e m.
-    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     Mouse m  (Signal Unit)
 
 clicks = do

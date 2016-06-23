@@ -15,7 +15,7 @@ import Control.Monad (when)
 import Test.QuickCheck.Arbitrary (class Arbitrary)
 import Test.QuickCheck.Gen (elements)
 import Math (sin, cos)
-import Data.List (List(..), (..), (:), fromList)
+import Data.List (List(..), (..), (:), toUnfoldable)
 import Data.Tuple (Tuple(..))
 import Data.Int (toNumber)
 
@@ -120,7 +120,7 @@ instance arbitraryExample :: Arbitrary Example where
     arbitrary =
         case examples of
             Cons head tail ->
-                elements head (fromList tail)
+                elements head (toUnfoldable tail)
 
             Nil ->
                 pure example1

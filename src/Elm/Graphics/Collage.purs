@@ -27,7 +27,7 @@ import Elm.Graphics.Element (Element)
 import Elm.Graphics.Element (fromRenderable) as Element
 import Elm.Graphics.Internal (createNode, setStyle, getDimensions, measure, addTransform)
 
-import Data.List (List(..), (..), (:), snoc, fromList, head, tail, reverse)
+import Data.List (List(..), (..), (:), snoc, toUnfoldable, head, tail, reverse)
 import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -61,7 +61,7 @@ import Control.Comonad (extract)
 import Control.Monad (when)
 import Control.Bind ((=<<), (>=>))
 
-import Graphics.Canvas (Context2D, Canvas, CanvasElement, PatternRepeat(Repeat))
+import Graphics.Canvas (Context2D, CANVAS, CanvasElement, PatternRepeat(Repeat))
 
 import Graphics.Canvas
     ( LineCap(..), LineJoin(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore
@@ -137,7 +137,7 @@ instance eqLineJoin :: Eq LineJoin where
 
 
 -- | Set the current line join type.
-setLineJoin :: ∀ e. LineJoin -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+setLineJoin :: ∀ e. LineJoin -> Context2D -> Eff (canvas :: CANVAS | e) Context2D
 
 setLineJoin Smooth =
     Canvas.setLineJoin Canvas.RoundJoin >=>
@@ -506,7 +506,7 @@ outlinedText ls t =
 -- RENDER
 ---------
 
-render :: ∀ e. Collage -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+render :: ∀ e. Collage -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 render model@(Collage {w, h}) = do
     div <- createNode "div"
 
@@ -539,7 +539,7 @@ render model@(Collage {w, h}) = do
 -- trying to do something that seems equivalent in purpose, but not having quite
 -- the same structure. So, ultimately I'll need to test it against example code
 -- to see that it produces the same results.
-update :: ∀ e. Boolean -> Node -> Collage -> Eff (dom :: DOM, canvas :: Canvas | e) Node
+update :: ∀ e. Boolean -> Node -> Collage -> Eff (dom :: DOM, canvas :: CANVAS | e) Node
 update redoWhenImageLoads parent c@(Collage {forms}) = do
     evalUpdate redoWhenImageLoads parent c $
         traverse renderForm forms
@@ -594,10 +594,10 @@ newtype UpdateEnv = UpdateEnv
 
 
 type Update m a = ReaderT UpdateEnv (StateT UpdateState m) a
-type UpdateEffects e a = Update (Eff (canvas :: Canvas, dom :: DOM | e)) a
+type UpdateEffects e a = Update (Eff (canvas :: CANVAS, dom :: DOM | e)) a
 
 
-evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> Eff (canvas :: Canvas, dom :: DOM | e) a
+evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> Eff (canvas :: CANVAS, dom :: DOM | e) a
 evalUpdate redoWhenImageLoads parent c cb = do
     ratio <-
         liftEff $
@@ -855,7 +855,7 @@ drawShape style closed points = do
 -- TEXT RENDERING
 
 -- Returns true if setLineDash was available, false if not.
-foreign import setLineDash :: ∀ e. Array Int -> Context2D -> Eff (canvas :: Canvas | e) Boolean
+foreign import setLineDash :: ∀ e. Array Int -> Context2D -> Eff (canvas :: CANVAS | e) Boolean
 
 
 fillText :: ∀ e. Text -> UpdateEffects e Context2D
@@ -871,13 +871,13 @@ strokeText style t = do
 
     liftEff do
         when (style.dashing /= Nil) $ void $
-            setLineDash (fromList style.dashing) ctx
+            setLineDash (toUnfoldable style.dashing) ctx
 
         drawCanvas Canvas.strokeText t ctx
 
 
 -- Should suggest adding this to Graphics.Canvas
-foreign import globalAlpha :: ∀ e. Context2D -> Eff (canvas :: Canvas | e) Number
+foreign import globalAlpha :: ∀ e. Context2D -> Eff (canvas :: CANVAS | e) Number
 
 
 formToMatrix :: Form -> Transform2D

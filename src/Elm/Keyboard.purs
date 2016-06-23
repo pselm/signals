@@ -13,32 +13,35 @@ module Elm.Keyboard
     ) where
 
 
-import Data.Set (Set, insert, delete, member)
 import Elm.Basics (Bool)
+import Elm.Signal (DELAY, Signal, GraphState, Graph, foldp, map, dropRepeats, Mailbox, mailbox, send, mergeMany)
+
 import Data.Foreign (toForeign)
 import Data.Foreign.Class (readProp)
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
+import Data.Set (Set, insert, delete, member)
+import Data.Set (empty) as Set
+
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (reader)
 import Control.Monad.State.Trans (StateT)
-import Prelude (class Eq, Unit, unit, bind, ($), const, pure, (>>=), (-), (&&), (==), class Show, show, (++))
-import Elm.Signal (DELAY, Signal, GraphState, Graph, foldp, map, dropRepeats, Mailbox, mailbox, send, mergeMany)
-
 import Control.Monad.Trans (lift)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
-import Control.Monad.Eff.Console (CONSOLE, print)
+import Control.Monad.Eff.Console (CONSOLE, errorShow)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
-import Data.Date (Now)
+import Control.Monad.Eff.Now (NOW)
 
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Types (windowToEventTarget, htmlDocumentToEventTarget)
+import DOM.HTML.Event.EventTypes (blur, keypress, keydown, keyup)
 import DOM.Event.Types (EventType, Event)
-import DOM.Event.EventTypes (blur, keypress, keydown, keyup)
 import DOM.Event.EventTarget (eventListener, addEventListener)
+
+import Prelude (class Eq, Unit, unit, bind, ($), const, pure, (>>=), (-), (&&), (==), class Show, show, (<>))
 
 
 -- | The Keyboard API uses some hidden state, managed by this type.
@@ -53,7 +56,7 @@ type KeyboardState =
 
 
 makeKeyboardState ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     GraphState m KeyboardState
 
 makeKeyboardState = do
@@ -71,7 +74,7 @@ makeKeyboardState = do
 -- |     setupKeyboard do
 -- |         altSignal <- alt
 setupKeyboard ::
-    ∀ e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m a. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     Keyboard m a -> GraphState m a
 
 setupKeyboard cb =
@@ -101,7 +104,7 @@ instance eqXY :: Eq XY where
 
 instance showXY :: Show XY where
     show (XY a) =
-        "{x: " ++ show a.x ++ ", y: " ++ show a.y ++ "}"
+        "{x: " <> show a.x <> ", y: " <> show a.y <> "}"
 
 
 -- | Extract an x and y value representing directions from a set of key codes
@@ -211,7 +214,7 @@ keysDown = reader _.keysDown
 
 -- | The latest key that has been pressed.
 presses ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     Keyboard m (Signal KeyCode)
 
 presses =
@@ -233,7 +236,7 @@ empty :: Model
 empty =
     { alt: false
     , meta: false
-    , keyCodes: Data.Set.empty
+    , keyCodes: Set.empty
     }
 
 
@@ -257,7 +260,7 @@ update event model =
 
 
 makeModel ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     GraphState m (Signal Model)
 
 makeModel = do
@@ -277,7 +280,7 @@ data KeyEvent
 
 
 rawEvents ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     GraphState m (Signal KeyEvent)
 
 rawEvents = do
@@ -311,7 +314,7 @@ type EventInfo =
     }
 
 
-keyListener :: ∀ e. Mailbox EventInfo -> Event -> Eff (ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) Unit
+keyListener :: ∀ e. Mailbox EventInfo -> Event -> Eff (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit
 keyListener mbox event = do
     let
         eventInfo = do
@@ -332,11 +335,11 @@ keyListener mbox event = do
             send mbox.address info
 
         Left err ->
-            print err
+            errorShow err
 
 
 keyEvent ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     EventType -> GraphState m (Signal EventInfo)
 
 keyEvent event = do
@@ -360,21 +363,21 @@ keyEvent event = do
 
 
 _presses ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     GraphState m (Signal EventInfo)
 
 _presses = keyEvent keypress
 
 
 downs ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     GraphState m (Signal EventInfo)
 
 downs = keyEvent keydown
 
 
 ups ::
-    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m) =>
     GraphState m (Signal EventInfo)
 
 ups = keyEvent keyup
@@ -382,7 +385,7 @@ ups = keyEvent keyup
 
 -- Emits whenever the window object gets a 'blur' event
 blurs ::
-    ∀ e m. (MonadEff (dom :: DOM, ref :: REF, now :: Now, delay :: DELAY, console :: CONSOLE | e) m) =>
+    ∀ e m. (MonadEff (dom :: DOM, ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) m) =>
     GraphState m (Signal Unit)
 
 blurs = do

@@ -25,8 +25,9 @@ module Elm.Graphics.Element
 
 import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure, removePaddingAndMargin)
 import Elm.Basics (Float, truncate)
-import Elm.Color (Color)
+import Elm.Color (Color, toCss)
 import Elm.Text (Text, renderHtml)
+import Elm.Text (fromString, monospace) as Text
 
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.List (List(..), null, (:), reverse, length, index)
@@ -44,6 +45,7 @@ import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, update) as Renderable
 import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToElement, htmlImageElementToHTMLElement)
 import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLImageElement
+import DOM.HTML.Event.EventTypes (load)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
@@ -53,15 +55,15 @@ import DOM.Node.NodeType (NodeType(ElementNode))
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
 import DOM.Event.EventTarget (addEventListener, eventListener)
-import DOM.Event.EventTypes (load)
 
 import Control.Monad.Eff (Eff, forE, foreachE)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad (when, unless)
 
 import Text.Format (format, precision)
-import Graphics.Canvas (Canvas)
+import Graphics.Canvas (CANVAS)
 import Unsafe.Coerce (unsafeCoerce)
+import Partial.Unsafe (unsafePartial)
 
 import Prelude
     ( class Show, class Eq, Unit, unit
@@ -70,6 +72,8 @@ import Prelude
     , (+), (-), (/), (*), (<>)
     , (==), (/=), (>), (||), (&&), negate
     )
+
+import Prelude (show) as Prelude
 
 
 -- FOREIGN
@@ -394,7 +398,7 @@ justified = block "justify"
 -- |     show value =
 -- |         leftAligned (Text.monospace (Text.fromString (toString value)))
 show :: ∀ a. (Show a) => a -> Element
-show = Prelude.show >>> Elm.Text.fromString >>> Elm.Text.monospace >>> leftAligned
+show = Prelude.show >>> Text.fromString >>> Text.monospace >>> leftAligned
 
 
 -- LAYOUT
@@ -747,7 +751,7 @@ setProps (Element {props, element}) node = do
         setStyle "opacity" (Prelude.show props.opacity) node
 
     for props.color \c ->
-        setStyle "backgroundColor" (Elm.Color.toCss c) node
+        setStyle "backgroundColor" (toCss c) node
 
     when (props.tag /= "") $
         setId (ElementId props.tag) node
@@ -975,7 +979,7 @@ needsReversal DIn = true
 needsReversal _ = false
 
 
-makeFlow :: ∀ e. Direction -> List Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+makeFlow :: ∀ e. Direction -> List Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 makeFlow dir elist = do
     parent <- createNode "div"
 
@@ -1066,7 +1070,7 @@ setPos pos (Element {element, props}) elem =
             ] \op -> op elem
 
 
-makeContainer :: ∀ e. RawPosition -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+makeContainer :: ∀ e. RawPosition -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 makeContainer pos elem = do
     e <- render elem
     setPos pos elem e
@@ -1098,11 +1102,11 @@ rawHtml html align = do
 
 -- RENDER
 
-render :: ∀ e. Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+render :: ∀ e. Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 render e = makeElement e >>= setProps e
 
 
-makeElement :: ∀ e. Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+makeElement :: ∀ e. Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 makeElement (Element {element, props}) =
     case element of
         Image imageStyle imageWidth imageHeight src ->
@@ -1132,7 +1136,7 @@ makeElement (Element {element, props}) =
 
 -- UPDATE
 
-updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 updateAndReplace node curr next = do
     newNode <- update node curr next
 
@@ -1151,15 +1155,16 @@ unsafeNodeToElement = unsafeCoerce
 -- Perhaps should suggest this for purescript-dom?
 nodeToElement :: Node -> Maybe DOM.Element
 nodeToElement node =
-    case nodeType node of
-        ElementNode ->
-            Just (unsafeNodeToElement node)
+    unsafePartial
+        case nodeType node of
+            ElementNode ->
+                Just (unsafeNodeToElement node)
 
-        _ ->
-            Nothing
+            _ ->
+                Nothing
 
 
-updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) Node
+updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
 updateFromNode node curr next =
     case nodeToElement node of
         Just element ->
@@ -1171,7 +1176,7 @@ updateFromNode node curr next =
             elementToNode <$> render next
 
 
-update :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: Canvas, dom :: DOM | e) DOM.Element
+update :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
 update outerNode (Element curr) (Element next) = do
     innerNode <-
         if tagName outerNode == "A"
@@ -1263,10 +1268,8 @@ update outerNode (Element curr) (Element next) = do
                                         goDir = directionTable dir
 
                                     -- Why doesn't forE take an Int?
-                                    forE 0.0 (toNumber len) \num -> do
+                                    forE 0 len \i -> do
                                         let
-                                            i = truncate num
-
                                             kidIndex =
                                                 if reversal
                                                     then len - (i + 1)
@@ -1357,7 +1360,7 @@ updateProps node (Element curr) (Element next) = do
 
     when (nextProps.color /= currProps.color) $
         case nextProps.color of
-            Just c -> setStyle "backgroundColor" (Elm.Color.toCss c) node
+            Just c -> setStyle "backgroundColor" (toCss c) node
             Nothing -> removeStyle "backgroundColor" node
 
     when (nextProps.tag /= currProps.tag) $

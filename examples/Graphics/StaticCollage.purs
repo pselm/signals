@@ -9,10 +9,8 @@ module Examples.Graphics.StaticCollage where
 
 import Examples.Graphics.CollageExamples (examples)
 
-import Elm.Graphics.Collage
-
 import Control.Monad.Eff (Eff)
-import Graphics.Canvas (Canvas)
+import Graphics.Canvas (CANVAS)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 
@@ -29,7 +27,7 @@ import DOM.Node.Node (appendChild)
 import Prelude (Unit, ($), bind, (<$>), (>>=))
 
 
-main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
+main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM | e) Unit
 main = do
     doc <-
         htmlDocumentToDocument <$>

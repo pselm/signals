@@ -19,7 +19,7 @@ type KeyboardState = { model :: Signal Model, keysDown :: Signal (Set KeyCode) }
 #### `setupKeyboard`
 
 ``` purescript
-setupKeyboard :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Keyboard m a -> GraphState m a
+setupKeyboard :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Keyboard m a -> GraphState m a
 ```
 
 Setup keyboard signals.
@@ -128,7 +128,7 @@ Set of keys that are currently down.
 #### `presses`
 
 ``` purescript
-presses :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => Keyboard m (Signal KeyCode)
+presses :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Keyboard m (Signal KeyCode)
 ```
 
 The latest key that has been pressed.

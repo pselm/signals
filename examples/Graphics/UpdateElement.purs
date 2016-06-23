@@ -3,22 +3,23 @@ module Examples.Graphics.UpdateElement where
 
 import Elm.Graphics.Element
 import Elm.Text (fromString)
+import Elm.Color (red, blue, yellow)
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Comonad (extract)
-import Graphics.Canvas (Canvas)
+import Graphics.Canvas (CANVAS)
 
 import DOM (DOM)
 import DOM.Renderable (Position(..), renderIntoDOM, updateDOM)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToEventTarget)
 import DOM.HTML.Window (document)
+import DOM.HTML.Event.EventTypes (keydown)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.ParentNode (firstElementChild) as ParentNode
 import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
 import DOM.Event.EventTarget (eventListener, addEventListener)
-import DOM.Event.EventTypes (keydown)
 
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
@@ -32,7 +33,7 @@ import Data.Tuple (Tuple(..))
 import Prelude (bind, Unit, unit, (>>=), ($), (>>>), pure)
 
 
-main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM, ref :: REF | e) Unit
+main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, ref :: REF | e) Unit
 main = do
     doc <-
         window >>= document
@@ -143,12 +144,12 @@ scene7 =
 
 blueBox :: Element
 blueBox =
-    color Elm.Color.blue (spacer 20 20)
+    color blue (spacer 20 20)
 
 
 redBox :: Element
 redBox =
-    color Elm.Color.red (spacer 30 40)
+    color red (spacer 30 40)
 
 
 title :: String -> Element
@@ -203,7 +204,7 @@ scene13 :: Element
 scene13 =
     flow down
         ( title "And different color."
-        : color Elm.Color.red blueBox
+        : color red blueBox
         : Nil
         )
 
@@ -274,7 +275,7 @@ scene21 :: Element
 scene21 =
     flow down
         ( title "This time, we'll change a prop, to color blue"
-        : color Elm.Color.blue (leftAligned (fromString "Changed text."))
+        : color blue (leftAligned (fromString "Changed text."))
         : Nil
         )
 
@@ -342,15 +343,15 @@ scene28 =
 
 
 smallBlueBox :: Element
-smallBlueBox = color Elm.Color.blue (spacer 20 20)
+smallBlueBox = color blue (spacer 20 20)
 
 
 smallRedBox :: Element
-smallRedBox = color Elm.Color.red (spacer 20 20)
+smallRedBox = color red (spacer 20 20)
 
 
 smallYellowBox :: Element
-smallYellowBox = color Elm.Color.yellow (spacer 20 20)
+smallYellowBox = color yellow (spacer 20 20)
 
 
 scene29 :: Element
@@ -399,7 +400,7 @@ scene33 =
 
 
 redColor :: Element -> Element
-redColor = color Elm.Color.red
+redColor = color red
 
 
 scene34 :: Element

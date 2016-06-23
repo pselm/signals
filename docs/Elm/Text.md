@@ -241,7 +241,7 @@ renderHtml :: Text -> String
 #### `drawCanvas`
 
 ``` purescript
-drawCanvas :: forall e. (forall eff. Context2D -> String -> Number -> Number -> Eff (canvas :: Canvas | eff) Context2D) -> Text -> Context2D -> Eff (canvas :: Canvas | e) Context2D
+drawCanvas :: forall e. (forall eff. Context2D -> String -> Number -> Number -> Eff (canvas :: CANVAS | eff) Context2D) -> Text -> Context2D -> Eff (canvas :: CANVAS | e) Context2D
 ```
 
 

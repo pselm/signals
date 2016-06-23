@@ -29,8 +29,9 @@ import Color (Color, rgb, rgba) as Virtual
 -- For internal use
 
 import Control.Monad.Eff (Eff)
-import Graphics.Canvas (Context2D, Canvas, CanvasGradient, createLinearGradient, createRadialGradient, addColorStop)
+import Graphics.Canvas (Context2D, CANVAS, CanvasGradient, createLinearGradient, createRadialGradient, addColorStop)
 import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
+import Color (hsla) as Color
 import Prelude (class Eq, eq, (==), (&&), ($), (*), (/), bind, (>>=), pure)
 import Data.Tuple (Tuple(..))
 import Data.Foldable (for_)
@@ -163,7 +164,7 @@ radial (Tuple startX startY) radius (Tuple endX endY) =
 
 
 -- | Make a CanvasGradient from a Gradient.
-toCanvasGradient :: ∀ e. Gradient -> Context2D -> Eff (canvas :: Canvas | e) CanvasGradient
+toCanvasGradient :: ∀ e. Gradient -> Context2D -> Eff (canvas :: CANVAS | e) CanvasGradient
 toCanvasGradient grad ctx =
     case grad of
         Linear p0 p1 stops ->
@@ -190,7 +191,7 @@ toCanvasGradient grad ctx =
             >>= addStops stops
 
 
-addStops :: ∀ e. List (Tuple Float Color) -> CanvasGradient -> Eff (canvas :: Canvas | e) CanvasGradient
+addStops :: ∀ e. List (Tuple Float Color) -> CanvasGradient -> Eff (canvas :: CANVAS | e) CanvasGradient
 addStops list grad = do
     for_ list \(Tuple stop color) ->
         addColorStop stop (toCss color) grad

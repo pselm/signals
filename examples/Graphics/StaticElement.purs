@@ -5,9 +5,10 @@ module Examples.Graphics.StaticElement
 
 import Elm.Graphics.Element
 import Elm.Text (bold, fromString)
+import Elm.Color (blue, red, yellow, lightBlue)
 
 import Control.Monad.Eff (Eff)
-import Graphics.Canvas (Canvas)
+import Graphics.Canvas (CANVAS)
 
 import DOM (DOM)
 import DOM.Renderable (render)
@@ -24,9 +25,10 @@ import Data.List (List(..), (:))
 import Data.Tuple (Tuple(..))
 
 import Prelude (bind, Unit, (>>=), ($), (<>), (<$>))
+import Prelude (show) as Prelude
 
 
-main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM | e) Unit
+main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM | e) Unit
 main = do
     doc <-
         window >>= document
@@ -150,7 +152,7 @@ testTag = tag "number9" $ title "9. This title has ID 'number9'"
 
 
 testColor :: Element
-testColor = color Elm.Color.lightBlue $ title "10. This title has a blue background"
+testColor = color lightBlue $ title "10. This title has a blue background"
 
 
 testImage :: Element
@@ -220,23 +222,23 @@ testShow =
 
 
 smallBlueBox :: Element
-smallBlueBox = color Elm.Color.blue (spacer 20 20)
+smallBlueBox = color blue (spacer 20 20)
 
 
 smallRedBox :: Element
-smallRedBox = color Elm.Color.red (spacer 20 20)
+smallRedBox = color red (spacer 20 20)
 
 
 bigBlueBox :: Element
-bigBlueBox = color Elm.Color.blue (spacer 40 40)
+bigBlueBox = color blue (spacer 40 40)
 
 
 smallYellowBox :: Element
-smallYellowBox = color Elm.Color.yellow (spacer 20 20)
+smallYellowBox = color yellow (spacer 20 20)
 
 
 redColor :: Element -> Element
-redColor = color Elm.Color.red
+redColor = color red
 
 
 testContainer :: Element
@@ -274,7 +276,7 @@ testPosition position text =
     container 120 120 middle $
         redColor $
             container 100 100 position $
-                color Elm.Color.lightBlue $
+                color lightBlue $
                     leftAligned $ fromString $ text
 
 
@@ -303,7 +305,7 @@ testBigPosition position text =
     container 220 220 middle $
         redColor $
             container 200 200 position $
-                color Elm.Color.lightBlue $
+                color lightBlue $
                     leftAligned $ fromString $ text
 
 

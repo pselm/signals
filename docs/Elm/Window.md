@@ -21,7 +21,7 @@ type WindowState = { dimensions :: Signal (Tuple Int Int), node :: Maybe HTMLEle
 #### `setupWindow`
 
 ``` purescript
-setupWindow :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => HTMLElement -> WindowCallback m a -> GraphState m a
+setupWindow :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => HTMLElement -> WindowCallback m a -> GraphState m a
 ```
 
 Setup window signals.
@@ -29,7 +29,7 @@ Setup window signals.
 #### `setupGlobalWindow`
 
 ``` purescript
-setupGlobalWindow :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: Now, console :: CONSOLE | e) m => WindowCallback m a -> GraphState m a
+setupGlobalWindow :: forall e m a. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => WindowCallback m a -> GraphState m a
 ```
 
 Setup window signals.

@@ -89,8 +89,8 @@ it put it.
 
 ``` purescript
 class Renderable a where
-  render :: forall e. a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
-  update :: forall e. Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
+  render :: forall e. a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+  update :: forall e. Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
 ```
 
 A `Renderable` is somethng that knows how to render some data type as a DOM
@@ -134,7 +134,7 @@ Renderable AnyRenderable
 #### `defaultUpdate`
 
 ``` purescript
-defaultUpdate :: forall a e. Renderable a => Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node
+defaultUpdate :: forall a e. Renderable a => Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
 ```
 
 A default implementation of `update`, which just calls `render` on the
@@ -191,7 +191,7 @@ without knowing the type of the original data.
 #### `makeAnyRenderable`
 
 ``` purescript
-makeAnyRenderable :: forall a. (forall e. a -> Eff (canvas :: Canvas, dom :: DOM | e) Node) -> (forall e. Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Node) -> a -> AnyRenderable
+makeAnyRenderable :: forall a. (forall e. a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node) -> (forall e. Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node) -> a -> AnyRenderable
 ```
 
 An alternative to `toAnyRenderable`, in cases where you don't have a
@@ -212,7 +212,7 @@ Indicate a position for rendering via `renderIntoDOM`.
 #### `renderIntoDOM`
 
 ``` purescript
-renderIntoDOM :: forall e a. Renderable a => Position -> Node -> a -> Eff (canvas :: Canvas, dom :: DOM | e) (Rendered a)
+renderIntoDOM :: forall e a. Renderable a => Position -> Node -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) (Rendered a)
 ```
 
 Calls `render` on the provided value, and inserts the result into the DOM,
@@ -230,7 +230,7 @@ keeps track of the previous data for you.
 #### `updateDOM`
 
 ``` purescript
-updateDOM :: forall e a. Renderable a => Rendered a -> a -> Eff (canvas :: Canvas, dom :: DOM | e) (Rendered a)
+updateDOM :: forall e a. Renderable a => Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) (Rendered a)
 ```
 
 Updates previously data previously rendered via `renderToDOM`, replacing
@@ -240,7 +240,7 @@ provided to `updateDOM` for future changes in the value.
 #### `renderOrUpdate`
 
 ``` purescript
-renderOrUpdate :: forall e a. Renderable a => Element -> a -> Eff (canvas :: Canvas, dom :: DOM | e) Unit
+renderOrUpdate :: forall e a. Renderable a => Element -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Unit
 ```
 
 Renders the provided `Renderable` and inserts the result as a child of the

@@ -9,12 +9,10 @@ module Examples.Graphics.UpdateCollage where
 
 import Examples.Graphics.CollageExamples (Example)
 
-import Elm.Graphics.Collage
-
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Random (RANDOM)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
-import Graphics.Canvas (Canvas)
+import Graphics.Canvas (CANVAS)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.Tuple (fst, snd)
@@ -27,17 +25,17 @@ import DOM.Renderable (renderOrUpdate)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.HTML.Window (document)
+import DOM.HTML.Event.EventTypes (keydown)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonElementParentNode, documentToEventTarget)
 import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Node (appendChild)
 import DOM.Event.EventTarget (eventListener, addEventListener)
-import DOM.Event.EventTypes (keydown)
 
 import Prelude (Unit, bind, (<$>), (>>=), const)
 
 
-main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM, random :: RANDOM | e) Unit
+main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, random :: RANDOM | e) Unit
 main = do
     doc <-
         htmlDocumentToDocument <$>

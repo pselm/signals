@@ -130,7 +130,7 @@ more visual explanation.
 #### `toCanvasGradient`
 
 ``` purescript
-toCanvasGradient :: forall e. Gradient -> Context2D -> Eff (canvas :: Canvas | e) CanvasGradient
+toCanvasGradient :: forall e. Gradient -> Context2D -> Eff (canvas :: CANVAS | e) CanvasGradient
 ```
 
 Make a CanvasGradient from a Gradient.
@@ -353,14 +353,6 @@ Show Color
 Eq Color
 ```
 
-#### `rgb`
-
-``` purescript
-rgb :: Int -> Int -> Int -> Color
-```
-
-Create a `Color` from integer RGB values between 0 and 255.
-
 #### `rgba`
 
 ``` purescript
@@ -369,4 +361,12 @@ rgba :: Int -> Int -> Int -> Number -> Color
 
 Create a `Color` from integer RGB values between 0 and 255 and a floating
 point alpha value between 0.0 and 1.0.
+
+#### `rgb`
+
+``` purescript
+rgb :: Int -> Int -> Int -> Color
+```
+
+Create a `Color` from integer RGB values between 0 and 255.
 

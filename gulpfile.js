@@ -164,13 +164,4 @@ gulp.task("docs", ["make"], function () {
     });
 });
 
-gulp.task("dotpsci", function () {
-    return purescript.psci({
-        src: sources,
-        ffi: foreigns
-    }).pipe(
-        gulp.dest(".")
-    );
-});
-
-gulp.task("default", ["bundle", "docs", "dotpsci"]);
+gulp.task("default", ["bundle", "docs"]);

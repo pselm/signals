@@ -12,16 +12,14 @@ module Examples.Graphics.UpdateRandomRenderable where
 import Examples.Graphics.CollageExamples (collages) as Examples
 import Examples.Graphics.StaticElement (elements) as Examples
 
-import Elm.Graphics.Collage
-
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Random (RANDOM)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
-import Graphics.Canvas (Canvas)
+import Graphics.Canvas (CANVAS)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.Tuple (fst, snd)
-import Data.List (List(..), fromList)
+import Data.List (List(..), toUnfoldable)
 import Test.QuickCheck.LCG (randomSeed)
 import Test.QuickCheck.Gen (Gen, runGen, elements)
 import Partial.Unsafe (unsafeCrashWith)
@@ -31,10 +29,10 @@ import DOM.Renderable (AnyRenderable, toAnyRenderable, renderOrUpdate)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.HTML.Window (document)
+import DOM.HTML.Event.EventTypes (keydown)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (ElementId(..), documentToNonElementParentNode, documentToEventTarget)
 import DOM.Event.EventTarget (eventListener, addEventListener)
-import DOM.Event.EventTypes (keydown)
 
 import Prelude (Unit, bind, (<$>), (>>=), const, (<>))
 
@@ -51,13 +49,13 @@ genAnyRenderable :: Gen AnyRenderable
 genAnyRenderable =
     case collagesAndElements of
         Cons first rest ->
-            elements first (fromList rest)
+            elements first (toUnfoldable rest)
 
         _ ->
             unsafeCrashWith "Can't get here, because collagesAndElements isn't empty"
 
 
-main :: ∀ e. Eff (canvas :: Canvas, dom :: DOM, random :: RANDOM | e) Unit
+main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, random :: RANDOM | e) Unit
 main = do
     doc <-
         htmlDocumentToDocument <$>
