@@ -28,7 +28,9 @@
     "purescript-timers": "^1.0.0",
     "purescript-canvas": "^1.0.0",
     "purescript-unsafe-coerce": "^1.0.0",
-    "purescript-now": "^1.0.0"
+    "purescript-now": "^1.0.0",
+    "purescript-lazy": "^1.0.0",
+    "purescript-arrays": "^1.0.0"
   },
   "devDependencies": {
     "purescript-test-unit": "^7.0.0"

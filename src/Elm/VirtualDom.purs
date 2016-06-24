@@ -8,6 +8,7 @@ module Elm.VirtualDom
     , on, onWithOptions, Options, defaultOptions
     , map
     , lazy, lazy2, lazy3
+--  , custom
 --  , programWithFlags
     ) where
 
@@ -21,20 +22,24 @@ import Elm.Graphics.Internal
     )
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, runPure)
+import Control.Monad (unless)
 import Unsafe.Coerce (unsafeCoerce)
-import Partial.Unsafe (unsafeCrashWith)
+import Partial (crashWith)
 
+import Data.Array (null) as Array
 import Data.Tuple (Tuple(..))
-import Data.List (List, length, singleton)
+import Data.List (List, length, singleton, snoc, drop, zip)
+import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Foldable (foldl, for_)
-import Data.StrMap (StrMap, foldM, foldMap)
+import Data.StrMap (StrMap, foldM, foldMap, lookup)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeGet)
 import Data.Maybe (Maybe(..))
 import Data.Exists (Exists, runExists, mkExists)
 import Data.Foreign (readString)
 import Data.Either (Either(..))
+import Data.Lazy (Lazy, defer)
 
 import DOM (DOM)
 import DOM.Node.Types (Element, textToNode)
@@ -45,7 +50,7 @@ import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Types (htmlDocumentToDocument)
 
-import Prelude (class Eq, Unit, flip, (+), void, pure, bind, (>>=), ($), (<#>), (==), (#), (<>))
+import Prelude (class Eq, Unit, unit, flip, (+), (-), void, pure, bind, (>>=), ($), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
 
 
 -- Will suggest these for Data.Exists if they work
@@ -67,6 +72,10 @@ runExists3 :: ∀ f r. (∀ a b c. f a b c -> r) -> Exists3 f -> r
 runExists3 = unsafeCoerce
 
 
+-- The original Javascript code uses reference equality on occasion ...
+foreign import refEq :: ∀ a b. a -> b -> Boolean
+
+
 -- | An immutable chunk of data representing a DOM node. This can be HTML or SVG.
 data Node msg
     = Text String
@@ -75,6 +84,7 @@ data Node msg
     | Thunk (Exists (ThunkRecord1 msg))
     | Thunk2 (Exists2 (ThunkRecord2 msg))
     | Thunk3 (Exists3 (ThunkRecord3 msg))
+--  | Custom
 
 
 type NodeRecord msg =
@@ -93,28 +103,40 @@ newtype TaggerRecord msg sub = TaggerRecord
     }
 
 
--- One wonders whether there is a better way. Note that the Elm version
--- of this is ultimately using referential equality on the models. So,
--- I suppose we should do that as well, at least at first. We could do
--- a version of this with real equality. However, the performance
--- implications of real equality on a possibly-deep subtree may not be
--- as desired.
+-- This should really be generalized and broken out. It has something
+-- in common with laziness, and something in common with memoization,
+-- but isn't quite the same as either. I suppose it is fundamentally
+-- a lazy calculation which is able to decide whether it is equal
+-- to another lazy calculation. So, if you have already forced one,
+-- you don't need to force another one that is equal.
+--
+-- Like the Elm version of this, we're relying on reference equality.
+-- Doing anything else would be a bit puzzling, unless we complicated
+-- the type of `Node` a great deal. The existential types help to a point,
+-- but prevent us (of course) from knowing that two things have the same
+-- type. I suppose this may be another case where typeable might help?
+-- There would also be the question of function equality to deal with.
 newtype ThunkRecord1 msg a = ThunkRecord1
-    { func :: (Eq a) => a -> Node msg
-    , arg :: (Eq a) => a
+    { func :: a -> Node msg
+    , arg :: a
+    , lazy :: Lazy (Node msg)
     }
+
 
 newtype ThunkRecord2 msg a b = ThunkRecord2
-    { func :: (Eq a, Eq b) => a -> b -> Node msg
-    , arg1 :: (Eq a) => a
-    , arg2 :: (Eq b) => b
+    { func :: a -> b -> Node msg
+    , arg1 :: a
+    , arg2 :: b
+    , lazy :: Lazy (Node msg)
     }
 
+
 newtype ThunkRecord3 msg a b c = ThunkRecord3
-    { func :: (Eq a, Eq b, Eq c) => a -> b -> c -> Node msg
-    , arg1 :: (Eq a) => a
-    , arg2 :: (Eq b) => b
-    , arg3 :: (Eq c) => c
+    { func :: a -> b -> c -> Node msg
+    , arg1 :: a
+    , arg2 :: b
+    , arg3 :: c
+    , lazy :: Lazy (Node msg)
     }
 
 
@@ -274,46 +296,6 @@ type Namespace = String
 type Key = String
 
 
--- Could optimize this stage out by writing a function that went straight
--- from OrganizedFacts to effects ... should try profiling at some point.
--- Also, there is probably a more efficient way to do this without all
--- the singleton list creation.
-initialFactChanges :: ∀ msg. OrganizedFacts msg -> List (FactChange msg)
-initialFactChanges facts =
-    attributeChanges <>
-    attributeNsChanges <>
-    eventChanges <>
-    styleChanges <>
-    propertyChanges
-
-    where
-        attributeChanges =
-            facts.attributes #
-                foldMap \k v ->
-                    singleton (AddAttribute k v)
-
-        attributeNsChanges =
-            facts.attributesNS #
-                foldMap \ns ->
-                    foldMap \k v ->
-                        singleton (AddAttributeNS ns k v)
-
-        eventChanges =
-            facts.events #
-                foldMap \k (Tuple options decoder) ->
-                    singleton (AddEvent k options decoder)
-
-        styleChanges =
-            facts.styles #
-                foldMap \k v ->
-                    singleton (AddStyle k v)
-
-        propertyChanges =
-            facts.properties #
-                foldMap \k v ->
-                    singleton (AddProperty k v)
-
-
 -- Basically, this seems to take a list of properties and group
 -- them according to their subtypes. Also, if properties of the
 -- same subtype have the same key, it would only retain one of
@@ -456,24 +438,22 @@ attributeNS = AttributeNS
 
 -- | Specify a list of styles.
 -- |
--- |     myStyle : Property msg
+-- |     myStyle :: Property msg
 -- |     myStyle =
 -- |       style
--- |         [ ("backgroundColor", "red")
--- |         , ("height", "90px")
--- |         , ("width", "100%")
+-- |         [ Tuple "backgroundColor" "red"
+-- |         , Tuple "height" "90px"
+-- |         , Tuple "width" "100%"
 -- |         ]
 -- |
--- |     greeting : Node msg
+-- |     greeting :: Node msg
 -- |     greeting =
 -- |       node "div" [ myStyle ] [ text "Hello!" ]
--- |
 style :: ∀ msg. List (Tuple String String) -> Property msg
 style = Styles
 
 
 -- EVENTS
-
 
 -- | Create a custom event listener.
 -- |
@@ -532,19 +512,19 @@ defaultOptions =
 -- | we know if the input to `view` is the same, the output must be the same!
 lazy :: ∀ a msg. (Eq a) => (a -> Node msg) -> a -> Node msg
 lazy func arg =
-    Thunk (mkExists (ThunkRecord1 {func, arg}))
+    Thunk (mkExists (ThunkRecord1 {func, arg, lazy: defer \_ -> func arg}))
 
 
 -- | Same as `lazy` but checks on two arguments.
 lazy2 :: ∀ a b msg. (Eq a, Eq b) => (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2 func arg1 arg2 =
-    Thunk2 (mkExists2 (ThunkRecord2 {func, arg1, arg2}))
+    Thunk2 (mkExists2 (ThunkRecord2 {func, arg1, arg2, lazy: defer \_ -> func arg1 arg2}))
 
 
 -- | Same as `lazy` but checks on three arguments.
 lazy3 :: ∀ a b c msg. (Eq a, Eq b, Eq c) => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3 func arg1 arg2 arg3 =
-    Thunk3 (mkExists3 (ThunkRecord3 {func, arg1, arg2, arg3}))
+    Thunk3 (mkExists3 (ThunkRecord3 {func, arg1, arg2, arg3, lazy: defer \_ -> func arg1 arg2 arg3}))
 
 
 {-
@@ -569,7 +549,7 @@ function equalEvents(a, b)
 -}
 
 
---  RENDERER
+-- RENDERER
 
 newtype EventNode = EventNode
     { tagger :: Int
@@ -636,13 +616,14 @@ var rAF =
 
 -}
 
+
 -- RENDER
 
-render :: ∀ e msg. Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+render :: ∀ e msg. (Partial) => Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
 render vNode eventNode =
     case vNode of
         Thunk t ->
-            unsafeCrashWith "TODO"
+            crashWith "TODO"
 
 {-
 			if (!vNode.node)
@@ -653,10 +634,10 @@ render vNode eventNode =
 -}
 
         Thunk2 t ->
-            unsafeCrashWith "TODO"
+            crashWith "TODO"
 
         Thunk3 t ->
-            unsafeCrashWith "TODO"
+            crashWith "TODO"
 
         Text string ->
             -- TODO: The document should probably be handled via state
@@ -667,7 +648,7 @@ render vNode eventNode =
             <#> textToNode
 
         PlainNode rec ->
-            unsafeCrashWith "TODO"
+            crashWith "TODO"
 
 {-
 			var domNode = vNode.namespace
@@ -687,7 +668,7 @@ render vNode eventNode =
 -}
 
         Tagger rec ->
-            unsafeCrashWith "TODO"
+            crashWith "TODO"
 
 {-
             var subEventRoot = {
@@ -709,7 +690,7 @@ render vNode eventNode =
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e msg. EventNode -> List (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts :: ∀ e msg. (Partial) => EventNode -> List (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
 applyFacts eventNode operations elem = do
     for_ operations \operation ->
         case operation of
@@ -726,10 +707,10 @@ applyFacts eventNode operations elem = do
                 removeAttributeNS ns key elem
 
             AddEvent key options decoder ->
-                unsafeCrashWith "TODO"
+                crashWith "TODO"
 
             RemoveEvent key options ->
-                unsafeCrashWith "TODO"
+                crashWith "TODO"
 
             AddStyle key value ->
                 setStyle key value elem
@@ -823,48 +804,100 @@ function makeEventHandler(eventNode, info)
 
 	return eventHandler;
 }
+-}
 
 
-////////////  DIFF  ////////////
+--  DIFF
+
+data PatchOp msg
+    = PRedraw (Node msg)
+    | PFacts (Array (FactChange msg))
+    | PText String
+    | PThunk
+    | PTagger
+    | PRemove Int
+    | PInsert (List (Node msg))
+    | PCustom
 
 
+type Patch msg =
+    { index :: Int
+    , type_ :: PatchOp msg
+    , domNode :: Maybe DOM.Node
+    , eventNode :: Maybe EventNode
+    }
+
+{-
 function diff(a, b)
 {
 	var patches = [];
 	diffHelp(a, b, patches, 0);
 	return patches;
 }
+-}
 
 
-function makePatch(type, index, data)
-{
-	return {
-		index: index,
-		type: type,
-		data: data,
-		domNode: null,
-		eventNode: null
-	};
-}
+makePatch :: ∀ msg. PatchOp msg -> Int -> Patch msg
+makePatch type_ index =
+    { index
+    , type_
+    , domNode: Nothing
+    , eventNode: Nothing
+    }
 
 
+diffHelp :: ∀ msg. Node msg -> Node msg -> List (Patch msg) -> Int -> List (Patch msg)
+diffHelp a b patches index =
+    -- Can't use regular equality because of the possible thunks ... should consider
+    -- a workaround, like perhaps forcing the thunks to have unique tags that cn be
+    -- compared in some way.
+    if a `refEq` b
+        then patches
+        else
+            case {a, b} of
+                {a: Thunk aThunk, b: Thunk bThunk} ->
+                    patches
+
+                {a: Thunk2 aThunk, b: Thunk2 bThunk} ->
+                    patches
+
+                {a: Thunk3 aThunk, b: Thunk3 bThunk} ->
+                    patches
+
+                {a: Tagger aTagger, b: Tagger bTagger} ->
+                    patches
+
+                {a: Text aText, b: Text bText} ->
+                    if aText == bText
+                        then patches
+                        else snoc patches (makePatch (PText bText) index)
+
+                {a: PlainNode aNode, b: PlainNode bNode} ->
+                    if aNode.tag /= bNode.tag || aNode.namespace /= bNode.namespace
+                        then snoc patches (makePatch (PRedraw b) index)
+                        else
+                            let
+                                factsDiff =
+                                    diffFacts aNode.facts bNode.facts
+
+                                patchesWithFacts =
+                                    if Array.null factsDiff
+                                        then patches
+                                        else snoc patches (makePatch (PFacts factsDiff) index)
+
+                            in
+                                -- diffChildren
+                                patchesWithFacts
+
+                _ ->
+                    -- This covers the case where they are different types
+                    -- TODO: Probably shouldn't use `List`, since we're appending
+                    snoc patches (makePatch (PRedraw b) index)
+
+{-
 function diffHelp(a, b, patches, index)
 {
-	if (a === b)
-	{
-		return;
-	}
 
-	var aType = a.type;
-	var bType = b.type;
-
-	// Bail if you run into different types of nodes. Implies that the
-	// structure has changed significantly and it's not worth a diff.
-	if (aType !== bType)
-	{
-		patches.push(makePatch('p-redraw', index, b));
-		return;
-	}
 
 	// Now we know that both nodes are the same type.
 	switch (bType)
@@ -940,15 +973,6 @@ function diffHelp(a, b, patches, index)
 			diffHelp(aSubNode, bSubNode, patches, index + 1);
 			return;
 
-		case 'text':
-			if (a.text !== b.text)
-			{
-				patches.push(makePatch('p-text', index, b.text));
-				return;
-			}
-
-			return;
-
 		case 'node':
 			// Bail if obvious indicators have changed. Implies more serious
 			// structural changes such that it's not worth it to diff.
@@ -1009,110 +1033,190 @@ function pairwiseRefEqual(as, bs)
 
 -}
 
-diffFacts :: ∀ msg. OrganizedFacts msg -> OrganizedFacts msg -> OrganizedFacts msg
-diffFacts a b =
-    unsafeCrashWith "TODO"
+
+-- Could optimize this stage out by writing a function that went straight
+-- from OrganizedFacts to effects ... should try profiling at some point.
+-- Also, there is probably a more efficient way to do this without all
+-- the singleton list creation.
+initialFactChanges :: ∀ msg. OrganizedFacts msg -> List (FactChange msg)
+initialFactChanges facts =
+    attributeChanges <>
+    attributeNsChanges <>
+    eventChanges <>
+    styleChanges <>
+    propertyChanges
+
+    where
+        attributeChanges =
+            facts.attributes #
+                foldMap \k v ->
+                    singleton (AddAttribute k v)
+
+        attributeNsChanges =
+            facts.attributesNS #
+                foldMap \ns ->
+                    foldMap \k v ->
+                        singleton (AddAttributeNS ns k v)
+
+        eventChanges =
+            facts.events #
+                foldMap \k (Tuple options decoder) ->
+                    singleton (AddEvent k options decoder)
+
+        styleChanges =
+            facts.styles #
+                foldMap \k v ->
+                    singleton (AddStyle k v)
+
+        propertyChanges =
+            facts.properties #
+                foldMap \k v ->
+                    singleton (AddProperty k v)
+
+
+diffFacts :: ∀ msg. OrganizedFacts msg -> OrganizedFacts msg -> Array (FactChange msg)
+diffFacts old new =
+    runPure do
+        runSTArray do
+            -- I suppose the other alternative would be a Writer monad ... perhaps
+            -- that would be better?
+            accum <- emptySTArray
+
+            let
+                newAttribute _ k newValue =
+                    case lookup k old.attributes of
+                        Just oldValue ->
+                            unless (newValue == oldValue) $ void $
+                                pushSTArray accum (AddAttribute k newValue)
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (AddAttribute k newValue)
+
+                oldAttribute _ k oldValue =
+                    case lookup k new.attributes of
+                        Just newValue ->
+                            -- We'll have done this one already ...
+                            pure unit
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (RemoveAttribute k)
+
+                newAttributeNS _ ns newSubmap =
+                    let
+                        submapper _ k newValue =
+                            case lookup ns old.attributesNS of
+                                Just oldSubmap ->
+                                    -- We had something in this namespace, so iterate
+                                    case lookup k oldSubmap of
+                                        Just oldValue ->
+                                            unless (newValue == oldValue) $ void $
+                                                pushSTArray accum (AddAttributeNS ns k newValue)
+
+                                        Nothing ->
+                                            void $
+                                                pushSTArray accum (AddAttributeNS ns k newValue)
+
+                                Nothing ->
+                                    -- There wasn't anything in this namespace, so
+                                    -- we'll need to add them all.
+                                    void $
+                                        pushSTArray accum (AddAttributeNS ns k newValue)
+
+                    in
+                        foldM submapper unit newSubmap
+
+                oldAttributeNS _ ns oldSubmap =
+                    let
+                        submapper _ k value =
+                            case lookup ns new.attributesNS of
+                                Just newSubmap ->
+                                    case lookup k newSubmap of
+                                        Just newValue ->
+                                            -- We'll have checked the newValue already
+                                            pure unit
+
+                                        Nothing ->
+                                            void $
+                                                pushSTArray accum (RemoveAttributeNS ns k)
+
+                                Nothing ->
+                                    -- There now isn't anything in this namespace, so remove all
+                                    void $
+                                        pushSTArray accum (RemoveAttributeNS ns k)
+
+                    in
+                        foldM submapper unit oldSubmap
+
+                newStyle _ k newValue =
+                    case lookup k old.styles of
+                        Just oldValue ->
+                            unless (newValue == oldValue) $ void $
+                                pushSTArray accum (AddStyle k newValue)
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (AddStyle k newValue)
+
+                oldStyle _ k oldValue =
+                    case lookup k new.styles of
+                        Just newValue ->
+                            -- We'll have done this one already ...
+                            pure unit
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (RemoveStyle k)
+
+            foldM newAttribute unit new.attributes
+            foldM oldAttribute unit old.attributes
+            foldM newAttributeNS unit new.attributesNS
+            foldM oldAttributeNS unit old.attributesNS
+            foldM newStyle unit new.styles
+            foldM oldStyle unit old.styles
+            -- TODO
+            -- foldM newEvent unit new.events -- uses equalEvents
+            -- foldM oldEvent unit old.events
+            -- foldM newProperty unit new.properties -- uses reference equality, but always passes through "value"
+            -- foldM oldProperty unit old.properties
+
+            pure accum
+
+
+diffChildren :: ∀ msg. NodeRecord msg -> NodeRecord msg -> List (Patch msg) -> Int -> List (Patch msg)
+diffChildren aParent bParent patches rootIndex =
+    let
+        aChildren = aParent.children
+        bChildren = bParent.children
+
+        aLen = length aChildren
+        bLen = length bChildren
+
+        insertsAndRemovals =
+            if aLen > bLen
+                then snoc patches (makePatch (PRemove (aLen - bLen)) rootIndex)
+                else
+                    if aLen < bLen
+                        then snoc patches (makePatch (PInsert (drop aLen bChildren)) rootIndex)
+                        else patches
+
+        pairs =
+            zip aParent.children bParent.children
+
+        diffPairs =
+            foldl diffChild { index: rootIndex, patches: insertsAndRemovals } pairs
+
+        diffChild memo (Tuple aChild bChild) =
+            { index: memo.index + 1 + (descendants aChild)
+            , patches: diffHelp aChild bChild memo.patches (memo.index + 1)
+            }
+
+    in
+        diffPairs.patches
+
 
 {-
-
-function diffFacts(a, b, category)
-{
-	var diff;
-
-	// look for changes and removals
-	for (var aKey in a)
-	{
-		if (aKey === STYLE_KEY || aKey === EVENT_KEY || aKey === ATTR_KEY || aKey === ATTR_NS_KEY)
-		{
-			var subDiff = diffFacts(a[aKey], b[aKey] || {}, aKey);
-			if (subDiff)
-			{
-				diff = diff || {};
-				diff[aKey] = subDiff;
-			}
-			continue;
-		}
-
-		// remove if not in the new facts
-		if (!(aKey in b))
-		{
-			diff = diff || {};
-			diff[aKey] =
-				(typeof category === 'undefined')
-					? (typeof a[aKey] === 'string' ? '' : null)
-					:
-				(category === STYLE_KEY)
-					? ''
-					:
-				(category === EVENT_KEY || category === ATTR_KEY)
-					? undefined
-					:
-				{ namespace: a[aKey].namespace, value: undefined };
-
-			continue;
-		}
-
-		var aValue = a[aKey];
-		var bValue = b[aKey];
-
-		// reference equal, so don't worry about it
-		if (aValue === bValue && aKey !== 'value'
-			|| category === EVENT_KEY && equalEvents(aValue, bValue))
-		{
-			continue;
-		}
-
-		diff = diff || {};
-		diff[aKey] = bValue;
-	}
-
-	// add new stuff
-	for (var bKey in b)
-	{
-		if (!(bKey in a))
-		{
-			diff = diff || {};
-			diff[bKey] = b[bKey];
-		}
-	}
-
-	return diff;
-}
-
-
-function diffChildren(aParent, bParent, patches, rootIndex)
-{
-	var aChildren = aParent.children;
-	var bChildren = bParent.children;
-
-	var aLen = aChildren.length;
-	var bLen = bChildren.length;
-
-	// FIGURE OUT IF THERE ARE INSERTS OR REMOVALS
-
-	if (aLen > bLen)
-	{
-		patches.push(makePatch('p-remove', rootIndex, aLen - bLen));
-	}
-	else if (aLen < bLen)
-	{
-		patches.push(makePatch('p-insert', rootIndex, bChildren.slice(aLen)));
-	}
-
-	// PAIRWISE DIFF EVERYTHING ELSE
-
-	var index = rootIndex;
-	var minLen = aLen < bLen ? aLen : bLen;
-	for (var i = 0; i < minLen; i++)
-	{
-		index++;
-		var aChild = aChildren[i];
-		diffHelp(aChild, bChildren[i], patches, index);
-		index += aChild.descendantsCount || 0;
-	}
-}
-
-
 
 ////////////  ADD DOM NODES  ////////////
 //
@@ -1300,27 +1404,4 @@ function programWithFlags(details)
 	};
 }
 
-
-return {
-	node: node,
-	text: text,
-
-	custom: custom,
-
-	map: F2(map),
-
-	on: F3(on),
-	style: style,
-	property: F2(property),
-	attribute: F2(attribute),
-	attributeNS: F3(attributeNS),
-
-	lazy: F2(lazy),
-	lazy2: F3(lazy2),
-	lazy3: F4(lazy3),
-
-	programWithFlags: programWithFlags
-};
-
-}();
 -}
