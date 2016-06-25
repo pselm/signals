@@ -18,39 +18,41 @@ import Elm.Basics (Bool)
 import Elm.Graphics.Internal
     ( setStyle, removeStyle
     , setProperty, setPropertyIfDifferent, removeProperty
-    , setAttributeNS, removeAttributeNS
+    , setAttributeNS, removeAttributeNS, nodeToElement
     )
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
-import Control.Monad.Eff (Eff, runPure)
+import Control.Monad.Eff (Eff, runPure, forE)
 import Control.Monad (unless)
 import Unsafe.Coerce (unsafeCoerce)
 import Partial (crashWith)
 
 import Data.Array (null) as Array
 import Data.Tuple (Tuple(..))
-import Data.List (List, length, singleton, snoc, drop, zip)
+import Data.List (List(..), length, singleton, snoc, drop, zip)
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
-import Data.Foldable (foldl, for_)
+import Data.Foldable (class Foldable, foldl, for_)
 import Data.StrMap (StrMap, foldM, foldMap, lookup)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeGet)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Exists (Exists, runExists, mkExists)
 import Data.Foreign (readString)
 import Data.Either (Either(..))
 import Data.Lazy (Lazy, defer)
+import Data.Nullable (toNullable, toMaybe)
 
 import DOM (DOM)
-import DOM.Node.Types (Element, textToNode)
+import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild)
+import DOM.Node.Types (Element, textToNode, elementToNode)
 import DOM.Node.Types (Node) as DOM
-import DOM.Node.Document (createTextNode)
+import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
 import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Types (htmlDocumentToDocument)
 
-import Prelude (class Eq, Unit, unit, flip, (+), (-), void, pure, bind, (>>=), ($), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
+import Prelude (class Eq, Unit, unit, flip, (+), (-), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
 
 
 -- Will suggest these for Data.Exists if they work
@@ -84,7 +86,7 @@ data Node msg
     | Thunk (Exists (ThunkRecord1 msg))
     | Thunk2 (Exists2 (ThunkRecord2 msg))
     | Thunk3 (Exists3 (ThunkRecord3 msg))
---  | Custom
+    | Custom
 
 
 type NodeRecord msg =
@@ -156,6 +158,9 @@ descendants n =
         Thunk _ -> 0
         Thunk2 _ -> 0
         Thunk3 _ -> 0
+
+        -- TODO: Check if this is right
+        Custom -> 0
 
 
 -- | Create a DOM node with a tag name, a list of HTML properties that can
@@ -620,7 +625,13 @@ var rAF =
 -- RENDER
 
 render :: ∀ e msg. (Partial) => Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
-render vNode eventNode =
+render vNode eventNode = do
+    doc <-
+        -- TODO: The document should probably be handled via state?
+        window
+        >>= document
+        <#> htmlDocumentToDocument
+
     case vNode of
         Thunk t ->
             crashWith "TODO"
@@ -640,32 +651,25 @@ render vNode eventNode =
             crashWith "TODO"
 
         Text string ->
-            -- TODO: The document should probably be handled via state
-            window
-            >>= document
-            <#> htmlDocumentToDocument
-            >>= createTextNode string
+            createTextNode string doc
             <#> textToNode
 
-        PlainNode rec ->
-            crashWith "TODO"
+        PlainNode rec -> do
+            domNode <-
+                case rec.namespace of
+                    Just ns ->
+                        createElementNS (toNullable rec.namespace) rec.tag doc
 
-{-
-			var domNode = vNode.namespace
-				? document.createElementNS(vNode.namespace, vNode.tag)
-				: document.createElement(vNode.tag);
+                    Nothing ->
+                        createElement rec.tag doc
 
-			applyFacts(domNode, eventNode, vNode.facts);
+            applyFacts eventNode (initialFactChanges rec.facts) domNode
 
-			var children = vNode.children;
+            for_ rec.children \child -> do
+                renderedChild <- render child eventNode
+                appendChild renderedChild (elementToNode domNode)
 
-			for (var i = 0; i < children.length; i++)
-			{
-				domNode.appendChild(render(children[i], eventNode));
-			}
-
-			return domNode;
--}
+            pure (elementToNode domNode)
 
         Tagger rec ->
             crashWith "TODO"
@@ -680,6 +684,9 @@ render vNode eventNode =
 			return domNode;
 -}
 
+        Custom ->
+            crashWith "TODO"
+
 {-
 		case 'custom':
 			var domNode = vNode.impl.render(vNode.model);
@@ -690,7 +697,7 @@ render vNode eventNode =
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e msg. (Partial) => EventNode -> List (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts :: ∀ e f msg. (Partial, Foldable f) => EventNode -> f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
 applyFacts eventNode operations elem = do
     for_ operations \operation ->
         case operation of
@@ -823,30 +830,28 @@ data PatchOp msg
 type Patch msg =
     { index :: Int
     , type_ :: PatchOp msg
-    , domNode :: Maybe DOM.Node
-    , eventNode :: Maybe EventNode
     }
 
-{-
-function diff(a, b)
-{
-	var patches = [];
-	diffHelp(a, b, patches, 0);
-	return patches;
-}
--}
+
+type PatchWithNodes msg =
+    { patch :: Patch msg
+    , domNode :: DOM.Node
+    , eventNode :: EventNode
+    }
+
+
+diff :: ∀ msg. (Partial) => Node msg -> Node msg -> List (Patch msg)
+diff a b = diffHelp a b Nil 0
 
 
 makePatch :: ∀ msg. PatchOp msg -> Int -> Patch msg
 makePatch type_ index =
     { index
     , type_
-    , domNode: Nothing
-    , eventNode: Nothing
     }
 
 
-diffHelp :: ∀ msg. Node msg -> Node msg -> List (Patch msg) -> Int -> List (Patch msg)
+diffHelp :: ∀ msg. (Partial) => Node msg -> Node msg -> List (Patch msg) -> Int -> List (Patch msg)
 diffHelp a b patches index =
     -- Can't use regular equality because of the possible thunks ... should consider
     -- a workaround, like perhaps forcing the thunks to have unique tags that cn be
@@ -856,16 +861,90 @@ diffHelp a b patches index =
         else
             case {a, b} of
                 {a: Thunk aThunk, b: Thunk bThunk} ->
-                    patches
+                    crashWith "TODO"
+
+                    {-
+                    case 'thunk':
+                        var aArgs = a.args;
+                        var bArgs = b.args;
+                        var i = aArgs.length;
+                        var same = a.func === b.func && i === bArgs.length;
+                        while (same && i--)
+                        {
+                            same = aArgs[i] === bArgs[i];
+                        }
+                        if (same)
+                        {
+                            b.node = a.node;
+                            return;
+                        }
+                        b.node = b.thunk();
+                        var subPatches = [];
+                        diffHelp(a.node, b.node, subPatches, 0);
+                        if (subPatches.length > 0)
+                        {
+                            patches.push(makePatch('p-thunk', index, subPatches));
+                        }
+                        return;
+                    -}
 
                 {a: Thunk2 aThunk, b: Thunk2 bThunk} ->
-                    patches
+                    crashWith "TODO"
 
                 {a: Thunk3 aThunk, b: Thunk3 bThunk} ->
-                    patches
+                    crashWith "TODO"
 
                 {a: Tagger aTagger, b: Tagger bTagger} ->
-                    patches
+                    crashWith "TODO"
+
+                    {-
+                    // gather nested taggers
+                    var aTaggers = a.tagger;
+                    var bTaggers = b.tagger;
+                    var nesting = false;
+
+                    var aSubNode = a.node;
+                    while (aSubNode.type === 'tagger')
+                    {
+                        nesting = true;
+
+                        typeof aTaggers !== 'object'
+                            ? aTaggers = [aTaggers, aSubNode.tagger]
+                            : aTaggers.push(aSubNode.tagger);
+
+                        aSubNode = aSubNode.node;
+                    }
+
+                    var bSubNode = b.node;
+                    while (bSubNode.type === 'tagger')
+                    {
+                        nesting = true;
+
+                        typeof bTaggers !== 'object'
+                            ? bTaggers = [bTaggers, bSubNode.tagger]
+                            : bTaggers.push(bSubNode.tagger);
+
+                        bSubNode = bSubNode.node;
+                    }
+
+                    // Just bail if different numbers of taggers. This implies the
+                    // structure of the virtual DOM has changed.
+                    if (nesting && aTaggers.length !== bTaggers.length)
+                    {
+                        patches.push(makePatch('p-redraw', index, b));
+                        return;
+                    }
+
+                    // check if taggers are "the same"
+                    if (nesting ? !pairwiseRefEqual(aTaggers, bTaggers) : aTaggers !== bTaggers)
+                    {
+                        patches.push(makePatch('p-tagger', index, bTaggers));
+                    }
+
+                    // diff everything below the taggers
+                    diffHelp(aSubNode, bSubNode, patches, index + 1);
+                    return;
+                    -}
 
                 {a: Text aText, b: Text bText} ->
                     if aText == bText
@@ -886,136 +965,42 @@ diffHelp a b patches index =
                                         else snoc patches (makePatch (PFacts factsDiff) index)
 
                             in
-                                -- diffChildren
-                                patchesWithFacts
+                                diffChildren aNode bNode patchesWithFacts index
+
+                {a: Custom, b: Custom} ->
+                    crashWith "TODO"
+
+                    {-
+                    case 'custom':
+                        if (a.impl !== b.impl)
+                        {
+                            patches.push(makePatch('p-redraw', index, b));
+                            return;
+                        }
+
+                        var factsDiff = diffFacts(a.facts, b.facts);
+                        if (typeof factsDiff !== 'undefined')
+                        {
+                            patches.push(makePatch('p-facts', index, factsDiff));
+                        }
+
+                        var patch = b.impl.diff(a,b);
+                        if (patch)
+                        {
+                            patches.push(makePatch('p-custom', index, patch));
+                            return;
+                        }
+
+                        return;
+                    -}
 
                 _ ->
                     -- This covers the case where they are different types
                     -- TODO: Probably shouldn't use `List`, since we're appending
                     snoc patches (makePatch (PRedraw b) index)
 
+
 {-
-function diffHelp(a, b, patches, index)
-{
-
-
-	// Now we know that both nodes are the same type.
-	switch (bType)
-	{
-		case 'thunk':
-			var aArgs = a.args;
-			var bArgs = b.args;
-			var i = aArgs.length;
-			var same = a.func === b.func && i === bArgs.length;
-			while (same && i--)
-			{
-				same = aArgs[i] === bArgs[i];
-			}
-			if (same)
-			{
-				b.node = a.node;
-				return;
-			}
-			b.node = b.thunk();
-			var subPatches = [];
-			diffHelp(a.node, b.node, subPatches, 0);
-			if (subPatches.length > 0)
-			{
-				patches.push(makePatch('p-thunk', index, subPatches));
-			}
-			return;
-
-		case 'tagger':
-			// gather nested taggers
-			var aTaggers = a.tagger;
-			var bTaggers = b.tagger;
-			var nesting = false;
-
-			var aSubNode = a.node;
-			while (aSubNode.type === 'tagger')
-			{
-				nesting = true;
-
-				typeof aTaggers !== 'object'
-					? aTaggers = [aTaggers, aSubNode.tagger]
-					: aTaggers.push(aSubNode.tagger);
-
-				aSubNode = aSubNode.node;
-			}
-
-			var bSubNode = b.node;
-			while (bSubNode.type === 'tagger')
-			{
-				nesting = true;
-
-				typeof bTaggers !== 'object'
-					? bTaggers = [bTaggers, bSubNode.tagger]
-					: bTaggers.push(bSubNode.tagger);
-
-				bSubNode = bSubNode.node;
-			}
-
-			// Just bail if different numbers of taggers. This implies the
-			// structure of the virtual DOM has changed.
-			if (nesting && aTaggers.length !== bTaggers.length)
-			{
-				patches.push(makePatch('p-redraw', index, b));
-				return;
-			}
-
-			// check if taggers are "the same"
-			if (nesting ? !pairwiseRefEqual(aTaggers, bTaggers) : aTaggers !== bTaggers)
-			{
-				patches.push(makePatch('p-tagger', index, bTaggers));
-			}
-
-			// diff everything below the taggers
-			diffHelp(aSubNode, bSubNode, patches, index + 1);
-			return;
-
-		case 'node':
-			// Bail if obvious indicators have changed. Implies more serious
-			// structural changes such that it's not worth it to diff.
-			if (a.tag !== b.tag || a.namespace !== b.namespace)
-			{
-				patches.push(makePatch('p-redraw', index, b));
-				return;
-			}
-
-			var factsDiff = diffFacts(a.facts, b.facts);
-
-			if (typeof factsDiff !== 'undefined')
-			{
-				patches.push(makePatch('p-facts', index, factsDiff));
-			}
-
-			diffChildren(a, b, patches, index);
-			return;
-
-		case 'custom':
-			if (a.impl !== b.impl)
-			{
-				patches.push(makePatch('p-redraw', index, b));
-				return;
-			}
-
-			var factsDiff = diffFacts(a.facts, b.facts);
-			if (typeof factsDiff !== 'undefined')
-			{
-				patches.push(makePatch('p-facts', index, factsDiff));
-			}
-
-			var patch = b.impl.diff(a,b);
-			if (patch)
-			{
-				patches.push(makePatch('p-custom', index, patch));
-				return;
-			}
-
-			return;
-	}
-}
-
 
 // assumes the incoming arrays are the same length
 function pairwiseRefEqual(as, bs)
@@ -1184,7 +1169,7 @@ diffFacts old new =
             pure accum
 
 
-diffChildren :: ∀ msg. NodeRecord msg -> NodeRecord msg -> List (Patch msg) -> Int -> List (Patch msg)
+diffChildren :: ∀ msg. (Partial) => NodeRecord msg -> NodeRecord msg -> List (Patch msg) -> Int -> List (Patch msg)
 diffChildren aParent bParent patches rootIndex =
     let
         aChildren = aParent.children
@@ -1216,16 +1201,16 @@ diffChildren aParent bParent patches rootIndex =
         diffPairs.patches
 
 
+
+
+-- ADD DOM NODES
+--
+-- Each DOM node has an "index" assigned in order of traversal. It is important
+-- to minimize our crawl over the actual DOM, so these indexes (along with the
+-- descendantsCount of virtual nodes) let us skip touching entire subtrees of
+-- the DOM if we know there are no patches there.
+
 {-
-
-////////////  ADD DOM NODES  ////////////
-//
-// Each DOM node has an "index" assigned in order of traversal. It is important
-// to minimize our crawl over the actual DOM, so these indexes (along with the
-// descendantsCount of virtual nodes) let us skip touching entire subtrees of
-// the DOM if we know there are no patches there.
-
-
 function addDomNodes(domNode, vNode, patches, eventNode)
 {
 	addDomNodesHelp(domNode, vNode, patches, 0, 0, vNode.descendantsCount, eventNode);
@@ -1322,73 +1307,94 @@ function applyPatchesHelp(rootDomNode, patches)
 	return rootDomNode;
 }
 
-function applyPatch(domNode, patch)
-{
-	switch (patch.type)
-	{
-		case 'p-redraw':
-			return redraw(domNode, patch.data, patch.eventNode);
+-}
 
-		case 'p-facts':
-			applyFacts(domNode, patch.eventNode, patch.data);
-			return domNode;
 
-		case 'p-text':
-			domNode.replaceData(0, domNode.length, patch.data);
-			return domNode;
+applyPatch :: ∀ e msg. (Partial) => PatchWithNodes msg -> DOM.Node -> Eff (dom :: DOM | e) DOM.Node
+applyPatch patch domNode =
+    case patch.patch.type_ of
+        PRedraw vNode ->
+            redraw domNode vNode patch.eventNode
 
-		case 'p-thunk':
+        PFacts changes -> do
+            nodeToElement domNode
+                <#> applyFacts patch.eventNode changes
+                # fromMaybe (pure unit)
+
+            pure domNode
+
+        PText string -> do
+            setTextContent string domNode
+            pure domNode
+
+        PThunk ->
+            pure domNode
+
+        {-
 			return applyPatchesHelp(domNode, patch.data);
+        -}
 
-		case 'p-tagger':
+        PTagger ->
+            pure domNode
+
+        {-
 			domNode.elm_event_node_ref.tagger = patch.data;
 			return domNode;
+        -}
 
-		case 'p-remove':
-			var i = patch.data;
-			while (i--)
-			{
-				domNode.removeChild(domNode.lastChild);
-			}
-			return domNode;
+        PRemove howMany -> do
+            forE 0 howMany \_ ->
+                lastChild domNode <#> toMaybe >>=
+                    case _ of
+                        Just child -> do
+                            removeChild child domNode
+                            pure unit
 
-		case 'p-insert':
-			var newNodes = patch.data;
-			for (var i = 0; i < newNodes.length; i++)
-			{
-				domNode.appendChild(render(newNodes[i], patch.eventNode));
-			}
-			return domNode;
+                        Nothing ->
+                            pure unit
 
-		case 'p-custom':
+            pure domNode
+
+        PInsert newNodes -> do
+            for_ newNodes \n ->
+                render n patch.eventNode
+                >>= (flip appendChild) domNode
+
+            pure domNode
+
+        PCustom ->
+		    pure domNode
+
+        {-
+        case 'p-custom':
 			var impl = patch.data;
 			return impl.applyPatch(domNode, impl.data);
-
-		default:
-			throw new Error('Ran into an unknown patch!');
-	}
-}
+        -}
 
 
-function redraw(domNode, vNode, eventNode)
-{
-	var parentNode = domNode.parentNode;
-	var newNode = render(vNode, eventNode);
-
-	var ref = domNode.elm_event_node_ref
+redraw :: ∀ e msg. (Partial) => DOM.Node -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+redraw domNode vNode eventNode = do
+    parentNode <- toMaybe <$> parentNode domNode
+    newNode <- render vNode eventNode
+	
+    {-
+    var ref = domNode.elm_event_node_ref
 	if (typeof ref !== 'undefined')
 	{
 		newNode.elm_event_node_ref = ref;
 	}
+    -}
 
-	if (parentNode && newNode !== domNode)
-	{
-		parentNode.replaceChild(newNode, domNode);
-	}
-	return newNode;
-}
+    case parentNode of
+        Just p -> do
+            replaceChild newNode domNode p
+            pure newNode
+
+        Nothing ->
+            pure newNode
 
 
+{-
 
 ////////////  PROGRAMS  ////////////
 

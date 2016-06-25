@@ -10,6 +10,7 @@ module Elm.Graphics.Internal
     , getDimensions, measure
     , setProperty, removeProperty, setPropertyIfDifferent
     , setAttributeNS, getAttributeNS, removeAttributeNS
+    , nodeToElement
     ) where
 
 
@@ -20,11 +21,14 @@ import DOM.HTML.Types (htmlDocumentToDocument, htmlElementToNode)
 import DOM.HTML.Document (body)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element, Node, elementToNode)
-import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode)
+import DOM.Node.NodeType (NodeType(ElementNode))
+import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType)
 import Data.Nullable (Nullable, toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.Foreign (Foreign)
 import Control.Monad.Eff (Eff, foreachE)
+import Partial.Unsafe (unsafePartial)
+import Unsafe.Coerce (unsafeCoerce)
 import Prelude (bind, (>>=), (>>>), pure, Unit)
 
 
@@ -149,3 +153,19 @@ measure node = do
                 { width: 0.0
                 , height: 0.0
                 }
+
+
+unsafeNodeToElement :: Node -> Element
+unsafeNodeToElement = unsafeCoerce
+
+
+-- Perhaps should suggest this for purescript-dom?
+nodeToElement :: Node -> Maybe Element
+nodeToElement node =
+    unsafePartial
+        case nodeType node of
+            ElementNode ->
+                Just (unsafeNodeToElement node)
+
+            _ ->
+                Nothing

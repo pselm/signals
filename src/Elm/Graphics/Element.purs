@@ -23,7 +23,7 @@ module Elm.Graphics.Element
     ) where
 
 
-import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure, removePaddingAndMargin)
+import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure, removePaddingAndMargin, nodeToElement)
 import Elm.Basics (Float, truncate)
 import Elm.Color (Color, toCss)
 import Elm.Text (Text, renderHtml)
@@ -50,8 +50,7 @@ import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
 import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
 import DOM.Node.Element (setId, setAttribute, tagName, removeAttribute)
-import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild, nodeType)
-import DOM.Node.NodeType (NodeType(ElementNode))
+import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild)
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
 import DOM.Node.HTMLCollection (length, item) as HTMLCollection
 import DOM.Event.EventTarget (addEventListener, eventListener)
@@ -62,8 +61,6 @@ import Control.Monad (when, unless)
 
 import Text.Format (format, precision)
 import Graphics.Canvas (CANVAS)
-import Unsafe.Coerce (unsafeCoerce)
-import Partial.Unsafe (unsafePartial)
 
 import Prelude
     ( class Show, class Eq, Unit, unit
@@ -1146,22 +1143,6 @@ updateAndReplace node curr next = do
             replaceChild (elementToNode newNode) (elementToNode node) parent
 
     pure newNode
-
-
-unsafeNodeToElement :: Node -> DOM.Element
-unsafeNodeToElement = unsafeCoerce
-
-
--- Perhaps should suggest this for purescript-dom?
-nodeToElement :: Node -> Maybe DOM.Element
-nodeToElement node =
-    unsafePartial
-        case nodeType node of
-            ElementNode ->
-                Just (unsafeNodeToElement node)
-
-            _ ->
-                Nothing
 
 
 updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
