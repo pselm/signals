@@ -5,7 +5,7 @@
 module Elm.VirtualDom
     ( Node, text, node
     , Property, property, attribute, attributeNS, style
-    , on, onWithOptions, Options, defaultOptions
+    , Options, on, onWithOptions, defaultOptions
     , map
     , lazy, lazy2, lazy3
 --  , custom
@@ -23,13 +23,17 @@ import Elm.Graphics.Internal
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import Control.Monad.Eff (Eff, runPure, forE)
-import Control.Monad (unless)
+import Control.Monad.Rec.Class (tailRecM2)
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
+import Control.Monad (unless, (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 import Partial (crashWith)
+import Partial.Unsafe (unsafeCrashWith)
 
 import Data.Array (null) as Array
 import Data.Tuple (Tuple(..))
-import Data.List (List(..), length, singleton, snoc, drop, zip)
+import Data.List (List(..), length, reverse, singleton, snoc, drop, zip, (:))
+import Data.List (foldM, singleton, null) as List
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Foldable (class Foldable, foldl, for_)
 import Data.StrMap (StrMap, foldM, foldMap, lookup)
@@ -38,12 +42,14 @@ import Data.StrMap.ST.Unsafe (unsafeGet)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Exists (Exists, runExists, mkExists)
 import Data.Foreign (readString)
+import Data.Ord (abs, max)
 import Data.Either (Either(..))
 import Data.Lazy (Lazy, defer)
 import Data.Nullable (toNullable, toMaybe)
 
 import DOM (DOM)
-import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild)
+import DOM.Node.NodeList (item)
+import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
 import DOM.Node.Types (Element, textToNode, elementToNode)
 import DOM.Node.Types (Node) as DOM
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
@@ -52,7 +58,7 @@ import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Types (htmlDocumentToDocument)
 
-import Prelude (class Eq, Unit, unit, flip, (+), (-), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
+import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
 
 
 -- Will suggest these for Data.Exists if they work
@@ -194,6 +200,13 @@ node tag properties children =
 
         organized =
             organizeFacts properties
+
+
+-- | Works just like `node`, but you add a unique identifier to each child
+-- | node. You want this when you have a list of nodes that is changing: adding
+-- | nodes, removing nodes, etc. In these cases, the unique identifiers help make
+-- | the DOM modifications more efficient.
+-- keyedNode :: String -> List (Property msg) -> List (Tuple String (Node msg)) -> Node msg
 
 
 {-
@@ -822,17 +835,188 @@ data PatchOp msg
     | PText String
     | PThunk
     | PTagger
-    | PRemove Int
-    | PInsert (List (Node msg))
+    | PRemoveLast Int
+    | PAppend (List (Node msg))
     | PCustom
 
 
+-- The index is a list of offsets to a root Node.
+--
+-- * If the patch relates to the root node itself, the list is empty.
+--
+-- * If the patch relates to a child of the root node, then the list
+--   has one member, with the index into the children.
+--
+-- * And so on.
+--
+-- The idea is to make it easy to navigate the real DOM, once we get there, while
+-- minimizing the iteration through the real DOM (which is postulated to be
+-- expensive).
+--
+-- The original Elm code does this in a different way. There, the index is a
+-- single `Int`, representing an offset into the nodes and children in order of
+-- traversal. However, the code for actually applying this in `addDomNodes` ...
+-- that is, for actually doing the traversal ...  is complex, difficult to
+-- understand, and (for that reason) possibly fragile.
+--
+-- Now, always traversing from a root node using the list would, presumably, be
+-- inefficient (or, at least, unoptimized). So, the strategy is to construct our
+-- `List (Patch msg)` in such a way that traversing from one to the next ought to
+-- be efficient. Then, we just need a function which, given two `List int`,
+-- determines how to traverse the DOM efficiently from the first to the second.
+-- So, in one case, it might be `nextSibling`, whereas in another case it might be
+-- `parent` and then something else etc. In fact, I suppose this function ought to
+-- get the root node as another parameter, since if you're sufficiently deep and
+-- your next stop is sufficiently shallow, then it might make sense to start over
+-- from the root.
+--
+-- In any event, the idea is that this will be more conceptually clear than the
+-- Elm implementation, while hopefully preserving some of the efficiency of the
+-- Elm implementation.
 type Patch msg =
-    { index :: Int
+    { index :: List Int
     , type_ :: PatchOp msg
     }
 
 
+makePatch :: ∀ msg. PatchOp msg -> List Int -> Patch msg
+makePatch type_ index =
+    { index
+    , type_
+    }
+
+
+data Traversal
+    = TRoot                 -- We're already there
+    | TParent Int           -- go to the nth ancestor
+    | TChild (List Int)     -- go to the child with the specified index, and repeat
+    | TSibling SiblingRec
+
+
+type SiblingRec =
+    { up :: Int
+    , from :: Int
+    , to :: Int
+    , down :: List Int
+    }
+
+
+instance showTraversal :: Show Traversal where
+    show TRoot = "TRoot"
+    show (TParent x) = "(TParent " <> show x <> ")"
+    show (TChild x) = "(TChild " <> show x <> ")"
+    show (TSibling s) = "(TSibling {up: " <> show s.up <> ", from: " <> show s.from <> ", to: " <> show s.to <> ", down: " <> show s.down <> "})"
+
+
+-- My theory is that a child traversal costs 2, since you'll need to get the list of child nodes
+-- and then index into them. But, I haven't really tested ... in theory, one could get actual
+-- data for this.
+costOfTraversal :: Traversal -> Int
+costOfTraversal TRoot = 0
+costOfTraversal (TParent x)  = x
+costOfTraversal (TChild x) = (length x) * 2
+costOfTraversal (TSibling s) = s.up + (max 3 (abs (s.from - s.to))) + ((length s.down) * 2)
+
+
+-- The first param is a sibling offset ... i.e. +1 for next sibling, -1 for
+-- previous sibling, +2 for two siblings ahead, etc.
+goSibling :: ∀ e. Int -> DOM.Node -> MaybeT (Eff (dom :: DOM | e)) DOM.Node
+goSibling =
+    tailRecM2 \which domNode ->
+        if which == 0
+            then
+                pure $ Right domNode
+
+            else
+                if which > 0
+                    then
+                        nextSibling domNode
+                        <#> toMaybe # MaybeT
+                        <#> {a: which - 1, b: _}
+                        <#> Left
+
+                    else
+                        previousSibling domNode
+                        <#> toMaybe # MaybeT
+                        <#> {a: which + 1, b: _}
+                        <#> Left
+
+
+-- Actually do the traversal ..
+performTraversal :: ∀ e. Traversal -> DOM.Node -> MaybeT (Eff (dom :: DOM | e)) DOM.Node
+performTraversal =
+    tailRecM2 \t domNode ->
+        case t of
+            TRoot ->
+                pure $ Right domNode
+
+            TParent x ->
+                if x > 0
+                    then
+                        parentNode domNode
+                        <#> toMaybe # MaybeT
+                        <#> {a: TParent (x - 1), b: _}
+                        <#> Left
+
+                    else
+                        pure $ Right domNode
+
+            TChild (Cons c cs) ->
+                childNodes domNode
+                >>= item c
+                <#> toMaybe # MaybeT
+                <#> {a: TChild cs, b: _}
+                <#> Left
+
+            TChild Nil ->
+                pure $ Right domNode
+
+            TSibling s ->
+                let
+                    distance =
+                        s.to - s.from
+
+                    sideways =
+                        if abs distance > 3
+                            then
+                                performTraversal (TParent 1) >=>
+                                performTraversal (TChild (List.singleton s.to))
+
+                            else
+                                goSibling distance
+
+                in
+                    performTraversal (TParent s.up) domNode
+                    >>= sideways
+                    <#> {a: TChild s.down, b: _}
+                    <#> Left
+
+
+-- So, figure out how to move from current to destination.
+traversal :: List Int -> List Int -> Traversal
+traversal Nil Nil = TRoot                   -- it's all been equal, and nothing's left, so we're there
+traversal Nil rest = TChild rest            -- Equal until something left on dest, so move to children
+traversal rest Nil = TParent (length rest)  -- Equal until something left on source, so move to parents
+traversal (Cons c cs) (Cons d ds) =         -- Something left on both sides, so take a look ...
+    if c == d
+        then
+            -- If we're still equal, then just keep going
+            traversal cs ds
+
+        else
+            -- Otherwise, we'll go up what's left on the source,
+            -- from one sibling to the next, and then down what's
+            -- left on the dest.
+            TSibling
+                { up: length cs
+                , from: c
+                , to: d
+                , down: ds
+                }
+
+
+-- This represents a patch with a domNode and event node filled in ... that is,
+-- a patch where we've now determined exactly what it is going to patch.
 type PatchWithNodes msg =
     { patch :: Patch msg
     , domNode :: DOM.Node
@@ -842,13 +1026,6 @@ type PatchWithNodes msg =
 
 diff :: ∀ msg. (Partial) => Node msg -> Node msg -> List (Patch msg)
 diff a b = diffHelp a b Nil 0
-
-
-makePatch :: ∀ msg. PatchOp msg -> Int -> Patch msg
-makePatch type_ index =
-    { index
-    , type_
-    }
 
 
 diffHelp :: ∀ msg. (Partial) => Node msg -> Node msg -> List (Patch msg) -> Int -> List (Patch msg)
@@ -949,11 +1126,11 @@ diffHelp a b patches index =
                 {a: Text aText, b: Text bText} ->
                     if aText == bText
                         then patches
-                        else snoc patches (makePatch (PText bText) index)
+                        else snoc patches (makePatch (PText bText) (List.singleton index))
 
                 {a: PlainNode aNode, b: PlainNode bNode} ->
                     if aNode.tag /= bNode.tag || aNode.namespace /= bNode.namespace
-                        then snoc patches (makePatch (PRedraw b) index)
+                        then snoc patches (makePatch (PRedraw b) (List.singleton index))
                         else
                             let
                                 factsDiff =
@@ -962,7 +1139,7 @@ diffHelp a b patches index =
                                 patchesWithFacts =
                                     if Array.null factsDiff
                                         then patches
-                                        else snoc patches (makePatch (PFacts factsDiff) index)
+                                        else snoc patches (makePatch (PFacts factsDiff) (List.singleton index))
 
                             in
                                 diffChildren aNode bNode patchesWithFacts index
@@ -997,7 +1174,7 @@ diffHelp a b patches index =
                 _ ->
                     -- This covers the case where they are different types
                     -- TODO: Probably shouldn't use `List`, since we're appending
-                    snoc patches (makePatch (PRedraw b) index)
+                    snoc patches (makePatch (PRedraw b) (List.singleton index))
 
 
 {-
@@ -1154,12 +1331,15 @@ diffFacts old new =
                             void $
                                 pushSTArray accum (RemoveStyle k)
 
-            foldM newAttribute unit new.attributes
+            -- Push removals first, then additions
             foldM oldAttribute unit old.attributes
-            foldM newAttributeNS unit new.attributesNS
             foldM oldAttributeNS unit old.attributesNS
-            foldM newStyle unit new.styles
             foldM oldStyle unit old.styles
+
+            foldM newAttribute unit new.attributes
+            foldM newAttributeNS unit new.attributesNS
+            foldM newStyle unit new.styles
+
             -- TODO
             -- foldM newEvent unit new.events -- uses equalEvents
             -- foldM oldEvent unit old.events
@@ -1180,10 +1360,10 @@ diffChildren aParent bParent patches rootIndex =
 
         insertsAndRemovals =
             if aLen > bLen
-                then snoc patches (makePatch (PRemove (aLen - bLen)) rootIndex)
+                then snoc patches (makePatch (PRemoveLast (aLen - bLen)) (List.singleton rootIndex))
                 else
                     if aLen < bLen
-                        then snoc patches (makePatch (PInsert (drop aLen bChildren)) rootIndex)
+                        then snoc patches (makePatch (PAppend (drop aLen bChildren)) (List.singleton rootIndex))
                         else patches
 
         pairs =
@@ -1201,113 +1381,79 @@ diffChildren aParent bParent patches rootIndex =
         diffPairs.patches
 
 
+addDomNodes :: ∀ e msg. (Partial) => DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
+addDomNodes rootNode vNode patches eventNode = do
+    patches
+        # List.foldM step
+            { currentNode: rootNode
+            , currentIndex: Nil
+            , accum: Nil
+            }
+        <#> \result ->
+            reverse result.accum
+
+    where
+        step params patch = do
+            let
+                fromRoot =
+                    traversal Nil patch.index
+
+                fromCurrent =
+                    traversal params.currentIndex patch.index
+
+                best =
+                    if (costOfTraversal fromRoot) < (costOfTraversal fromCurrent)
+                        then performTraversal fromRoot rootNode
+                        else performTraversal fromCurrent params.currentNode
+
+            maybeDest <-
+                runMaybeT best
+
+            case maybeDest of
+                Just domNode ->
+                    let
+                        patchWithNodes =
+                            { patch
+                            , domNode
+                            , eventNode
+                            }
+
+                    in
+                        pure
+                            { currentNode: domNode
+                            , currentIndex: patch.index
+                            , accum: Cons patchWithNodes params.accum
+                            }
+
+                Nothing ->
+                    -- Now, I think crashing if the DOM has been unexpectedly modified is probably
+                    -- the right thing to do, since all bets are then off. I suppose it's either that,
+                    -- or revert to a complete redraw? In any event, the other question is where to
+                    -- handle this problem ... we could just throw an exception here and let someone
+                    -- else handle it. Also, we should add some more information, to help with debugging.
+                    unsafeCrashWith "Problem traversing DOM -- has it been modified from the outside?"
 
 
--- ADD DOM NODES
---
--- Each DOM node has an "index" assigned in order of traversal. It is important
--- to minimize our crawl over the actual DOM, so these indexes (along with the
--- descendantsCount of virtual nodes) let us skip touching entire subtrees of
--- the DOM if we know there are no patches there.
+-- APPLY PATCHES
 
-{-
-function addDomNodes(domNode, vNode, patches, eventNode)
-{
-	addDomNodesHelp(domNode, vNode, patches, 0, 0, vNode.descendantsCount, eventNode);
-}
+applyPatches :: ∀ e msg. Partial => DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+applyPatches rootDomNode oldVirtualNode patches eventNode =
+    if List.null patches
+        then
+            pure rootDomNode
 
-
-// assumes `patches` is non-empty and indexes increase monotonically.
-function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
-{
-	var patch = patches[i];
-	var index = patch.index;
-
-	while (index === low)
-	{
-		var patchType = patch.type;
-
-		if (patchType === 'p-thunk')
-		{
-			addDomNodes(domNode, vNode.node, patch.data, eventNode);
-		}
-		else
-		{
-			patch.domNode = domNode;
-			patch.eventNode = eventNode;
-		}
-
-		i++;
-
-		if (!(patch = patches[i]) || (index = patch.index) > high)
-		{
-			return i;
-		}
-	}
-
-	switch (vNode.type)
-	{
-		case 'tagger':
-			return addDomNodesHelp(domNode, vNode.node, patches, i, low + 1, high, domNode.elm_event_node_ref);
-
-		case 'node':
-			var vChildren = vNode.children;
-			var childNodes = domNode.childNodes;
-			for (var j = 0; j < vChildren.length; j++)
-			{
-				low++;
-				var vChild = vChildren[j];
-				var nextLow = low + (vChild.descendantsCount || 0);
-				if (low <= index && index <= nextLow)
-				{
-					i = addDomNodesHelp(childNodes[j], vChild, patches, i, low, nextLow, eventNode);
-					if (!(patch = patches[i]) || (index = patch.index) > high)
-					{
-						return i;
-					}
-				}
-				low = nextLow;
-			}
-			return i;
-
-		case 'text':
-		case 'thunk':
-			throw new Error('should never traverse `text` or `thunk` nodes like this');
-	}
-}
+        else
+            addDomNodes rootDomNode oldVirtualNode patches eventNode
+            >>= applyPatchesHelp rootDomNode
 
 
-
-////////////  APPLY PATCHES  ////////////
-
-
-function applyPatches(rootDomNode, oldVirtualNode, patches, eventNode)
-{
-	if (patches.length === 0)
-	{
-		return rootDomNode;
-	}
-
-	addDomNodes(rootDomNode, oldVirtualNode, patches, eventNode);
-	return applyPatchesHelp(rootDomNode, patches);
-}
-
-function applyPatchesHelp(rootDomNode, patches)
-{
-	for (var i = 0; i < patches.length; i++)
-	{
-		var patch = patches[i];
-		var localDomNode = patch.domNode
-		var newNode = applyPatch(localDomNode, patch);
-		if (localDomNode === rootDomNode)
-		{
-			rootDomNode = newNode;
-		}
-	}
-	return rootDomNode;
-}
-
--}
+applyPatchesHelp :: ∀ e msg. (Partial) => DOM.Node -> List (PatchWithNodes msg) -> Eff (dom :: DOM | e) DOM.Node
+applyPatchesHelp =
+    List.foldM \rootNode patch -> do
+        newNode <- applyPatch patch patch.domNode
+        if patch.domNode `refEq` rootNode
+            then pure newNode
+            else pure rootNode
 
 
 applyPatch :: ∀ e msg. (Partial) => PatchWithNodes msg -> DOM.Node -> Eff (dom :: DOM | e) DOM.Node
@@ -1342,7 +1488,8 @@ applyPatch patch domNode =
 			return domNode;
         -}
 
-        PRemove howMany -> do
+        PRemoveLast howMany -> do
+            -- There must be a replicateM somewhere I'm forgetting ...
             forE 0 howMany \_ ->
                 lastChild domNode <#> toMaybe >>=
                     case _ of
@@ -1355,7 +1502,7 @@ applyPatch patch domNode =
 
             pure domNode
 
-        PInsert newNodes -> do
+        PAppend newNodes -> do
             for_ newNodes \n ->
                 render n patch.eventNode
                 >>= (flip appendChild) domNode
@@ -1378,11 +1525,9 @@ redraw domNode vNode eventNode = do
     newNode <- render vNode eventNode
 	
     {-
-    var ref = domNode.elm_event_node_ref
-	if (typeof ref !== 'undefined')
-	{
-		newNode.elm_event_node_ref = ref;
-	}
+    if (typeof newNode.elm_event_node_ref === 'undefined')
+ 	{
++		newNode.elm_event_node_ref = domNode.elm_event_node_ref;
     -}
 
     case parentNode of
