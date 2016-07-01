@@ -13,10 +13,12 @@ me that it might be more interesting to port the Elm libraries to Purescript --
 at least as a first step. I could then change the app to use more idiomatic
 Purescript at my leisure.
 
-Having started down that rabbit hole, I basically just became fascinated by how
-Purescript does things -- and also fascinated by some of the inner workings of
-Elm. So, I have continued to work away at it, with my original goals receding
-far into the distance.
+Having started down that rabbit hole, I became fascinated by how Purescript
+does things -- and also fascinated by some of the inner workings of Elm. One of
+the things I've tried to do is rewrite as much as possible of the Javascript
+used by Elm in plain-old-Purescript. This has been more time-consuming than
+just wrapping the Javascript, but it has been a nice way to teach myself
+idiomatic Purescript techniques.
 
 I have now broken out some of the core Elm modules into a
 [purescript-elm-compat](https://github.com/rgrempel/purescript-elm-compat) library,
@@ -27,21 +29,20 @@ those useful already.
 
 The main things remaining to do are:
 
-* The Graphics libraries (I've made a start on Elm.Graphics.Element)
+* The Graphics libraries (`Elm.Graphics.Element` and `Elm.Graphics.Collage` are now
+  mostly working.)
 
-* The virtual-dom and elm-html libraries.
+* The virtual-dom and elm-html libraries. (I'm currently mostly working on the new
+  `VirtualDom` implementation from Elm 0.17).
 
 * Making the initial setup of an Elm-like program as nice as possible.
-  (That is, the construction of the signal graph, hooking up "ports", the
-  graphics etc. -- the kind of thing which the Elm run-time facilitates).
-  I have jotted down some
-  [intial thoughts](https://github.com/rgrempel/purescript-elm/blob/master/src/Elm/Signal.md)
-  about this.
 
-Note that I'm targeting Elm version 0.16, or version 3.0.0 of the core
-Elm libraries. Once Elm version 0.17 comes out, I'll have to assess whether
-it's easier to switch targets in-flight, or whether it would be easier to
-complete work on Elm 0.16 and then work on the changes.
+I was initially targeting Elm version 0.16 (or version 3.0 of the core libraries).
+Now that Elm 0.17 is out (version 4.0 of the core libraries), my goal is to support
+Elm 0.17, but try to maintain more backwards-compatibility with Elm 0.16 than Elm
+itself did. That essentially would mean trying to build a `Signal` abstraction
+on top of (or beside) Elm 0.17's subscriptions. It remains to be seen how feasible
+that will be!
 
 
 ## Philosophy
@@ -193,9 +194,11 @@ you used Tuples, there are two alternatives.
   more awkward (as you have to wrap and unwrap the newtype) ... anyway, it's
   a bit of a disadvantage.
 
-In doing the conversion, I've sometimes used the `Tuple` type, and sometimes
-converted to using records instead. In either case, you'll need to make some
-modifications to your own code that uses Tuples.
+In doing the conversion, I initially sometimes used the `Tuple` type, and sometimes
+converted to using records instead. However, now I'm strictly using `Tuple` for
+Elm tuples. The reason is that I ultimately hope to be able to do some of the
+conversion from Elm source to Purescript source automatically, and using tuples
+for tuples makes the process more mechanical.
 
 
 ### Booleans
@@ -352,11 +355,6 @@ to `import Elm.Basics`.
 A "plain" import statement imports everything in a module. So, in Purescript,
 `import Data.List` is equivalent to the Elm `import List exposing (..)`.
 
-If you're going to refer to something in fully-qualified way, it appears that
-you don't actually have to import it at all, which is unlike Elm. However,
-I've seen some discussion on the mailing list that this might be a warning
-or an error in the future.
-
 If you want to re-export something, you need to re-export a whole module. However,
 it can be an aliased module name, and you can import specific symbols from other
 modules into the the aliased module. So, you can do something like this, which
@@ -403,6 +401,9 @@ import Elm.List (List(..))
 ```
 
 ... or, there would be a way to do it with `do` notation.
+
+In many cases, I've converted Elm signatures that use `List` to polymorphic types,
+so that the functions can accept a `List`, `Array`, and others.
 
 
 ### Array
