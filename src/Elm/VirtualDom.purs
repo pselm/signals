@@ -56,6 +56,7 @@ import DOM.Node.Element (setAttribute, removeAttribute)
 import DOM.HTML (window)
 import DOM.HTML.Window (document)
 import DOM.HTML.Types (htmlDocumentToDocument)
+import DOM.Renderable (class Renderable)
 
 import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
 
@@ -106,6 +107,22 @@ newtype TaggerRecord msg sub = TaggerRecord
     { tagger :: sub -> msg
     , child :: Node sub
     }
+
+
+instance renderableNode :: Renderable (Node msg) where
+    render n =
+        render n $
+            EventNode
+                { tagger: 0
+                , parent: Nothing
+                }
+
+    update old current =
+        applyPatches old.result old.value (diff old.value current) $
+            EventNode
+                { tagger: 0
+                , parent: Nothing
+                }
 
 
 -- This should really be generalized and broken out. It has something
