@@ -58,6 +58,10 @@ var bundles = [{
     purs: "examples/Graphics/UpdateCollage.purs",
     html: "examples/Graphics/UpdateCollage.html"
 },{
+    module: "Examples.VirtualDom.StaticVirtualDom",
+    purs: "examples/VirtualDom/StaticVirtualDom.purs",
+    html: "examples/VirtualDom/StaticVirtualDom.html"
+},{
     module: "Examples.Keyboard.Console",
     purs: "examples/Keyboard/Console.purs",
     html: "examples/Keyboard/Console.html"
