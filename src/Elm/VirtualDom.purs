@@ -27,7 +27,6 @@ import Control.Monad.Rec.Class (tailRecM2)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad (unless, (>=>))
 import Unsafe.Coerce (unsafeCoerce)
-import Partial (crashWith)
 import Partial.Unsafe (unsafeCrashWith)
 
 import Data.Array (null) as Array
@@ -637,7 +636,7 @@ var rAF =
 
 -- RENDER
 
-render :: ∀ e msg. (Partial) => Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+render :: ∀ e msg. Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
 render vNode eventNode = do
     doc <-
         -- TODO: The document should probably be handled via state?
@@ -647,7 +646,7 @@ render vNode eventNode = do
 
     case vNode of
         Thunk t ->
-            crashWith "TODO"
+            unsafeCrashWith "TODO"
 
 {-
 			if (!vNode.node)
@@ -658,10 +657,10 @@ render vNode eventNode = do
 -}
 
         Thunk2 t ->
-            crashWith "TODO"
+            unsafeCrashWith "TODO"
 
         Thunk3 t ->
-            crashWith "TODO"
+            unsafeCrashWith "TODO"
 
         Text string ->
             createTextNode string doc
@@ -685,7 +684,7 @@ render vNode eventNode = do
             pure (elementToNode domNode)
 
         Tagger rec ->
-            crashWith "TODO"
+            unsafeCrashWith "TODO"
 
 {-
             var subEventRoot = {
@@ -698,7 +697,7 @@ render vNode eventNode = do
 -}
 
         Custom ->
-            crashWith "TODO"
+            unsafeCrashWith "TODO"
 
 {-
 		case 'custom':
@@ -710,7 +709,7 @@ render vNode eventNode = do
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e f msg. (Partial, Foldable f) => EventNode -> f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts :: ∀ e f msg. (Foldable f) => EventNode -> f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
 applyFacts eventNode operations elem = do
     for_ operations \operation ->
         case operation of
@@ -727,10 +726,10 @@ applyFacts eventNode operations elem = do
                 removeAttributeNS ns key elem
 
             AddEvent key options decoder ->
-                crashWith "TODO"
+                unsafeCrashWith "TODO"
 
             RemoveEvent key options ->
-                crashWith "TODO"
+                unsafeCrashWith "TODO"
 
             AddStyle key value ->
                 setStyle key value elem
@@ -1024,11 +1023,11 @@ type PatchWithNodes msg =
     }
 
 
-diff :: ∀ msg. (Partial) => Node msg -> Node msg -> List (Patch msg)
-diff a b = diffHelp a b Nil 0
+diff :: ∀ msg. Node msg -> Node msg -> List (Patch msg)
+diff a b = diffHelp a b Nil Nil
 
 
-diffHelp :: ∀ msg. (Partial) => Node msg -> Node msg -> List (Patch msg) -> Int -> List (Patch msg)
+diffHelp :: ∀ msg. Node msg -> Node msg -> List (Patch msg) -> List Int -> List (Patch msg)
 diffHelp a b patches index =
     -- Can't use regular equality because of the possible thunks ... should consider
     -- a workaround, like perhaps forcing the thunks to have unique tags that cn be
@@ -1038,7 +1037,7 @@ diffHelp a b patches index =
         else
             case {a, b} of
                 {a: Thunk aThunk, b: Thunk bThunk} ->
-                    crashWith "TODO"
+                    unsafeCrashWith "TODO"
 
                     {-
                     case 'thunk':
@@ -1066,13 +1065,13 @@ diffHelp a b patches index =
                     -}
 
                 {a: Thunk2 aThunk, b: Thunk2 bThunk} ->
-                    crashWith "TODO"
+                    unsafeCrashWith "TODO"
 
                 {a: Thunk3 aThunk, b: Thunk3 bThunk} ->
-                    crashWith "TODO"
+                    unsafeCrashWith "TODO"
 
                 {a: Tagger aTagger, b: Tagger bTagger} ->
-                    crashWith "TODO"
+                    unsafeCrashWith "TODO"
 
                     {-
                     // gather nested taggers
@@ -1145,7 +1144,7 @@ diffHelp a b patches index =
                                 diffChildren aNode bNode patchesWithFacts index
 
                 {a: Custom, b: Custom} ->
-                    crashWith "TODO"
+                    unsafeCrashWith "TODO"
 
                     {-
                     case 'custom':
@@ -1349,7 +1348,7 @@ diffFacts old new =
             pure accum
 
 
-diffChildren :: ∀ msg. (Partial) => NodeRecord msg -> NodeRecord msg -> List (Patch msg) -> Int -> List (Patch msg)
+diffChildren :: ∀ msg. NodeRecord msg -> NodeRecord msg -> List (Patch msg) -> List Int -> List (Patch msg)
 diffChildren aParent bParent patches rootIndex =
     let
         aChildren = aParent.children
@@ -1381,7 +1380,7 @@ diffChildren aParent bParent patches rootIndex =
         diffPairs.patches
 
 
-addDomNodes :: ∀ e msg. (Partial) => DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
+addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
 addDomNodes rootNode vNode patches eventNode = do
     patches
         # List.foldM step
@@ -1436,7 +1435,7 @@ addDomNodes rootNode vNode patches eventNode = do
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. Partial => DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) DOM.Node
 applyPatches rootDomNode oldVirtualNode patches eventNode =
     if List.null patches
         then
@@ -1447,7 +1446,7 @@ applyPatches rootDomNode oldVirtualNode patches eventNode =
             >>= applyPatchesHelp rootDomNode
 
 
-applyPatchesHelp :: ∀ e msg. (Partial) => DOM.Node -> List (PatchWithNodes msg) -> Eff (dom :: DOM | e) DOM.Node
+applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> Eff (dom :: DOM | e) DOM.Node
 applyPatchesHelp =
     List.foldM \rootNode patch -> do
         newNode <- applyPatch patch patch.domNode
@@ -1456,7 +1455,7 @@ applyPatchesHelp =
             else pure rootNode
 
 
-applyPatch :: ∀ e msg. (Partial) => PatchWithNodes msg -> DOM.Node -> Eff (dom :: DOM | e) DOM.Node
+applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> Eff (dom :: DOM | e) DOM.Node
 applyPatch patch domNode =
     case patch.patch.type_ of
         PRedraw vNode ->
@@ -1519,7 +1518,7 @@ applyPatch patch domNode =
         -}
 
 
-redraw :: ∀ e msg. (Partial) => DOM.Node -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
 redraw domNode vNode eventNode = do
     parentNode <- toMaybe <$> parentNode domNode
     newNode <- render vNode eventNode
