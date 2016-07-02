@@ -39,7 +39,7 @@ import Data.StrMap (StrMap, foldM, foldMap, lookup)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeGet)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Exists (Exists, runExists, mkExists)
+import Data.Exists (Exists, mkExists)
 import Data.Foreign (readString)
 import Data.Ord (abs, max)
 import Data.Either (Either(..))
@@ -99,14 +99,12 @@ type NodeRecord msg =
     , namespace :: Maybe String
     , facts :: OrganizedFacts msg
     , children :: List (Node msg)
-    , descendantsCount :: Int
     }
 
 
 newtype TaggerRecord msg sub = TaggerRecord
     { tagger :: sub -> msg
     , child :: Node sub
-    , descendantsCount :: Int
     }
 
 
@@ -147,27 +145,6 @@ newtype ThunkRecord3 msg a b c = ThunkRecord3
     }
 
 
-descendants :: ∀ msg. Node msg -> Int
-descendants n =
-    case n of
-        Text _ -> 0
-
-        PlainNode {descendantsCount} ->
-            descendantsCount
-
-        Tagger tagger ->
-            tagger #
-                runExists \(TaggerRecord t) ->
-                    t.descendantsCount
-
-        Thunk _ -> 0
-        Thunk2 _ -> 0
-        Thunk3 _ -> 0
-
-        -- TODO: Check if this is right
-        Custom -> 0
-
-
 -- | Create a DOM node with a tag name, a list of HTML properties that can
 -- | include styles and event listeners, a list of CSS properties like `color`, and
 -- | a list of child nodes.
@@ -189,14 +166,10 @@ node tag properties children =
         { tag
         , namespace: organized.namespace
         , children
-        , descendantsCount
         , facts: organized.facts
         }
 
     where
-        descendantsCount =
-            (foldl (\memo n -> memo + (descendants n)) 0 children) + (length children)
-
         organized =
             organizeFacts properties
 
@@ -253,11 +226,7 @@ text = Text
 -- | `Msg` so they can be handled by your update function!
 map :: ∀ sub msg. (sub -> msg) -> Node sub -> Node msg
 map tagger child =
-    Tagger (mkExists (TaggerRecord {tagger, child, descendantsCount}))
-
-    where
-        descendantsCount =
-            descendants child + 1
+    Tagger (mkExists (TaggerRecord {tagger, child}))
 
 
 -- PROPERTIES
@@ -1125,11 +1094,11 @@ diffHelp a b patches index =
                 {a: Text aText, b: Text bText} ->
                     if aText == bText
                         then patches
-                        else snoc patches (makePatch (PText bText) (List.singleton index))
+                        else snoc patches (makePatch (PText bText) index)
 
                 {a: PlainNode aNode, b: PlainNode bNode} ->
                     if aNode.tag /= bNode.tag || aNode.namespace /= bNode.namespace
-                        then snoc patches (makePatch (PRedraw b) (List.singleton index))
+                        then snoc patches (makePatch (PRedraw b) index)
                         else
                             let
                                 factsDiff =
@@ -1138,7 +1107,7 @@ diffHelp a b patches index =
                                 patchesWithFacts =
                                     if Array.null factsDiff
                                         then patches
-                                        else snoc patches (makePatch (PFacts factsDiff) (List.singleton index))
+                                        else snoc patches (makePatch (PFacts factsDiff) index)
 
                             in
                                 diffChildren aNode bNode patchesWithFacts index
@@ -1173,7 +1142,7 @@ diffHelp a b patches index =
                 _ ->
                     -- This covers the case where they are different types
                     -- TODO: Probably shouldn't use `List`, since we're appending
-                    snoc patches (makePatch (PRedraw b) (List.singleton index))
+                    snoc patches (makePatch (PRedraw b) index)
 
 
 {-
@@ -1359,21 +1328,21 @@ diffChildren aParent bParent patches rootIndex =
 
         insertsAndRemovals =
             if aLen > bLen
-                then snoc patches (makePatch (PRemoveLast (aLen - bLen)) (List.singleton rootIndex))
+                then snoc patches (makePatch (PRemoveLast (aLen - bLen)) rootIndex)
                 else
                     if aLen < bLen
-                        then snoc patches (makePatch (PAppend (drop aLen bChildren)) (List.singleton rootIndex))
+                        then snoc patches (makePatch (PAppend (drop aLen bChildren)) rootIndex)
                         else patches
 
         pairs =
             zip aParent.children bParent.children
 
         diffPairs =
-            foldl diffChild { index: rootIndex, patches: insertsAndRemovals } pairs
+            foldl diffChild { subIndex: 0, patches: insertsAndRemovals } pairs
 
         diffChild memo (Tuple aChild bChild) =
-            { index: memo.index + 1 + (descendants aChild)
-            , patches: diffHelp aChild bChild memo.patches (memo.index + 1)
+            { subIndex: memo.subIndex + 1
+            , patches: diffHelp aChild bChild memo.patches (snoc rootIndex memo.subIndex)
             }
 
     in
