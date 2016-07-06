@@ -163,6 +163,7 @@ gulp.task("docs", ["make"], function () {
             "Elm.Text": "docs/Elm/Text.md",
             "Elm.Transform2D": "docs/Elm/Transform2D.md",
             "Elm.Time": "docs/Elm/Time.md",
+            "Elm.VirtualDom": "docs/Elm/VirtualDom.md",
             "Elm.Window": "docs/Elm/Window.md"
         }
     });
