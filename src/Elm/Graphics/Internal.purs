@@ -10,26 +10,28 @@ module Elm.Graphics.Internal
     , getDimensions, measure
     , setProperty, removeProperty, setPropertyIfDifferent
     , setAttributeNS, getAttributeNS, removeAttributeNS
-    , nodeToElement
+    , defaultView
+    , nodeToElement, documentToHtmlDocument
+    , documentForNode
     ) where
 
 
 import DOM (DOM)
-import DOM.HTML (window)
-import DOM.HTML.Window (document)
-import DOM.HTML.Types (htmlDocumentToDocument, htmlElementToNode)
+import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode)
 import DOM.HTML.Document (body)
 import DOM.Node.Document (createElement)
-import DOM.Node.Types (Element, Node, elementToNode)
+import DOM.Node.Types (Document, Element, Node, elementToNode)
 import DOM.Node.NodeType (NodeType(ElementNode))
-import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType)
+import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType, ownerDocument)
 import Data.Nullable (Nullable, toMaybe)
-import Data.Maybe (Maybe(..))
-import Data.Foreign (Foreign)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Either (either)
+import Data.Foreign (Foreign, toForeign)
+import Data.Foreign.Class (read)
 import Control.Monad.Eff (Eff, foreachE)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude (bind, (>>=), (>>>), pure, Unit)
+import Prelude (bind, (>>=), (>>>), pure, Unit, (<#>), const, (<$>))
 
 
 -- Sets the style named in the first param to the value of the second param
@@ -59,14 +61,23 @@ foreign import setAttributeNS :: ∀ e. String -> String -> String -> Element ->
 foreign import getAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) (Nullable String)
 foreign import removeAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
 
+foreign import defaultView :: HTMLDocument -> Nullable Window
 
-createNode :: ∀ e. String -> Eff (dom :: DOM | e) Element
-createNode elementType = do
+
+-- | Given a node, returns the document which the node belongs to.
+documentForNode :: ∀ e. Node -> Eff (dom :: DOM | e) Document
+documentForNode node =
+    -- The unsafeCoerce should be safe, because if `ownerDocument`
+    -- returns null, then the node itself must be the document.
+    ownerDocument node
+        <#> toMaybe
+        <#> fromMaybe (unsafeCoerce node)
+
+
+createNode :: ∀ e. Document -> String -> Eff (dom :: DOM | e) Element
+createNode document elementType = do
     node <-
-        window >>=
-        document >>=
-        htmlDocumentToDocument >>>
-        createElement elementType
+        createElement elementType document
 
     removePaddingAndMargin node
     pure node
@@ -104,19 +115,27 @@ removeTransform node =
 
 -- Note that if the node is already in a document, you can just run getDimensions.
 -- This is effectful, in the sense that the node will be removed from any parent
--- it currently has.
+-- it currently has (though we will put it back at the end).
 measure :: ∀ e. Node -> Eff (dom :: DOM | e) {width :: Number, height :: Number}
 measure node = do
-    doc <-
-        window >>= document
+    maybeHtmlDoc <-
+        documentToHtmlDocument <$> documentForNode node
 
-    nullableBody <-
-        body doc
+    maybeBody <-
+        case maybeHtmlDoc of
+            Just doc ->
+                toMaybe <$> body doc
 
-    case toMaybe nullableBody of
+            Nothing ->
+                pure Nothing
+
+    case maybeBody of
         Just b -> do
+            doc <-
+                documentForNode node
+
             temp <-
-                createElement "div" (htmlDocumentToDocument doc)
+                createElement "div" doc
 
             setStyle "visibility" "hidden" temp
             setStyle "float" "left" temp
@@ -169,3 +188,8 @@ nodeToElement node =
 
             _ ->
                 Nothing
+
+
+documentToHtmlDocument :: Document -> Maybe HTMLDocument
+documentToHtmlDocument doc =
+    either (const Nothing) Just (read (toForeign doc))

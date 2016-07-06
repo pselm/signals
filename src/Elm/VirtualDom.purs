@@ -19,6 +19,7 @@ import Elm.Graphics.Internal
     ( setStyle, removeStyle
     , setProperty, setPropertyIfDifferent, removeProperty
     , setAttributeNS, removeAttributeNS, nodeToElement
+    , documentForNode
     )
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
@@ -49,13 +50,10 @@ import Data.Nullable (toNullable, toMaybe)
 import DOM (DOM)
 import DOM.Node.NodeList (item)
 import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
-import DOM.Node.Types (Element, textToNode, elementToNode)
+import DOM.Node.Types (Document, Element, textToNode, elementToNode)
 import DOM.Node.Types (Node) as DOM
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
-import DOM.HTML (window)
-import DOM.HTML.Window (document)
-import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.Renderable (class Renderable)
 
 import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
@@ -110,8 +108,8 @@ newtype TaggerRecord msg sub = TaggerRecord
 
 
 instance renderableNode :: Renderable (Node msg) where
-    render n =
-        render n $
+    render document n =
+        render document n $
             EventNode
                 { tagger: 0
                 , parent: Nothing
@@ -622,14 +620,8 @@ var rAF =
 
 -- RENDER
 
-render :: ∀ e msg. Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
-render vNode eventNode = do
-    doc <-
-        -- TODO: The document should probably be handled via state?
-        window
-        >>= document
-        <#> htmlDocumentToDocument
-
+render :: ∀ e msg. Document -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+render doc vNode eventNode = do
     case vNode of
         Thunk t ->
             unsafeCrashWith "TODO"
@@ -664,7 +656,7 @@ render vNode eventNode = do
             applyFacts eventNode (initialFactChanges rec.facts) domNode
 
             for_ rec.children \child -> do
-                renderedChild <- render child eventNode
+                renderedChild <- render doc child eventNode
                 appendChild renderedChild (elementToNode domNode)
 
             pure (elementToNode domNode)
@@ -1442,7 +1434,10 @@ applyPatchesHelp =
 
 
 applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> Eff (dom :: DOM | e) DOM.Node
-applyPatch patch domNode =
+applyPatch patch domNode = do
+    document <-
+        documentForNode domNode
+
     case patch.patch.type_ of
         PRedraw vNode ->
             redraw domNode vNode patch.eventNode
@@ -1489,7 +1484,7 @@ applyPatch patch domNode =
 
         PAppend newNodes -> do
             for_ newNodes \n ->
-                render n patch.eventNode
+                render document n patch.eventNode
                 >>= (flip appendChild) domNode
 
             pure domNode
@@ -1506,8 +1501,9 @@ applyPatch patch domNode =
 
 redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
 redraw domNode vNode eventNode = do
+    document <- documentForNode domNode
     parentNode <- toMaybe <$> parentNode domNode
-    newNode <- render vNode eventNode
+    newNode <- render document vNode eventNode
 	
     {-
     if (typeof newNode.elm_event_node_ref === 'undefined')

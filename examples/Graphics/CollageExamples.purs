@@ -20,9 +20,6 @@ import Data.Tuple (Tuple(..))
 import Data.Int (toNumber)
 
 import DOM.Renderable (class Renderable, render)
-import DOM.HTML (window)
-import DOM.HTML.Types (htmlDocumentToDocument)
-import DOM.HTML.Window (document)
 import DOM.Node.Types (elementToNode, textToNode)
 import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Element (setAttribute)
@@ -38,13 +35,7 @@ newtype Example = Example
     }
 
 instance renderableExample :: Renderable Example where
-    render (Example example) = do
-        -- I wonder whether `render` ought to supply the document? But I guess it's
-        -- going to be slightly inconvenient either way.
-        doc <-
-            htmlDocumentToDocument <$>
-                (window >>= document)
-
+    render doc (Example example) = do
         row <- elementToNode <$> createElement "tr" doc
 
         column1 <- createElement "td" doc
@@ -67,7 +58,7 @@ instance renderableExample :: Renderable Example where
         appendChild text caption
         appendChild caption (elementToNode column1)
 
-        collage <- render example.collage
+        collage <- render doc example.collage
         appendChild collage (elementToNode column2)
 
         when (example.reference /= "") do
@@ -95,7 +86,7 @@ instance renderableExample :: Renderable Example where
             setStyle "top" "0px" image3
             appendChild (elementToNode image3) (elementToNode mixed)
 
-            collage2 <- render example.collage
+            collage2 <- render doc example.collage
             div <- createElement "div" doc
             setStyle "position" "absolute" div
             setStyle "left" "0px" div
@@ -113,7 +104,8 @@ instance renderableExample :: Renderable Example where
     --     update = defaultUpdate
     --
     -- ... but the compiler complains.
-    update rendered = render
+    update rendered =
+        render rendered.document
 
 
 instance arbitraryExample :: Arbitrary Example where

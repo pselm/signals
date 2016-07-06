@@ -13,7 +13,7 @@ import Graphics.Canvas (CANVAS)
 import DOM (DOM)
 import DOM.Renderable (Position(..), renderIntoDOM, updateDOM)
 import DOM.HTML (window)
-import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToEventTarget)
+import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToEventTarget, htmlDocumentToDocument)
 import DOM.HTML.Window (document)
 import DOM.HTML.Event.EventTypes (keydown)
 import DOM.Node.NonElementParentNode (getElementById)
@@ -61,6 +61,7 @@ main = do
                         updateDOM
                             { result: (elementToNode child)
                             , value: extract current
+                            , document: htmlDocumentToDocument doc
                             }
                             (extract next)
 

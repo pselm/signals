@@ -29,7 +29,7 @@ import Elm.Color (Color, toCss)
 import Elm.Text (Text, renderHtml)
 import Elm.Text (fromString, monospace) as Text
 
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.List (List(..), null, (:), reverse, length, index)
 import Data.Int (ceil, toNumber)
 import Data.Ord (max)
@@ -48,7 +48,7 @@ import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLIm
 import DOM.HTML.Event.EventTypes (load)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
+import DOM.Node.Types (Document, Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
 import DOM.Node.Element (setId, setAttribute, tagName, removeAttribute)
 import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild)
 import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
@@ -64,7 +64,7 @@ import Graphics.Canvas (CANVAS)
 
 import Prelude
     ( class Show, class Eq, Unit, unit
-    , flip, map, (<$>), ($), (>>>)
+    , flip, map, (<$>), (<#>), ($), (>>>)
     , bind, (>>=), pure
     , (+), (-), (/), (*), (<>)
     , (==), (/=), (>), (||), (&&), negate
@@ -98,8 +98,8 @@ newtype Element = Element
     }
 
 instance renderableElement :: Renderable Element where
-    render value = elementToNode <$> render value
-    update {result, value} = updateFromNode result value
+    render document value = elementToNode <$> render document value
+    update {result, value, document} = updateFromNode document result value
 
 
 -- I've removed the `id :: Int` because it's essentially effectful to add an id.
@@ -731,8 +731,8 @@ newElement w h prim =
 
 -- PROPERTIES
 
-setProps :: ∀ e. Element -> DOM.Element -> Eff (dom :: DOM | e) DOM.Element
-setProps (Element {props, element}) node = do
+setProps :: ∀ e. Document -> Element -> DOM.Element -> Eff (dom :: DOM | e) DOM.Element
+setProps document (Element {props, element}) node = do
     let
         w = props.width
         h = props.height
@@ -769,7 +769,7 @@ setProps (Element {props, element}) node = do
     if props.href == ""
         then pure node
         else do
-            anchor <- createNode "a"
+            anchor <- createNode document "a"
 
             setStyle "display" "block" anchor
             setStyle "pointerEvents" "auto" anchor
@@ -862,24 +862,24 @@ backgroundSizeStyles =
     ]
 
 
-makeImage :: ∀ e. Properties -> ImageStyle -> Int -> Int -> String -> Eff (dom :: DOM | e) DOM.Element
-makeImage props imageStyle imageWidth imageHeight src =
+makeImage :: ∀ e. Document -> Properties -> ImageStyle -> Int -> Int -> String -> Eff (dom :: DOM | e) DOM.Element
+makeImage document props imageStyle imageWidth imageHeight src =
     case imageStyle of
         Plain -> do
-            img <- createNode "img"
+            img <- createNode document "img"
             setAttribute "src" src img
             setAttribute "name" src img
             setStyle "display" "block" img
             pure img
 
         Fitted -> do
-            div <- createNode "div"
+            div <- createNode document "div"
             setStyle "background" ("url('" <> src <> "') no-repeat center") div
             setBackgroundSize "cover" div
             pure div
 
         Cropped pos -> do
-            e <- createNode "div"
+            e <- createNode document "div"
 
             setStyle "overflow" "hidden" e
 
@@ -936,7 +936,7 @@ makeImage props imageStyle imageWidth imageHeight src =
             pure e
 
         Tiled -> do
-            div <- createNode "div"
+            div <- createNode document "div"
             let s = "url(" <> src <> ")"
             setStyle "backgroundImage" s div
             pure div
@@ -976,9 +976,9 @@ needsReversal DIn = true
 needsReversal _ = false
 
 
-makeFlow :: ∀ e. Direction -> List Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-makeFlow dir elist = do
-    parent <- createNode "div"
+makeFlow :: ∀ e. Document -> Direction -> List Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+makeFlow document dir elist = do
+    parent <- createNode document "div"
 
     case dir of
         DIn -> setStyle "pointerEvents" "none" parent
@@ -995,7 +995,7 @@ makeFlow dir elist = do
             directionTable dir
 
     for possiblyReversed \elem -> do
-        rendered <- render elem
+        rendered <- render document elem
         goDir rendered
         appendChild (elementToNode rendered) (elementToNode parent)
 
@@ -1067,12 +1067,12 @@ setPos pos (Element {element, props}) elem =
             ] \op -> op elem
 
 
-makeContainer :: ∀ e. RawPosition -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-makeContainer pos elem = do
-    e <- render elem
+makeContainer :: ∀ e. Document -> RawPosition -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+makeContainer document pos elem = do
+    e <- render document elem
     setPos pos elem e
 
-    div <- createNode "div"
+    div <- createNode document "div"
 
     setStyle "position" "relative" div
     setStyle "overflow" "hidden" div
@@ -1081,9 +1081,9 @@ makeContainer pos elem = do
     pure div
 
 
-rawHtml :: ∀ e. String -> String -> Eff (dom :: DOM | e) DOM.Element
-rawHtml html align = do
-    div <- createNode "div"
+rawHtml :: ∀ e. Document -> String -> String -> Eff (dom :: DOM | e) DOM.Element
+rawHtml document html align = do
+    div <- createNode document "div"
 
     setInnerHtml html div
     setStyle "visibility" "hidden" div
@@ -1099,43 +1099,45 @@ rawHtml html align = do
 
 -- RENDER
 
-render :: ∀ e. Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-render e = makeElement e >>= setProps e
+render :: ∀ e. Document -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+render document e =
+    makeElement document e
+    >>= setProps document e
 
 
-makeElement :: ∀ e. Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-makeElement (Element {element, props}) =
+makeElement :: ∀ e. Document -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+makeElement document (Element {element, props}) =
     case element of
         Image imageStyle imageWidth imageHeight src ->
-            makeImage props imageStyle imageWidth imageHeight src
+            makeImage document props imageStyle imageWidth imageHeight src
 
         Flow direction children ->
-            makeFlow direction children
+            makeFlow document direction children
 
         Container position inner ->
-            makeContainer position inner
+            makeContainer document position inner
 
         Spacer ->
-            createNode "div"
+            createNode document "div"
 
         RawHtml html align ->
-            rawHtml html align
+            rawHtml document html align
 
         Custom renderable -> do
             -- We don't insist on renderables creating elements, so we use a wrapper here.
             -- I suppose we could test what we get back from Renderable and only use a wrapper
             -- if it's not in fact an element.
-            wrapper <- createNode "div"
-            child <- Renderable.render renderable
+            wrapper <- createNode document "div"
+            child <- Renderable.render document renderable
             appendChild child (elementToNode wrapper)
             pure wrapper
 
 
 -- UPDATE
 
-updateAndReplace :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-updateAndReplace node curr next = do
-    newNode <- update node curr next
+updateAndReplace :: ∀ e. Document -> DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+updateAndReplace document node curr next = do
+    newNode <- update document node curr next
 
     unless (same newNode node) do
         nullableParent <- parentNode (elementToNode node)
@@ -1145,20 +1147,20 @@ updateAndReplace node curr next = do
     pure newNode
 
 
-updateFromNode :: ∀ e. Node -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
-updateFromNode node curr next =
+updateFromNode :: ∀ e. Document -> Node -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+updateFromNode document node curr next =
     case nodeToElement node of
         Just element ->
-            elementToNode <$> update element curr next
+            elementToNode <$> update document element curr next
 
         Nothing ->
             -- We would have produced an element, so something's wrong ... fall
             -- back to `render`
-            elementToNode <$> render next
+            elementToNode <$> render document next
 
 
-update :: ∀ e. DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-update outerNode (Element curr) (Element next) = do
+update :: ∀ e. Document -> DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+update document outerNode (Element curr) (Element next) = do
     innerNode <-
         if tagName outerNode == "A"
             then do
@@ -1176,7 +1178,7 @@ update outerNode (Element curr) (Element next) = do
     if same currE nextE
         then do
             -- If the ElementPrim is the same, then just update the  props
-            updateProps innerNode (Element curr) (Element next)
+            updateProps document innerNode (Element curr) (Element next)
             pure outerNode
 
         else
@@ -1187,7 +1189,7 @@ update outerNode (Element curr) (Element next) = do
                 { nextE: Spacer
                 , currE: Spacer
                 } -> do
-                    updateProps innerNode (Element curr) (Element next)
+                    updateProps document innerNode (Element curr) (Element next)
                     pure outerNode
 
                 -- Both RawHtml
@@ -1197,7 +1199,7 @@ update outerNode (Element curr) (Element next) = do
                     when (html /= oldHtml) $
                         setInnerHtml html innerNode
 
-                    updateProps innerNode (Element curr) (Element next)
+                    updateProps document innerNode (Element curr) (Element next)
                     pure outerNode
 
                 -- Both Images
@@ -1214,7 +1216,7 @@ update outerNode (Element curr) (Element next) = do
                             when (oldSrc /= src) $
                                 setAttribute "src" src innerNode
 
-                            updateProps innerNode (Element curr) (Element next)
+                            updateProps document innerNode (Element curr) (Element next)
                             pure outerNode
 
                         _ ->
@@ -1226,9 +1228,9 @@ update outerNode (Element curr) (Element next) = do
                                imageWidth /= oldImageWidth ||
                                imageHeight /= oldImageHeight ||
                                src /= oldSrc
-                                    then render (Element next)
+                                    then render document (Element next)
                                     else do
-                                        updateProps innerNode (Element curr) (Element next)
+                                        updateProps document innerNode (Element curr) (Element next)
                                         pure outerNode
 
                 -- Both flows
@@ -1236,13 +1238,13 @@ update outerNode (Element curr) (Element next) = do
                 , currE: Flow oldDir oldList
                 } -> do
                     if dir /= oldDir
-                        then render (Element next)
+                        then render document (Element next)
                         else do
                             kids <- ParentNode.children (elementToParentNode innerNode)
                             len <- HTMLCollection.length kids
 
                             if len /= length list || len /= length oldList
-                                then render (Element next)
+                                then render document (Element next)
                                 else do
                                     let
                                         reversal = needsReversal dir
@@ -1263,9 +1265,9 @@ update outerNode (Element curr) (Element next) = do
                                         for_ kid \k ->
                                             for_ innerOld \old ->
                                                 for_ innerNext \next ->
-                                                    updateAndReplace k old next >>= goDir
+                                                    updateAndReplace document k old next >>= goDir
 
-                                    updateProps innerNode (Element curr) (Element next)
+                                    updateProps document innerNode (Element curr) (Element next)
                                     pure outerNode
 
                 -- Both containers
@@ -1274,10 +1276,10 @@ update outerNode (Element curr) (Element next) = do
                 } -> do
                     nullableSubnode <- ParentNode.firstElementChild (elementToParentNode innerNode)
                     for_ (toMaybe nullableSubnode) \subnode -> do
-                        newSubNode <- updateAndReplace subnode oldElem elem
+                        newSubNode <- updateAndReplace document subnode oldElem elem
                         setPos rawPos elem newSubNode
 
-                    updateProps innerNode (Element curr) (Element next)
+                    updateProps document innerNode (Element curr) (Element next)
                     pure outerNode
 
                 -- Both custom
@@ -1293,6 +1295,7 @@ update outerNode (Element curr) (Element next) = do
                                 Renderable.update
                                     { value: oldRenderable
                                     , result: oldResult
+                                    , document
                                     }
                                     newRenderable
 
@@ -1300,23 +1303,23 @@ update outerNode (Element curr) (Element next) = do
                             -- Otherwise, we should set the props as if fresh.
                             if same updatedNode oldResult
                                 then do
-                                    updateProps innerNode (Element curr) (Element next)
+                                    updateProps document innerNode (Element curr) (Element next)
                                     pure outerNode
 
                                 else
-                                    setProps (Element next) innerNode
+                                    setProps document (Element next) innerNode
 
                         Nothing ->
                             -- If there was no wrapper, then we should bail and just render
-                            render (Element next)
+                            render document (Element next)
 
                 -- Different element constructors
                 _ ->
-                    render (Element next)
+                    render document (Element next)
 
 
-updateProps :: ∀ e. DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) Unit
-updateProps node (Element curr) (Element next) = do
+updateProps :: ∀ e. Document -> DOM.Element -> Element -> Element -> Eff (dom :: DOM | e) Unit
+updateProps document node (Element curr) (Element next) = do
     let
         nextProps = next.props
         currProps = curr.props
@@ -1352,7 +1355,7 @@ updateProps node (Element curr) (Element next) = do
     when (nextProps.href /= currProps.href) $
         if currProps.href == ""
             then do
-                anchor <- createNode "a"
+                anchor <- createNode document "a"
 
                 setStyle "display" "block" anchor
                 setStyle "pointerEvents" "auto" anchor
@@ -1467,15 +1470,18 @@ runHtmlHeight w html =
 htmlHeight :: ∀ e. Int -> String -> Eff (dom :: DOM | e) {width :: Number, height :: Number}
 htmlHeight w html = do
     -- Because of runHtmlHeight, we double-check whether we really have a document or not.
-    nullableDoc <- nullableDocument
-    case toMaybe nullableDoc of
-        Nothing ->
-            pure
-                { width: 0.0
-                , height: 0.0
-                }
-
-        Just doc -> do
+    -- In principle, we should take the document as a parameter. However, that would complicate
+    -- the original Elm API in ways that might not be desirable ... I can reconsider that
+    -- at some point.
+    nullableDocument
+    <#> toMaybe
+    >>= maybe
+        ( pure
+            { width: 0.0
+            , height: 0.0
+            }
+        )
+        \doc -> do
             temp <- createElement "div" (htmlDocumentToDocument doc)
 
             setInnerHtml html temp

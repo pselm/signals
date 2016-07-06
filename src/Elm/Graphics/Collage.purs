@@ -25,7 +25,7 @@ import Elm.Transform2D (Transform2D)
 import Elm.Transform2D (identity, multiply, rotation, matrix, toCSS) as T2D
 import Elm.Graphics.Element (Element)
 import Elm.Graphics.Element (fromRenderable) as Element
-import Elm.Graphics.Internal (createNode, setStyle, getDimensions, measure, addTransform)
+import Elm.Graphics.Internal (createNode, setStyle, getDimensions, measure, addTransform, documentToHtmlDocument, documentForNode, defaultView)
 
 import Data.List (List(..), (..), (:), snoc, toUnfoldable, head, tail, reverse)
 import Data.List.Zipper (Zipper(..), down)
@@ -45,10 +45,9 @@ import DOM (DOM)
 import DOM.Renderable (class Renderable, AnyRenderable, Position(..), toAnyRenderable, renderIntoDOM)
 import DOM.Node.Node (nodeName, removeChild, appendChild, insertBefore, firstChild, nextSibling)
 import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (Node, elementToNode)
+import DOM.Node.Types (Document, Node, elementToNode)
 import DOM.Node.Element (setAttribute)
 import DOM.HTML.Types (Window)
-import DOM.HTML (window)
 
 import Control.Monad.Eff (Eff, untilE)
 import Control.Monad.Eff.Class (liftEff)
@@ -71,9 +70,9 @@ import Graphics.Canvas
     ) as Canvas
 
 import Prelude
-    ( class Eq, eq, not, (<<<), Unit, unit, (||)
+    ( class Eq, eq, not, (<<<), (>>>), Unit, unit, (||)
     , bind, (>>=), pure, void
-    , (*), (/), ($), (#), map, (<$>), (+), (-), (<>)
+    , (*), (/), ($), (#), map, (<$>), (<#>), (+), (-), (<>)
     , show, (<), negate, (/=), (==)
     )
 
@@ -357,8 +356,8 @@ newtype Collage = Collage
 
 
 instance renderableCollage :: Renderable Collage where
-    render a =
-        elementToNode <$> render a
+    render document a =
+        elementToNode <$> render document a
 
     update rendered new =
         update true rendered.result new
@@ -506,9 +505,9 @@ outlinedText ls t =
 -- RENDER
 ---------
 
-render :: ∀ e. Collage -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
-render model@(Collage {w, h}) = do
-    div <- createNode "div"
+render :: ∀ e. Document -> Collage -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+render document model@(Collage {w, h}) = do
+    div <- createNode document "div"
 
     setStyle "overflow" "hidden" div
     setStyle "position" "relative" div
@@ -585,11 +584,14 @@ newtype UpdateEnv = UpdateEnv
     -- The collage we're working on.
     , collage :: Collage
 
-    -- The node we're rending into
+    -- The node we're rendering into
     , parent :: Node
 
     -- The devicePixelRatio
     , devicePixelRatio :: Float
+
+    -- The document we're rendering into
+    , document :: Document
     }
 
 
@@ -599,9 +601,14 @@ type UpdateEffects e a = Update (Eff (canvas :: CANVAS, dom :: DOM | e)) a
 
 evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> Eff (canvas :: CANVAS, dom :: DOM | e) a
 evalUpdate redoWhenImageLoads parent c cb = do
+    document <-
+        documentForNode parent
+
     ratio <-
-        liftEff $
-            window >>= devicePixelRatio
+        documentToHtmlDocument document
+        >>= (defaultView >>> toMaybe)
+        <#> devicePixelRatio
+        # fromMaybe (pure 1.0)
 
     current <-
         liftEff $
@@ -614,6 +621,7 @@ evalUpdate redoWhenImageLoads parent c cb = do
                 , collage: c
                 , parent
                 , devicePixelRatio: ratio
+                , document
                 }
 
         state =
@@ -996,6 +1004,7 @@ makeTransform dim f = do
 renderForm :: ∀ e. Form -> UpdateEffects e Context2D
 renderForm f@(Form innerForm) = do
     ctx <- getContext
+    document <- getDocument
 
     case innerForm.basicForm of
         FPath lineStyle points ->
@@ -1054,14 +1063,14 @@ renderForm f@(Form innerForm) = do
 
                                 Nothing -> do
                                     -- It wasn't a div, so insert ...
-                                    w <- createNode "div"
+                                    w <- createNode document "div"
                                     insertBefore (elementToNode w) k parent
                                     renderIntoDOM AfterLastChild (elementToNode w) renderable
                                     pure w
 
                         Nothing -> do
                             -- There were no more children, so append
-                            w <- createNode "div"
+                            w <- createNode document "div"
                             appendChild (elementToNode w) parent
                             renderIntoDOM AfterLastChild (elementToNode w) renderable
                             pure w
@@ -1161,9 +1170,12 @@ popStuffOffTheStackOfGroupSettings =
 
 makeCanvas :: ∀ e. UpdateEffects e CanvasElement
 makeCanvas = do
+    document
+        <- getDocument
+
     canvas <-
         liftEff $
-            createNode "canvas"
+            createNode document "canvas"
 
     liftEff do
         setStyle "display" "block" canvas
@@ -1247,6 +1259,12 @@ setNextChild node = do
     modify \(UpdateState s) ->
         UpdateState $
             s { currentChild = node }
+
+
+getDocument :: ∀ e. UpdateEffects e Document
+getDocument =
+    reader \(UpdateEnv env) ->
+        env.document
 
 
 getParent :: ∀ e. UpdateEffects e Node

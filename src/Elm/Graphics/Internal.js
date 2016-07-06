@@ -103,3 +103,7 @@ exports.removeAttributeNS = function (ns) {
         };
     };
 };
+
+exports.defaultView = function (htmlDoc) {
+    return htmlDoc.defaultView;
+};

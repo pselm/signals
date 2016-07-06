@@ -7,7 +7,7 @@ import Control.Monad.Eff (Eff)
 import DOM (DOM)
 import DOM.Renderable (render)
 import DOM.HTML (window)
-import DOM.HTML.Types (htmlDocumentToNonElementParentNode)
+import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToDocument)
 import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..))
@@ -30,7 +30,7 @@ main = do
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
     for_ (toMaybe nullableContainer) \container -> do
-        element <- render scene
+        element <- render (htmlDocumentToDocument doc) scene
         appendChild element (elementToNode container)
 
 
