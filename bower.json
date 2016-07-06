@@ -34,7 +34,8 @@
   },
   "devDependencies": {
     "purescript-test-unit": "^7.0.0",
-    "purescript-psci-support": "^1.0.0"
+    "purescript-psci-support": "^1.0.0",
+    "purescript-jsdom": "git://github.com/rgrempel/purescript-jsdom#3da4b91e5878ce8a8af8cade726c940bc4eb2615"
   },
   "repository": {
     "type": "git",

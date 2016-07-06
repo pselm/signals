@@ -13,11 +13,16 @@ import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Aff.AVar (AVAR)
 import Elm.Signal (DELAY)
 
+import DOM (DOM)
+import DOM.JSDOM (JSDOM)
+import Graphics.Canvas (CANVAS)
+
 import Test.Elm.TextTest as TextTest
 import Test.Elm.ColorTest as ColorTest
 import Test.Elm.TimeTest as TimeTest
 import Test.Elm.TaskTest as TaskTest
 import Test.Elm.SignalTest as SignalTest
+import Test.Elm.VirtualDomTest as VirtualDomTest
 
 import Prelude (Unit, bind)
 
@@ -32,6 +37,9 @@ main :: Eff
     , ref :: REF
     , delay :: DELAY
     , now :: NOW
+    , canvas :: CANVAS
+    , dom :: DOM
+    , jsdom :: JSDOM
     ) Unit
 
 main =
@@ -41,3 +49,4 @@ main =
         TimeTest.tests
         TaskTest.tests
         SignalTest.tests
+        VirtualDomTest.tests
