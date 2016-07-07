@@ -31,7 +31,7 @@ import Data.Foreign.Class (read)
 import Control.Monad.Eff (Eff, foreachE)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude (bind, (>>=), (>>>), pure, Unit, (<#>), const, (<$>))
+import Prelude (bind, (>>=), (>>>), pure, Unit, (<#>), (<$>), const)
 
 
 -- Sets the style named in the first param to the value of the second param

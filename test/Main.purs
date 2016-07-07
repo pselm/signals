@@ -23,6 +23,7 @@ import Test.Elm.TimeTest as TimeTest
 import Test.Elm.TaskTest as TaskTest
 import Test.Elm.SignalTest as SignalTest
 import Test.Elm.VirtualDomTest as VirtualDomTest
+import Test.Elm.Graphics.StaticElementTest as StaticElementTest
 
 import Prelude (Unit, bind)
 
@@ -50,3 +51,4 @@ main =
         TaskTest.tests
         SignalTest.tests
         VirtualDomTest.tests
+        StaticElementTest.tests

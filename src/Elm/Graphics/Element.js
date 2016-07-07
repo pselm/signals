@@ -1,8 +1,6 @@
 /* global exports */
 "use strict";
 
-// module Elm.Graphics.Element
-
 exports.setInnerHtml = function (html) {
     return function (element) {
         return function () {
@@ -19,9 +17,13 @@ exports.same = function (a) {
 };
 
 exports.nullableDocument = function () {
-    if (window && window.document) {
+    try {
+        // This fails in testing on Node, since we don't have a window object.
+        // We can use JSDOM to get the document, but there's no point, because
+        // this is only used for measuring things, and JSDOM doesn't actually
+        // do any layout.
         return window.document;
-    } else {
+    } catch (e) {
         return null;
     }
 };

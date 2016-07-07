@@ -1,4 +1,4 @@
-module Test.Internal.Graphics where
+module Test.Elm.Graphics.Internal where
 
 
 import DOM (DOM)

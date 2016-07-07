@@ -3,7 +3,7 @@ module Test.Elm.VirtualDomTest (tests) where
 import Test.Unit (TestSuite, Test, suite, test)
 import Test.Unit.Assert (equal)
 
-import Test.Internal.Graphics (innerHtml)
+import Test.Elm.Graphics.Internal (innerHtml)
 
 import Elm.VirtualDom
 

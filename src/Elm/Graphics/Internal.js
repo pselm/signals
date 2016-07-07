@@ -5,8 +5,9 @@
 
 exports.getDimensions = function (node) {
     return function () {
-        var style = window.getComputedStyle(node, null);
-
+        // Get the "window" from the node, rather than assuming a global
+        // window object.
+        var style = node.ownerDocument.defaultView.getComputedStyle(node, null);
         // parseFloat will ignore the 'px' at the end, which is convenient ...
         var w = parseFloat(style.getPropertyValue('width'));
         var h = parseFloat(style.getPropertyValue('height'));
