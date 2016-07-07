@@ -81,8 +81,10 @@ exports.setAttributeNS = function (ns) {
     return function (key) {
         return function (value) {
             return function (element) {
-                element.setAttributeNS(ns, key, value);
-                return {};
+                return function () {
+                    element.setAttributeNS(ns, key, value);
+                    return {};
+                };
             };
         };
     };
@@ -91,7 +93,9 @@ exports.setAttributeNS = function (ns) {
 exports.getAttributeNS = function (ns) {
     return function (key) {
         return function (element) {
-            return element.getAttributeNS(ns, key);
+            return function () {
+                return element.getAttributeNS(ns, key);
+            };
         };
     };
 };
@@ -99,8 +103,10 @@ exports.getAttributeNS = function (ns) {
 exports.removeAttributeNS = function (ns) {
     return function (key) {
         return function (element) {
-            element.removeAttributeNS(ns, key);
-            return {};
+            return function () {
+                element.removeAttributeNS(ns, key);
+                return {};
+            };
         };
     };
 };

@@ -13,10 +13,12 @@ import DOM.JSDOM (JSDOM, jsdom)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (Element, ElementId(..), documentToNonElementParentNode, elementToNode)
 
+import Elm.Json.Encode as Json
 import Graphics.Canvas (CANVAS)
 import Data.Nullable (toMaybe)
 import Data.Maybe (fromJust)
 import Data.List (List(..), (:))
+import Data.Tuple (Tuple(..))
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Partial.Unsafe (unsafePartial)
@@ -33,7 +35,7 @@ equals = flip equal
 blank :: String
 blank =
     """
-    <html>
+    <html xmlns:ns="http://localhost/bob">
         <head></head>
         <body>
             <div id="contents">
@@ -58,26 +60,132 @@ withContainer callback = do
 tests :: forall e. TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
 tests =
     suite "Elm.VirtualDom" do
-        test "Hello World" do
-            container <-
-                liftEff $
-                    withContainer \c -> do
-                        renderIntoDOM ReplacingChildren (elementToNode c) helloWorld
-                        pure c
-
-            result <-
-                liftEff $ innerHtml container
-
-            result === helloWorldResult
+        makeTest helloWorld
+        makeTest propertyTest
+        makeTest attributeTest
+        makeTest attributeNsTest
+        makeTest styleTest
+        makeTest namespacedNode
 
 
-helloWorldResult :: String
-helloWorldResult = "<p>Hello World!</p>"
+makeTest :: ∀ e msg. NodeTest msg -> TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+makeTest nodeTest =
+    test nodeTest.title do
+        container <-
+            liftEff $
+                withContainer \c -> do
+                    renderIntoDOM ReplacingChildren (elementToNode c) nodeTest.node
+                    pure c
 
-helloWorld :: ∀ msg. Node msg
+        result <-
+            liftEff $ innerHtml container
+
+        result === nodeTest.expected
+
+
+type NodeTest msg =
+    { title :: String
+    , node :: Node msg
+    , expected :: String
+    }
+
+
+helloWorld :: ∀ msg. NodeTest msg
 helloWorld =
-    node "p"
-        Nil
-        ( text "Hello World!"
-        : Nil
-        )
+    { title: "Simple <p> with text"
+    , node:
+        node "p"
+            Nil
+            ( text "Hello World!"
+            : Nil
+            )
+    , expected:
+        "<p>Hello World!</p>"
+    }
+
+
+propertyTest :: ∀ msg. NodeTest msg
+propertyTest =
+    { title: "property"
+    , node:
+        node "div"
+            ( property "className" (Json.string "greeting")
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        "<div class=\"greeting\">Hello!</div>"
+    }
+
+
+attributeTest :: ∀ msg. NodeTest msg
+attributeTest =
+    { title: "attribute"
+    , node:
+        node "div"
+            ( attribute "class" "greeting"
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        "<div class=\"greeting\">Hello!</div>"
+    }
+
+
+attributeNsTest :: ∀ msg. NodeTest msg
+attributeNsTest =
+    { title: "attributeNS"
+    , node:
+        node "div"
+            ( attributeNS "ns" "data" "greeting"
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        -- JSDOM doesn't seem to put the namespace in the innerHTML ...
+        "<div data=\"greeting\">Hello!</div>"
+    }
+
+
+styleTest :: ∀ msg. NodeTest msg
+styleTest =
+    { title: "style"
+    , node:
+        node "div"
+            ( style
+                ( Tuple "backgroundColor" "red"
+                : Tuple "height" "90px"
+                : Tuple "width" "100%"
+                : Nil
+                )
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        "<div style=\"background-color: red; height: 90px; width: 100%;\">Hello!</div>"
+    }
+
+
+namespacedNode :: ∀ msg. NodeTest msg
+namespacedNode =
+    { title: "Namespaced node"
+    , node:
+        node "p"
+            ( property "namespace" (Json.string "ns")
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        -- JSDOM doesn't seem to put the namespaces in the HTML.
+        "<p>Hello!</p>"
+    }

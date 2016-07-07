@@ -150,6 +150,9 @@ to JavaScript's `setAttributeNS` function under the hood. It is doing pretty
 much the same thing as `attribute` but you are able to have "namespaced"
 attributes. This is used in some SVG stuff at least.
 
+* Note that the first argument is the namespace, the second the label, and
+third the value. *
+
 #### `style`
 
 ``` purescript
