@@ -1,14 +1,17 @@
 module Test.Elm.VirtualDomTest (tests) where
 
-import Test.Unit (TestSuite, Test, suite, test)
+import Test.Unit (TestSuite, Test, suite, test, success, failure)
 import Test.Unit.Assert (equal)
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
+import Test.QuickCheck.LCG (randomSeed)
+import Test.QuickCheck.Gen (GenState, elements, runGen)
 
 import Test.Elm.Graphics.Internal (innerHtml)
 
 import Elm.VirtualDom
 
 import DOM (DOM)
-import DOM.Renderable (Position(..), renderIntoDOM)
+import DOM.Renderable (Position(..), renderIntoDOM, renderOrUpdate)
 import DOM.JSDOM (JSDOM, jsdom)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (Element, ElementId(..), documentToNonElementParentNode, elementToNode)
@@ -16,14 +19,17 @@ import DOM.Node.Types (Element, ElementId(..), documentToNonElementParentNode, e
 import Elm.Json.Encode as Json
 import Graphics.Canvas (CANVAS)
 import Data.Nullable (toMaybe)
-import Data.Maybe (fromJust)
-import Data.List (List(..), (:))
-import Data.Tuple (Tuple(..))
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Class (liftEff)
-import Partial.Unsafe (unsafePartial)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.List (List(..), (:), toUnfoldable)
+import Data.Tuple (Tuple(..), fst, snd)
+import Data.Foldable (traverse_)
+import Data.Either (Either(..))
+import Control.Monad.Eff.Class (class MonadEff, liftEff)
+import Control.Monad.Eff.Random (RANDOM)
+import Control.Monad.Rec.Class (tailRecM3)
+import Partial.Unsafe (unsafePartial, unsafeCrashWith)
 
-import Prelude (class Show, class Eq, flip, bind, ($), (<#>), (>>>), pure)
+import Prelude (class Show, class Eq, flip, bind, ($), (<>), show, (<#>), (>>>), pure, unit, (<=), (==), (/=), (-))
 
 
 infixl 9 equals as ===
@@ -45,31 +51,128 @@ blank =
     """
 
 
-withContainer :: ∀ e a. (Element -> Eff (jsdom :: JSDOM, dom :: DOM | e) a) -> Eff (dom :: DOM, jsdom :: JSDOM | e) a
+withContainer :: ∀ e m a. (MonadEff (jsdom :: JSDOM, dom :: DOM | e) m) => (Element -> m a) -> m a
 withContainer callback = do
-    doc <-
-        jsdom blank {}
-
     node <-
-        getElementById (ElementId "contents") (documentToNonElementParentNode doc)
+        liftEff do
+            doc <- jsdom blank {}
+            getElementById (ElementId "contents") (documentToNonElementParentNode doc)
 
     -- Should be safe, because the HTML is just above
     unsafePartial (callback (fromJust (toMaybe node)))
 
 
-tests :: forall e. TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+tests :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
 tests =
     suite "Elm.VirtualDom" do
-        makeTest helloWorld
-        makeTest propertyTest
-        makeTest attributeTest
-        makeTest attributeNsTest
-        makeTest styleTest
-        makeTest namespacedNode
+        suite "Static Tests" $
+            traverse_ makeStaticTest nodeTests
+
+        specificTransitions
+        randomTransitions
 
 
-makeTest :: ∀ e msg. NodeTest msg -> TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
-makeTest nodeTest =
+specificTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+specificTransitions =
+    test "Specific Transitions" do
+        makeTransitionTest attributeTest helloWorld
+        makeTransitionTest propertyTest attributeNsTest
+
+
+randomTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+randomTransitions =
+    test "Random Transitions" $
+        withContainer \container -> do
+            seed <-
+                liftEff $ randomSeed
+
+            runFor container 100
+                { newSeed: seed
+                , size: 1
+                } Nothing
+
+
+makeUpdateTest :: ∀ e msg. Element -> Int -> NodeTest msg -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM | e)
+makeUpdateTest container remaining (NodeTest nodeTest) previous = do
+    result <-
+        liftEff do
+            renderOrUpdate container nodeTest.node
+            innerHtml container
+
+    if result == nodeTest.expected
+        then success
+        else
+            let
+                context =
+                    case previous of
+                        Nothing ->
+                            "on first render"
+
+                        Just (NodeTest p) ->
+                            "from " <> p.title
+
+            in
+                failure $
+                    "expected " <> show nodeTest.expected <>
+                    ", got " <> show result <>
+                    ", for " <> nodeTest.title <>
+                    ", " <> context <>
+                    ", with remaining " <> show remaining
+
+
+runFor :: ∀ e msg. Element -> Int -> GenState -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM | e)
+runFor container =
+    tailRecM3 \remaining genState previous ->
+        if remaining <= 0
+            then
+                pure $ Right unit
+
+            else do
+                let
+                    state =
+                        runGen arbitrary genState
+
+                makeUpdateTest container remaining (fst state) previous
+
+                pure $ Left
+                    { a: remaining - 1
+                    , b: snd state
+                    , c: Just (fst state)
+                    }
+
+
+makeTransitionTest :: ∀ e msg. NodeTest msg -> NodeTest msg -> Test (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+makeTransitionTest (NodeTest from) (NodeTest to) =
+    withContainer \container -> do
+        resultFrom <-
+            liftEff do
+                renderOrUpdate container from.node
+                innerHtml container
+
+        if resultFrom /= from.expected
+            then
+                failure $
+                    from.title <> " --> " <> to.title <>
+                    " failed at from: expected " <> show from.expected <>
+                    " actual " <> show resultFrom
+
+            else do
+                resultTo <-
+                    liftEff do
+                        renderOrUpdate container to.node
+                        innerHtml container
+
+                if resultTo == to.expected
+                    then success
+                    else
+                        failure $
+                            from.title <> " --> " <> to.title <>
+                            " failed at to expected " <> show to.expected <>
+                            " actual " <> show resultTo
+
+
+makeStaticTest :: ∀ e msg. NodeTest msg -> TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+makeStaticTest (NodeTest nodeTest) =
     test nodeTest.title do
         container <-
             liftEff $
@@ -83,15 +186,40 @@ makeTest nodeTest =
         result === nodeTest.expected
 
 
-type NodeTest msg =
+newtype NodeTest msg = NodeTest (NodeTestRec msg)
+
+
+type NodeTestRec msg =
     { title :: String
     , node :: Node msg
     , expected :: String
     }
 
 
+instance arbitraryNodeTest :: Arbitrary (NodeTest msg) where
+    arbitrary =
+        case nodeTests of
+            Cons first rest ->
+                elements first (toUnfoldable rest)
+
+            _ ->
+                unsafeCrashWith "Can't get here, because it's not an empty list"
+
+
+nodeTests :: ∀ msg. List (NodeTest msg)
+nodeTests =
+    ( helloWorld
+    : propertyTest
+    : attributeTest
+    : attributeNsTest
+    : styleTest
+    : namespacedNode
+    : Nil
+    )
+
+
 helloWorld :: ∀ msg. NodeTest msg
-helloWorld =
+helloWorld = NodeTest
     { title: "Simple <p> with text"
     , node:
         node "p"
@@ -105,7 +233,7 @@ helloWorld =
 
 
 propertyTest :: ∀ msg. NodeTest msg
-propertyTest =
+propertyTest = NodeTest
     { title: "property"
     , node:
         node "div"
@@ -121,7 +249,7 @@ propertyTest =
 
 
 attributeTest :: ∀ msg. NodeTest msg
-attributeTest =
+attributeTest = NodeTest
     { title: "attribute"
     , node:
         node "div"
@@ -137,7 +265,7 @@ attributeTest =
 
 
 attributeNsTest :: ∀ msg. NodeTest msg
-attributeNsTest =
+attributeNsTest = NodeTest
     { title: "attributeNS"
     , node:
         node "div"
@@ -154,7 +282,7 @@ attributeNsTest =
 
 
 styleTest :: ∀ msg. NodeTest msg
-styleTest =
+styleTest = NodeTest
     { title: "style"
     , node:
         node "div"
@@ -175,7 +303,7 @@ styleTest =
 
 
 namespacedNode :: ∀ msg. NodeTest msg
-namespacedNode =
+namespacedNode = NodeTest
     { title: "Namespaced node"
     , node:
         node "p"

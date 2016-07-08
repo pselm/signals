@@ -53,11 +53,22 @@ exports.setProperty = function (key) {
 exports.removeProperty = function (key) {
     return function (element) {
         return function () {
-            // This is really a special-case for VirtualDOM -- it's
-            // what the original Javascript does. One might prefer
-            // `delete element[key]`, but perhaps that causes trouble
-            // in some cases.
+            // This is what the original Elm code in VirtualDom does.
+            //
+            // Now, you might think that `delete element[key]` would be
+            // better. However, perhaps that is problemaatic when dealing
+            // with properties that have a significance to the DOM
+            // (as opposed to custom properties).
             element[key] = (typeof element[key] === 'string') ? '' : null;
+
+            // This is a hackish special case. You can't entirely get rid
+            // of the `class` attribute this way, so we'll take care of that.
+            // This is mostly for testing, since it wouldn't really be a problem
+            // in practice.
+            if (key === "className") {
+                element.removeAttribute("class");
+            }
+
             return {};
         };
     };

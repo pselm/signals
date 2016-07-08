@@ -103,7 +103,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Exists (Exists, runExists, mkExists)
 import Unsafe.Coerce (unsafeCoerce)
 import Graphics.Canvas (CANVAS)
-import Prelude (Unit, bind, pure, not, void, ($), (#), (<$>), (<#>))
+import Prelude (Unit, bind, pure, unit, not, void, ($), (#), (<$>), (<#>))
 
 
 -- | A `Renderable` is somethng that knows how to render some data type as a DOM
@@ -327,8 +327,9 @@ renderIntoDOM position node value = do
             removeChildren node
             appendChild result node
 
-        ReplacingItself ->
+        ReplacingItself -> do
             replaceNode node result
+            pure node
 
     pure { value, result, document }
 
@@ -347,17 +348,18 @@ removeChildren parent =
                 pure true
 
 
-replaceNode :: ∀ e. Node -> Node -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+replaceNode :: ∀ e. Node -> Node -> Eff (canvas :: CANVAS, dom :: DOM | e) Unit
 replaceNode old new = do
     parent <- parentNode old
 
     case toMaybe parent of
         Just p ->
-            replaceChild new old p
+            void $ replaceChild new old p
 
-        Nothing -> do
-            removeChildren old
-            appendChild new old
+        Nothing ->
+            -- If the old node has been removed from the DOM, assume that
+            -- someone has already stitched the new one in place.
+            pure unit
 
 
 -- | Updates previously data previously rendered via `renderToDOM`, replacing
@@ -368,7 +370,7 @@ updateDOM rendered value = do
     result <- update rendered value
 
     -- Update may return the same node that it was given
-    when (not $ same rendered.result result) $ void $
+    when (not $ same rendered.result result) $
         replaceNode rendered.result result
 
     pure { value, result, document: rendered.document }

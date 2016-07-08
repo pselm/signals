@@ -26,7 +26,7 @@ import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import Control.Monad.Eff (Eff, runPure, forE)
 import Control.Monad.Rec.Class (tailRecM2)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Control.Monad (unless, (>=>))
+import Control.Monad (when, unless, (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 import Partial.Unsafe (unsafeCrashWith)
 
@@ -36,7 +36,7 @@ import Data.List (List(..), length, reverse, singleton, snoc, drop, zip, (:))
 import Data.List (foldM, singleton, null) as List
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Foldable (class Foldable, foldl, for_)
-import Data.StrMap (StrMap, foldM, foldMap, lookup)
+import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeGet)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -56,7 +56,7 @@ import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
 import DOM.Renderable (class Renderable)
 
-import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>))
+import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>), (>>>), not)
 
 
 -- Will suggest these for Data.Exists if they work
@@ -107,20 +107,23 @@ newtype TaggerRecord msg sub = TaggerRecord
     }
 
 
+rootEventNode :: EventNode
+rootEventNode =
+    EventNode
+        { tagger: 0
+        , parent: Nothing
+        }
+
 instance renderableNode :: Renderable (Node msg) where
     render document n =
-        render document n $
-            EventNode
-                { tagger: 0
-                , parent: Nothing
-                }
+        render document n rootEventNode
 
-    update old current =
-        applyPatches old.result old.value (diff old.value current) $
-            EventNode
-                { tagger: 0
-                , parent: Nothing
-                }
+    update old current = do
+        applyPatches
+            old.result
+            old.value
+            (diff old.value current)
+            rootEventNode
 
 
 -- This should really be generalized and broken out. It has something
@@ -289,6 +292,7 @@ data FactChange msg
     | RemoveEvent String Options
     | AddStyle String String
     | RemoveStyle String
+    | RemoveAllStyles
     | AddProperty String Json.Value
     | RemoveProperty String
 
@@ -717,6 +721,9 @@ applyFacts eventNode operations elem = do
 
             RemoveStyle key ->
                 removeStyle key elem
+
+            RemoveAllStyles ->
+                removeAttribute "style" elem
 
             AddProperty key value ->
                 if key == "value"
@@ -1225,6 +1232,26 @@ diffFacts old new =
             accum <- emptySTArray
 
             let
+                newProperty _ k newValue =
+                    case lookup k old.properties of
+                        Just oldValue ->
+                            when ((not (newValue `refEq` oldValue)) || (k == "value")) $ void $
+                                pushSTArray accum (AddProperty k newValue)
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (AddProperty k newValue)
+
+                oldProperty _ k oldValue =
+                    case lookup k new.properties of
+                        Just newValue ->
+                            -- We've done this already
+                            pure unit
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (RemoveProperty k)
+
                 newAttribute _ k newValue =
                     case lookup k old.attributes of
                         Just oldValue ->
@@ -1314,17 +1341,34 @@ diffFacts old new =
             -- Push removals first, then additions
             foldM oldAttribute unit old.attributes
             foldM oldAttributeNS unit old.attributesNS
-            foldM oldStyle unit old.styles
+            foldM oldProperty unit old.properties
 
             foldM newAttribute unit new.attributes
             foldM newAttributeNS unit new.attributesNS
-            foldM newStyle unit new.styles
+            foldM newProperty unit new.properties
+
+            case Tuple (isEmpty old.styles) (isEmpty new.styles) of
+                Tuple false true ->
+                    -- It wasn't empty but now is, so remove all
+                    void $ pushSTArray accum RemoveAllStyles
+
+                Tuple true true ->
+                    -- It was empty and still is, so do nothing
+                    pure unit
+
+                Tuple false false -> do
+                    -- There were some, and still are, so look
+                    -- at both
+                    foldM oldStyle unit old.styles
+                    foldM newStyle unit new.styles
+
+                Tuple true false ->
+                    -- It was empty, and now isn't. So, just add.
+                    foldM newStyle unit new.styles
 
             -- TODO
             -- foldM newEvent unit new.events -- uses equalEvents
             -- foldM oldEvent unit old.events
-            -- foldM newProperty unit new.properties -- uses reference equality, but always passes through "value"
-            -- foldM oldProperty unit old.properties
 
             pure accum
 
@@ -1431,7 +1475,13 @@ applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> Eff (dom
 applyPatchesHelp =
     List.foldM \rootNode patch -> do
         newNode <- applyPatch patch patch.domNode
-        if patch.domNode `refEq` rootNode
+
+        -- This is a little hackish ... should think this through better.
+        -- But, basically the idea is that if the patch index was nil,
+        -- we want to go on with the newNode. If not ... that is, if
+        -- we were patching further on ... then we don't want to change
+        -- the rootNode.
+        if patch.patch.index == Nil
             then pure newNode
             else pure rootNode
 
@@ -1507,7 +1557,7 @@ redraw domNode vNode eventNode = do
     document <- documentForNode domNode
     parentNode <- toMaybe <$> parentNode domNode
     newNode <- render document vNode eventNode
-	
+
     {-
     if (typeof newNode.elm_event_node_ref === 'undefined')
  	{
