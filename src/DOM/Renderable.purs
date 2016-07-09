@@ -96,14 +96,15 @@ module DOM.Renderable
 import Control.Monad (when)
 import Control.Monad.Eff (Eff, untilE)
 import DOM (DOM)
-import DOM.Node.Types (Document, Element, Node, elementToNode)
-import DOM.Node.Node (parentNode, firstChild, appendChild, replaceChild, removeChild, insertBefore, ownerDocument)
+import DOM.Node.Types (Document, Element, Node, elementToNode, textToNode)
+import DOM.Node.Node (parentNode, firstChild, appendChild, replaceChild, removeChild, insertBefore, ownerDocument, setTextContent)
+import DOM.Node.Document (createTextNode)
 import Data.Nullable (Nullable, toMaybe)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Exists (Exists, runExists, mkExists)
 import Unsafe.Coerce (unsafeCoerce)
 import Graphics.Canvas (CANVAS)
-import Prelude (Unit, bind, pure, unit, not, void, ($), (#), (<$>), (<#>))
+import Prelude (Unit, bind, pure, unit, not, void, ($), (#), (<$>), (<#>), (/=))
 
 
 -- | A `Renderable` is somethng that knows how to render some data type as a DOM
@@ -414,3 +415,15 @@ renderOrUpdate element renderable = do
     -- In either case, remember the anyRenderable
     setRenderable element new
 
+
+-- INSTANCES
+
+instance renderableString :: Renderable String where
+    render doc str =
+        textToNode <$> createTextNode str doc
+
+    update rendered str = do
+        when (str /= rendered.value) $
+            setTextContent str rendered.result
+
+        pure rendered.result
