@@ -131,7 +131,7 @@ import Prelude (Unit, bind, pure, unit, not, void, ($), (#), (<$>), (<#>), (/=))
 -- |   some reason. However, you can manually write out a trivial update function
 -- |   in this way:
 -- |
--- |       update rendered = render
+-- |       update rendered = render rendered.document
 -- |
 -- | * So, calling `render` and `update` should produce the same results,
 -- |   so long as the `Rendered` parameter provided to `update` follows the rules.
