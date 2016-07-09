@@ -8,7 +8,7 @@ module Elm.VirtualDom
     , Options, on, onWithOptions, defaultOptions
     , map
     , lazy, lazy2, lazy3
---  , custom
+    , fromRenderable
 --  , programWithFlags
     ) where
 
@@ -54,9 +54,11 @@ import DOM.Node.Types (Document, Element, textToNode, elementToNode)
 import DOM.Node.Types (Node) as DOM
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
-import DOM.Renderable (class Renderable)
+import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
+import DOM.Renderable (render, updateDOM) as Renderable
+import Graphics.Canvas (CANVAS)
 
-import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>), (>>>), not)
+import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>), (>>>), (<<<), not)
 
 
 -- Will suggest these for Data.Exists if they work
@@ -90,7 +92,7 @@ data Node msg
     | Thunk (Exists (ThunkRecord1 msg))
     | Thunk2 (Exists2 (ThunkRecord2 msg))
     | Thunk3 (Exists3 (ThunkRecord3 msg))
-    | Custom
+    | Custom AnyRenderable
 
 
 type NodeRecord msg =
@@ -113,6 +115,7 @@ rootEventNode =
         { tagger: 0
         , parent: Nothing
         }
+
 
 instance renderableNode :: Renderable (Node msg) where
     render document n =
@@ -180,7 +183,7 @@ newtype ThunkRecord3 msg a b c = ThunkRecord3
 -- |         [ text "Hello!" ]
 node :: ∀ msg. String -> List (Property msg) -> List (Node msg) -> Node msg
 node tag properties children =
-    PlainNode $
+    PlainNode
         { tag
         , namespace: organized.namespace
         , children
@@ -199,19 +202,13 @@ node tag properties children =
 -- keyedNode :: String -> List (Property msg) -> List (Tuple String (Node msg)) -> Node msg
 
 
-{-
-function custom(factList, model, impl)
-{
-	var facts = organizeFacts(factList).facts;
-
-	return {
-		type: 'custom',
-		facts: facts,
-		model: model,
-		impl: impl
-	};
-}
--}
+-- | Create a `Node` from anything that has a `Renderable` instance.
+fromRenderable :: ∀ a msg. (Renderable a) => a -> Node msg
+fromRenderable =
+    -- The original Elm allows a list of facts here as well, but that ends up being
+    -- incoherent, since if we change what the renderable produces, then the
+    -- renderable can be out of sync for updates.
+    Custom <<< toAnyRenderable
 
 
 -- | Just put plain text in the DOM. It will escape the string so that it appears
@@ -627,7 +624,7 @@ var rAF =
 
 -- RENDER
 
-render :: ∀ e msg. Document -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+render :: ∀ e msg. Document -> Node msg -> EventNode -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 render doc vNode eventNode = do
     case vNode of
         Thunk t ->
@@ -681,15 +678,8 @@ render doc vNode eventNode = do
 			return domNode;
 -}
 
-        Custom ->
-            unsafeCrashWith "TODO"
-
-{-
-		case 'custom':
-			var domNode = vNode.impl.render(vNode.model);
-			applyFacts(domNode, eventNode, vNode.facts);
-			return domNode;
--}
+        Custom renderable -> do
+            Renderable.render doc renderable
 
 
 -- APPLY FACTS
@@ -824,7 +814,7 @@ data PatchOp msg
     | PTagger
     | PRemoveLast Int
     | PAppend (List (Node msg))
-    | PCustom
+    | PCustom AnyRenderable AnyRenderable
 
 
 -- The index is a list of offsets to a root Node.
@@ -1131,32 +1121,8 @@ diffHelp a b patches index =
                             in
                                 diffChildren aNode bNode patchesWithFacts index
 
-                {a: Custom, b: Custom} ->
-                    unsafeCrashWith "TODO"
-
-                    {-
-                    case 'custom':
-                        if (a.impl !== b.impl)
-                        {
-                            patches.push(makePatch('p-redraw', index, b));
-                            return;
-                        }
-
-                        var factsDiff = diffFacts(a.facts, b.facts);
-                        if (typeof factsDiff !== 'undefined')
-                        {
-                            patches.push(makePatch('p-facts', index, factsDiff));
-                        }
-
-                        var patch = b.impl.diff(a,b);
-                        if (patch)
-                        {
-                            patches.push(makePatch('p-custom', index, patch));
-                            return;
-                        }
-
-                        return;
-                    -}
+                {a: Custom oldRenderable, b: Custom newRenderable} ->
+                    snoc patches (makePatch (PCustom oldRenderable newRenderable) index)
 
                 _ ->
                     -- This covers the case where they are different types
@@ -1460,7 +1426,7 @@ addDomNodes rootNode vNode patches eventNode = do
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 applyPatches rootDomNode oldVirtualNode patches eventNode =
     if List.null patches
         then
@@ -1471,7 +1437,7 @@ applyPatches rootDomNode oldVirtualNode patches eventNode =
             >>= applyPatchesHelp rootDomNode
 
 
-applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> Eff (dom :: DOM | e) DOM.Node
+applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 applyPatchesHelp =
     List.foldM \rootNode patch -> do
         newNode <- applyPatch patch patch.domNode
@@ -1486,7 +1452,7 @@ applyPatchesHelp =
             else pure rootNode
 
 
-applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> Eff (dom :: DOM | e) DOM.Node
+applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 applyPatch patch domNode = do
     document <-
         documentForNode domNode
@@ -1542,17 +1508,17 @@ applyPatch patch domNode = do
 
             pure domNode
 
-        PCustom ->
-		    pure domNode
+        PCustom old new ->
+            Renderable.updateDOM
+                { value: old
+                , result: domNode
+                , document
+                }
+                new
+            <#> \x -> x.result
 
-        {-
-        case 'p-custom':
-			var impl = patch.data;
-			return impl.applyPatch(domNode, impl.data);
-        -}
 
-
-redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode -> Eff (dom :: DOM | e) DOM.Node
+redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 redraw domNode vNode eventNode = do
     document <- documentForNode domNode
     parentNode <- toMaybe <$> parentNode domNode
