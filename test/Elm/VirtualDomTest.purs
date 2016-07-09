@@ -86,7 +86,7 @@ randomTransitions =
             seed <-
                 liftEff $ randomSeed
 
-            runFor container 100
+            runFor container 250
                 { newSeed: seed
                 , size: 1
                 } Nothing
@@ -208,11 +208,11 @@ instance arbitraryNodeTest :: Arbitrary (NodeTest msg) where
 
 nodeTests :: ∀ msg. List (NodeTest msg)
 nodeTests =
-    ( helloWorld
-    : propertyTest
-    : attributeTest
-    : attributeNsTest
+    ( helloWorld : helloWorld2 : helloWorld3 : helloWorld4 : helloWorld5
+    : propertyTest : propertyTest2
+    : attributeTest : attributeTest2 : attributeTest3
     : styleTest
+    : attributeNsTest
     : namespacedNode
     : Nil
     )
@@ -220,7 +220,7 @@ nodeTests =
 
 helloWorld :: ∀ msg. NodeTest msg
 helloWorld = NodeTest
-    { title: "Simple <p> with text"
+    { title: "helloWorld"
     , node:
         node "p"
             Nil
@@ -231,6 +231,61 @@ helloWorld = NodeTest
         "<p>Hello World!</p>"
     }
 
+
+helloWorld2 :: ∀ msg. NodeTest msg
+helloWorld2 = NodeTest
+    { title: "helloWorld2"
+    , node:
+        node "p"
+            Nil
+            ( text "Hello to the World!"
+            : Nil
+            )
+    , expected:
+        "<p>Hello to the World!</p>"
+    }
+
+
+helloWorld3 :: ∀ msg. NodeTest msg
+helloWorld3 = NodeTest
+    { title: "helloWorld3"
+    , node:
+        node "div"
+            Nil
+            ( text "Hello World!"
+            : Nil
+            )
+    , expected:
+        "<div>Hello World!</div>"
+    }
+
+
+helloWorld4 :: ∀ msg. NodeTest msg
+helloWorld4 = NodeTest
+    { title: "helloWorld4"
+    , node:
+        node "div"
+            Nil
+            ( node "p" Nil (text "Hello World!" : Nil)
+            : Nil
+            )
+    , expected:
+        "<div><p>Hello World!</p></div>"
+    }
+
+
+helloWorld5 :: ∀ msg. NodeTest msg
+helloWorld5 = NodeTest
+    { title: "helloWorld5"
+    , node:
+        node "div"
+            Nil
+            ( node "p" Nil (text "Hello to the World!" : Nil)
+            : Nil
+            )
+    , expected:
+        "<div><p>Hello to the World!</p></div>"
+    }
 
 propertyTest :: ∀ msg. NodeTest msg
 propertyTest = NodeTest
@@ -248,6 +303,22 @@ propertyTest = NodeTest
     }
 
 
+propertyTest2 :: ∀ msg. NodeTest msg
+propertyTest2 = NodeTest
+    { title: "property2"
+    , node:
+        node "div"
+            ( property "className" (Json.string "meeting")
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        "<div class=\"meeting\">Hello!</div>"
+    }
+
+
 attributeTest :: ∀ msg. NodeTest msg
 attributeTest = NodeTest
     { title: "attribute"
@@ -261,6 +332,38 @@ attributeTest = NodeTest
             )
     , expected:
         "<div class=\"greeting\">Hello!</div>"
+    }
+
+
+attributeTest2 :: ∀ msg. NodeTest msg
+attributeTest2 = NodeTest
+    { title: "attribute2"
+    , node:
+        node "div"
+            ( attribute "class" "sleeping"
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        "<div class=\"sleeping\">Hello!</div>"
+    }
+
+
+attributeTest3 :: ∀ msg. NodeTest msg
+attributeTest3 = NodeTest
+    { title: "attribute3"
+    , node:
+        node "div"
+            ( attribute "href" "http://www.apple.com/"
+            : Nil
+            )
+            ( text "Hello!"
+            : Nil
+            )
+    , expected:
+        "<div href=\"http://www.apple.com/\">Hello!</div>"
     }
 
 
