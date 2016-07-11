@@ -58,7 +58,15 @@ import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Graphics.Canvas (CANVAS)
 
-import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), const, (==), (/=), (||), (#), (<>), (<), (>), (>>>), (<<<), not)
+import Prelude
+    ( class Eq, (==), (/=), (<), (>), not, (||)
+    , class Show, show, (<>)
+    , Unit, unit, void
+    , flip, ($), (#), const, (>>>), (<<<)
+    , class Functor, (<$>), (<#>)
+    , bind, pure, (>>=)
+    , (+), (-), (*)
+    )
 
 
 -- Will suggest these for Data.Exists if they work
@@ -93,6 +101,10 @@ data Node msg
     | Thunk2 (Exists2 (ThunkRecord2 msg))
     | Thunk3 (Exists3 (ThunkRecord3 msg))
     | Custom AnyRenderable
+
+
+instance functorNode :: Functor Node where
+    map = map
 
 
 type NodeRecord msg =
