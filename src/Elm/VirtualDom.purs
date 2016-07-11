@@ -3,7 +3,7 @@
 -- | that expose more helper functions for HTML or SVG.
 
 module Elm.VirtualDom
-    ( Node, text, node
+    ( Node, text, node, keyedNode
     , Property, property, attribute, attributeNS, style
     , Options, on, onWithOptions, defaultOptions
     , map
@@ -95,7 +95,8 @@ foreign import refEq :: ∀ a b. a -> b -> Boolean
 -- | An immutable chunk of data representing a DOM node. This can be HTML or SVG.
 data Node msg
     = Text String
-    | PlainNode (NodeRecord msg)
+    | PlainNode (NodeRecord msg) (List (Node msg))
+    | KeyedNode (NodeRecord msg) (List (Tuple String (Node msg)))
     | Tagger (Exists (TaggerRecord msg))
     | Thunk (Exists (ThunkRecord1 msg))
     | Thunk2 (Exists2 (ThunkRecord2 msg))
@@ -111,7 +112,6 @@ type NodeRecord msg =
     { tag :: String
     , namespace :: Maybe String
     , facts :: OrganizedFacts msg
-    , children :: List (Node msg)
     }
 
 
@@ -208,11 +208,10 @@ newtype ThunkRecord3 msg a b c = ThunkRecord3
 -- |         [ property "id" (Json.string "greeting") ]
 -- |         [ text "Hello!" ]
 node :: ∀ msg. String -> List (Property msg) -> List (Node msg) -> Node msg
-node tag properties children =
+node tag properties =
     PlainNode
         { tag
         , namespace: organized.namespace
-        , children
         , facts: organized.facts
         }
 
@@ -225,7 +224,17 @@ node tag properties children =
 -- | node. You want this when you have a list of nodes that is changing: adding
 -- | nodes, removing nodes, etc. In these cases, the unique identifiers help make
 -- | the DOM modifications more efficient.
--- keyedNode :: String -> List (Property msg) -> List (Tuple String (Node msg)) -> Node msg
+keyedNode :: ∀ msg. String -> List (Property msg) -> List (Tuple String (Node msg)) -> Node msg
+keyedNode tag properties =
+    KeyedNode
+        { tag
+        , namespace: organized.namespace
+        , facts: organized.facts
+        }
+
+    where
+        organized =
+            organizeFacts properties
 
 
 -- | Create a `Node` from anything that has a `Renderable` instance.
@@ -668,7 +677,7 @@ render doc vNode eventNode = do
             createTextNode string doc
             <#> textToNode
 
-        PlainNode rec -> do
+        PlainNode rec children -> do
             domNode <-
                 case rec.namespace of
                     Just ns ->
@@ -679,7 +688,24 @@ render doc vNode eventNode = do
 
             applyFacts eventNode (initialFactChanges rec.facts) domNode
 
-            for_ rec.children \child -> do
+            for_ children \child -> do
+                renderedChild <- render doc child eventNode
+                appendChild renderedChild (elementToNode domNode)
+
+            pure (elementToNode domNode)
+
+        KeyedNode rec children -> do
+            domNode <-
+                case rec.namespace of
+                    Just ns ->
+                        createElementNS (toNullable rec.namespace) rec.tag doc
+
+                    Nothing ->
+                        createElement rec.tag doc
+
+            applyFacts eventNode (initialFactChanges rec.facts) domNode
+
+            for_ children \(Tuple key child) -> do
                 renderedChild <- render doc child eventNode
                 appendChild renderedChild (elementToNode domNode)
 
@@ -1125,7 +1151,7 @@ diffHelp a b patches index =
                         then patches
                         else snoc patches (makePatch (PText bText) index)
 
-                {a: PlainNode aNode, b: PlainNode bNode} ->
+                {a: PlainNode aNode aChildren, b: PlainNode bNode bChildren} ->
                     if aNode.tag /= bNode.tag || aNode.namespace /= bNode.namespace
                         then snoc patches (makePatch (PRedraw b) index)
                         else
@@ -1139,7 +1165,31 @@ diffHelp a b patches index =
                                         else snoc patches (makePatch (PFacts factsDiff) index)
 
                             in
-                                diffChildren aNode bNode patchesWithFacts index
+                                diffChildren aChildren bChildren patchesWithFacts index
+
+                {a: KeyedNode aNode aChildren, b: KeyedNode bNode bChildren} ->
+                    unsafeCrashWith "TODO"
+
+{-
+		case 'keyed-node':
+			// Bail if obvious indicators have changed. Implies more serious
+			// structural changes such that it's not worth it to diff.
+			if (a.tag !== b.tag || a.namespace !== b.namespace)
+			{
+				patches.push(makePatch('p-redraw', index, b));
+				return;
+			}
+
+			var factsDiff = diffFacts(a.facts, b.facts);
+
+			if (typeof factsDiff !== 'undefined')
+			{
+				patches.push(makePatch('p-facts', index, factsDiff));
+			}
+
+			diffKeyedChildren(a, b, patches, index);
+			return;
+-}
 
                 {a: Custom oldRenderable, b: Custom newRenderable} ->
                     snoc patches (makePatch (PCustom oldRenderable newRenderable) index)
@@ -1359,12 +1409,9 @@ diffFacts old new =
             pure accum
 
 
-diffChildren :: ∀ msg. NodeRecord msg -> NodeRecord msg -> List (Patch msg) -> List Int -> List (Patch msg)
-diffChildren aParent bParent patches rootIndex =
+diffChildren :: ∀ msg. List (Node msg) -> List (Node msg) -> List (Patch msg) -> List Int -> List (Patch msg)
+diffChildren aChildren bChildren patches rootIndex =
     let
-        aChildren = aParent.children
-        bChildren = bParent.children
-
         aLen = length aChildren
         bLen = length bChildren
 
@@ -1377,7 +1424,7 @@ diffChildren aParent bParent patches rootIndex =
                         else patches
 
         pairs =
-            zip aParent.children bParent.children
+            zip aChildren bChildren
 
         diffPairs =
             foldl diffChild { subIndex: 0, patches: insertsAndRemovals } pairs
@@ -1389,6 +1436,254 @@ diffChildren aParent bParent patches rootIndex =
 
     in
         diffPairs.patches
+
+
+{-
+function diffKeyedChildren(aParent, bParent, patches, rootIndex)
+{
+	var localPatches = [];
+
+	var changes = {}; // Dict String Entry
+	var inserts = []; // Array { index : Int, entry : Entry }
+	// type Entry = { tag : String, vnode : VNode, index : Int, data : _ }
+
+	var aChildren = aParent.children;
+	var bChildren = bParent.children;
+	var aLen = aChildren.length;
+	var bLen = bChildren.length;
+	var aIndex = 0;
+	var bIndex = 0;
+
+	var index = rootIndex;
+
+	while (aIndex < aLen && bIndex < bLen)
+	{
+		var a = aChildren[aIndex];
+		var b = bChildren[bIndex];
+
+		var aKey = a._0;
+		var bKey = b._0;
+		var aNode = a._1;
+		var bNode = b._1;
+
+		// check if keys match
+
+		if (aKey === bKey)
+		{
+			index++;
+			diffHelp(aNode, bNode, localPatches, index);
+			index += aNode.descendantsCount || 0;
+
+			aIndex++;
+			bIndex++;
+			continue;
+		}
+
+		// look ahead 1 to detect insertions and removals.
+
+		var aLookAhead = aIndex + 1 < aLen;
+		var bLookAhead = bIndex + 1 < bLen;
+
+		if (aLookAhead)
+		{
+			var aNext = aChildren[aIndex + 1];
+			var aNextKey = aNext._0;
+			var aNextNode = aNext._1;
+			var oldMatch = bKey === aNextKey;
+		}
+
+		if (bLookAhead)
+		{
+			var bNext = bChildren[bIndex + 1];
+			var bNextKey = bNext._0;
+			var bNextNode = bNext._1;
+			var newMatch = aKey === bNextKey;
+		}
+
+
+		// swap a and b
+		if (aLookAhead && bLookAhead && newMatch && oldMatch)
+		{
+			index++;
+			diffHelp(aNode, bNextNode, localPatches, index);
+			insertNode(changes, localPatches, aKey, bNode, bIndex, inserts);
+			index += aNode.descendantsCount || 0;
+
+			index++;
+			removeNode(changes, localPatches, aKey, aNextNode, index);
+			index += aNextNode.descendantsCount || 0;
+
+			aIndex += 2;
+			bIndex += 2;
+			continue;
+		}
+
+		// insert b
+		if (bLookAhead && newMatch)
+		{
+			index++;
+			insertNode(changes, localPatches, bKey, bNode, bIndex, inserts);
+			diffHelp(aNode, bNextNode, localPatches, index);
+			index += aNode.descendantsCount || 0;
+
+			aIndex += 1;
+			bIndex += 2;
+			continue;
+		}
+
+		// remove a
+		if (aLookAhead && oldMatch)
+		{
+			index++;
+			removeNode(changes, localPatches, aKey, aNode, index);
+			index += aNode.descendantsCount || 0;
+
+			index++;
+			diffHelp(aNextNode, bNode, localPatches, index);
+			index += aNextNode.descendantsCount || 0;
+
+			aIndex += 2;
+			bIndex += 1;
+			continue;
+		}
+
+		// remove a, insert b
+		if (aLookAhead && bLookAhead && aNextKey === bNextKey)
+		{
+			index++;
+			removeNode(changes, localPatches, aKey, aNode, index);
+			insertNode(changes, localPatches, bKey, bNode, bIndex, inserts);
+			index += aNode.descendantsCount || 0;
+
+			index++;
+			diffHelp(aNextNode, bNextNode, localPatches, index);
+			index += aNextNode.descendantsCount || 0;
+
+			aIndex += 2;
+			bIndex += 2;
+			continue;
+		}
+
+		break;
+	}
+
+	// eat up any remaining nodes with removeNode and insertNode
+
+	while (aIndex < aLen)
+	{
+		index++;
+		var a = aChildren[aIndex];
+		var aNode = a._1;
+		removeNode(changes, localPatches, a._0, aNode, index);
+		index += aNode.descendantsCount || 0;
+		aIndex++;
+	}
+
+	var endInserts;
+	while (bIndex < bLen)
+	{
+		endInserts = endInserts || [];
+		var b = bChildren[bIndex];
+		insertNode(changes, localPatches, b._0, b._1, undefined, endInserts);
+		bIndex++;
+	}
+
+	if (localPatches.length > 0 || inserts.length > 0 || typeof endInserts !== 'undefined')
+	{
+		patches.push(makePatch('p-reorder', rootIndex, {
+			patches: localPatches,
+			inserts: inserts,
+			endInserts: endInserts
+		}));
+	}
+}
+
+
+var POSTFIX = '_elmW6BL';
+
+
+function insertNode(changes, localPatches, key, vnode, bIndex, inserts)
+{
+	var entry = changes[key];
+
+	// never seen this key before
+	if (typeof entry === 'undefined')
+	{
+		entry = {
+			tag: 'insert',
+			vnode: vnode,
+			index: bIndex,
+			data: undefined
+		};
+
+		inserts.push({ index: bIndex, entry: entry });
+		changes[key] = entry;
+
+		return;
+	}
+
+	// this key was removed earlier, a match!
+	if (entry.tag === 'remove')
+	{
+		inserts.push({ index: bIndex, entry: entry });
+
+		entry.tag = 'move';
+		var subPatches = [];
+		diffHelp(entry.vnode, vnode, subPatches, entry.index);
+		entry.index = bIndex;
+		entry.data.data = {
+			patches: subPatches,
+			entry: entry
+		};
+
+		return;
+	}
+
+	// this key has already been inserted or moved, a duplicate!
+	insertNode(changes, localPatches, key + POSTFIX, vnode, bIndex, inserts);
+}
+
+
+function removeNode(changes, localPatches, key, vnode, index)
+{
+	var entry = changes[key];
+
+	// never seen this key before
+	if (typeof entry === 'undefined')
+	{
+		var patch = makePatch('p-remove', index, undefined);
+		localPatches.push(patch);
+
+		changes[key] = {
+			tag: 'remove',
+			vnode: vnode,
+			index: index,
+			data: patch
+		};
+
+		return;
+	}
+
+	// this key was inserted earlier, a match!
+	if (entry.tag === 'insert')
+	{
+		entry.tag = 'move';
+		var subPatches = [];
+		diffHelp(vnode, entry.vnode, subPatches, index);
+
+		var patch = makePatch('p-remove', index, {
+			patches: subPatches,
+			entry: entry
+		});
+		localPatches.push(patch);
+
+		return;
+	}
+
+	// this key has already been removed or moved, a duplicate!
+	removeNode(changes, localPatches, key + POSTFIX, vnode, index);
+}
+-}
 
 
 addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode msg -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
@@ -1442,6 +1737,121 @@ addDomNodes rootNode vNode patches eventNode = do
                     -- handle this problem ... we could just throw an exception here and let someone
                     -- else handle it. Also, we should add some more information, to help with debugging.
                     unsafeCrashWith "Problem traversing DOM -- has it been modified from the outside?"
+
+
+{-
+function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
+{
+	var patch = patches[i];
+	var index = patch.index;
+
+	while (index === low)
+	{
+		var patchType = patch.type;
+
+		if (patchType === 'p-thunk')
+		{
+			addDomNodes(domNode, vNode.node, patch.data, eventNode);
+		}
+		else if (patchType === 'p-reorder')
+		{
+			patch.domNode = domNode;
+			patch.eventNode = eventNode;
+
+			var subPatches = patch.data.patches;
+			if (subPatches.length > 0)
+			{
+				addDomNodesHelp(domNode, vNode, subPatches, 0, low, high, eventNode);
+			}
+		}
+		else if (patchType === 'p-remove')
+		{
+			patch.domNode = domNode;
+			patch.eventNode = eventNode;
+
+			var data = patch.data;
+			if (typeof data !== 'undefined')
+			{
+				data.entry.data = domNode;
+				var subPatches = data.patches;
+				if (subPatches.length > 0)
+				{
+					addDomNodesHelp(domNode, vNode, subPatches, 0, low, high, eventNode);
+				}
+			}
+		}
+		else
+		{
+			patch.domNode = domNode;
+			patch.eventNode = eventNode;
+		}
+
+		i++;
+
+		if (!(patch = patches[i]) || (index = patch.index) > high)
+		{
+			return i;
+		}
+	}
+
+	switch (vNode.type)
+	{
+		case 'tagger':
+			var subNode = vNode.node;
+
+			while (subNode.type === "tagger")
+			{
+				subNode = subNode.node;
+			}
+
+			return addDomNodesHelp(domNode, subNode, patches, i, low + 1, high, domNode.elm_event_node_ref);
+
+		case 'node':
+			var vChildren = vNode.children;
+			var childNodes = domNode.childNodes;
+			for (var j = 0; j < vChildren.length; j++)
+			{
+				low++;
+				var vChild = vChildren[j];
+				var nextLow = low + (vChild.descendantsCount || 0);
+				if (low <= index && index <= nextLow)
+				{
+					i = addDomNodesHelp(childNodes[j], vChild, patches, i, low, nextLow, eventNode);
+					if (!(patch = patches[i]) || (index = patch.index) > high)
+					{
+						return i;
+					}
+				}
+				low = nextLow;
+			}
+			return i;
+
+		case 'keyed-node':
+			var vChildren = vNode.children;
+			var childNodes = domNode.childNodes;
+			for (var j = 0; j < vChildren.length; j++)
+			{
+				low++;
+				var vChild = vChildren[j]._1;
+				var nextLow = low + (vChild.descendantsCount || 0);
+				if (low <= index && index <= nextLow)
+				{
+					i = addDomNodesHelp(childNodes[j], vChild, patches, i, low, nextLow, eventNode);
+					if (!(patch = patches[i]) || (index = patch.index) > high)
+					{
+						return i;
+					}
+				}
+				low = nextLow;
+			}
+			return i;
+
+		case 'text':
+		case 'thunk':
+			throw new Error('should never traverse `text` or `thunk` nodes like this');
+	}
+}
+-}
 
 
 -- APPLY PATCHES
@@ -1527,6 +1937,76 @@ applyPatch patch domNode = do
                 >>= (flip appendChild) domNode
 
             pure domNode
+
+{-
+		case 'p-remove':
+			var data = patch.data;
+			if (typeof data === 'undefined')
+			{
+				domNode.parentNode.removeChild(domNode);
+				return domNode;
+			}
+			var entry = data.entry;
+			if (typeof entry.index !== 'undefined')
+			{
+				domNode.parentNode.removeChild(domNode);
+			}
+			entry.data = applyPatchesHelp(domNode, data.patches);
+			return domNode;
+
+		case 'p-reorder':
+			var data = patch.data;
+
+			// end inserts
+			var endInserts = data.endInserts;
+			var end;
+			if (typeof endInserts !== 'undefined')
+			{
+				if (endInserts.length === 1)
+				{
+					var insert = endInserts[0];
+					var entry = insert.entry;
+					var end = entry.tag === 'move'
+						? entry.data
+						: render(entry.vnode, patch.eventNode);
+				}
+				else
+				{
+					end = document.createDocumentFragment();
+					for (var i = 0; i < endInserts.length; i++)
+					{
+						var insert = endInserts[i];
+						var entry = insert.entry;
+						var node = entry.tag === 'move'
+							? entry.data
+							: render(entry.vnode, patch.eventNode);
+						end.appendChild(node);
+					}
+				}
+			}
+
+			// removals
+			domNode = applyPatchesHelp(domNode, data.patches);
+
+			// inserts
+			var inserts = data.inserts;
+			for (var i = 0; i < inserts.length; i++)
+			{
+				var insert = inserts[i];
+				var entry = insert.entry;
+				var node = entry.tag === 'move'
+					? entry.data
+					: render(entry.vnode, patch.eventNode);
+				domNode.insertBefore(node, domNode.childNodes[insert.index]);
+			}
+
+			if (typeof end !== 'undefined')
+			{
+				domNode.appendChild(end);
+			}
+
+			return domNode;
+-}
 
         PCustom old new ->
             Renderable.updateDOM
