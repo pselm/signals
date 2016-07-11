@@ -58,7 +58,7 @@ import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Graphics.Canvas (CANVAS)
 
-import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), (==), (/=), (||), (#), (<>), (<), (>), (>>>), (<<<), not)
+import Prelude (class Eq, class Show, show, Unit, unit, flip, (+), (-), (*), void, pure, bind, (>>=), ($), (<$>), (<#>), const, (==), (/=), (||), (#), (<>), (<), (>), (>>>), (<<<), not)
 
 
 -- Will suggest these for Data.Exists if they work
@@ -109,14 +109,28 @@ newtype TaggerRecord msg sub = TaggerRecord
     }
 
 
-rootEventNode :: EventNode
+-- This is here for initial testing only ... doesn't ultimately make sense.
+rootEventNode :: ∀ msg. EventNode msg
 rootEventNode =
-    EventNode
-        { tagger: 0
-        , parent: Nothing
-        }
+    mkExists $
+        EventNodeRecord
+            { tagger: const
+            , parent: Nothing
+            }
 
 
+newtype EventNodeRecord msg parentMsg = EventNodeRecord
+    { tagger :: msg -> parentMsg
+    , parent :: Maybe (EventNode parentMsg)
+    }
+
+
+type EventNode msg = Exists (EventNodeRecord msg)
+
+
+-- The references to rootEventNode here don't ultimately make sense.
+-- Eventually, the thing that is `Renderable` is going to have to
+-- include the concept of an `EventNode`, in one way or another.
 instance renderableNode :: Renderable (Node msg) where
     render document n =
         render document n rootEventNode
@@ -556,12 +570,6 @@ function equalEvents(a, b)
 
 -- RENDERER
 
-newtype EventNode = EventNode
-    { tagger :: Int
-    , parent :: Maybe EventNode
-    }
-
-
 {-
 function renderer(parent, tagger, initialVirtualNode)
 {
@@ -624,7 +632,7 @@ var rAF =
 
 -- RENDER
 
-render :: ∀ e msg. Document -> Node msg -> EventNode -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+render :: ∀ e msg. Document -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 render doc vNode eventNode = do
     case vNode of
         Thunk t ->
@@ -684,7 +692,7 @@ render doc vNode eventNode = do
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e f msg. (Foldable f) => EventNode -> f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts :: ∀ e f msg. (Foldable f) => EventNode msg -> f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
 applyFacts eventNode operations elem = do
     for_ operations \operation ->
         case operation of
@@ -997,7 +1005,7 @@ traversal (Cons c cs) (Cons d ds) =         -- Something left on both sides, so 
 type PatchWithNodes msg =
     { patch :: Patch msg
     , domNode :: DOM.Node
-    , eventNode :: EventNode
+    , eventNode :: EventNode msg
     }
 
 
@@ -1371,7 +1379,7 @@ diffChildren aParent bParent patches rootIndex =
         diffPairs.patches
 
 
-addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
+addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode msg -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
 addDomNodes rootNode vNode patches eventNode = do
     patches
         # List.foldM step
@@ -1426,7 +1434,7 @@ addDomNodes rootNode vNode patches eventNode = do
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 applyPatches rootDomNode oldVirtualNode patches eventNode =
     if List.null patches
         then
@@ -1518,7 +1526,7 @@ applyPatch patch domNode = do
             <#> \x -> x.result
 
 
-redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 redraw domNode vNode eventNode = do
     document <- documentForNode domNode
     parentNode <- toMaybe <$> parentNode domNode
