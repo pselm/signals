@@ -433,7 +433,6 @@ organizeFacts factList =
             }
 
 
-
 -- | Create arbitrary *properties*.
 -- |
 -- |     import JavaScript.Encode as Json
@@ -715,11 +714,24 @@ render doc vNode eventNode = do
             unsafeCrashWith "TODO"
 
 {-
-            var subEventRoot = {
-				tagger: vNode.tagger,
+			var subNode = vNode.node;
+			var tagger = vNode.tagger;
+
+			while (subNode.type === 'tagger')
+			{
+				typeof tagger !== 'object'
+					? tagger = [tagger, subNode.tagger]
+					: tagger.push(subNode.tagger);
+
+				subNode = subNode.node;
+			}
+
+			var subEventRoot = {
+				tagger: tagger,
 				parent: eventNode
 			};
-			var domNode = render(vNode.node, subEventRoot);
+
+			var domNode = render(subNode, subEventRoot);
 			domNode.elm_event_node_ref = subEventRoot;
 			return domNode;
 -}
@@ -785,6 +797,7 @@ function applyEvents(domNode, eventNode, events)
 		if (typeof value === 'undefined')
 		{
 			domNode.removeEventListener(key, handler);
+            allHandlers[key] = undefined;
 		}
 		else if (typeof handler === 'undefined')
 		{
