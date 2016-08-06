@@ -77,6 +77,10 @@ instance showEqFunc :: Show (EqFunc a b) where
     show (EqFunc func) = "(EqFunc {tag: " <> show func.tag <> "})"
 
 
+instance functorEqFunc :: Functor (EqFunc a) where
+    map func1 func2 = compose (eqFunc func1) func2
+
+
 -- A tag that tracks things about how a function was created, so that
 -- we have some chance of determining that two functions are equal,
 -- even if they are not literally the same function.
