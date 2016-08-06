@@ -28,6 +28,11 @@ add3 =
     eqFunc3 \a b c ->
         a + b + c
 
+add4 :: Int ==> Int ==> Int ==> Int ==> Int
+add4 =
+    eqFunc4 \a b c d ->
+        a + b + c + d
+
 
 times2 :: Int ==> Int
 times2 = eqFunc (_ * 2)
@@ -86,7 +91,7 @@ tests =
             assert "p <<< id actually works" $
                 applyEF (subtract7 <<< id) 9 == 2
 
-        test "partial application" do
+        test "eqFunc2" do
             assert "a function partially applied twice with the same parameter should be equal" $
                 (applyEF add 2) == (applyEF add 2)
 
@@ -96,7 +101,7 @@ tests =
             assert "a partially applied function should actually work" $
                 ((add =$= 2) =$= 3) == 5
 
-        test "partial application 3" do
+        test "eqFunc3" do
             assert "a function partially applied twice with the same parameter should be equal" $
                 (applyEF add3 2) == (applyEF add3 2)
 
@@ -111,3 +116,25 @@ tests =
 
             assert "a partially applied function should actually work" $
                 (((add3 =$= 2) =$= 3) =$= 4) == 9
+
+        test "eqFunc4" do
+            assert "a function partially applied twice with the same parameter should be equal" $
+                (applyEF add4 2) == (applyEF add4 2)
+
+            assert "a function partially applied twice with the same two parameters should be equal" $
+                applyEF (applyEF add4 2) 5 == applyEF (applyEF add4 2) 5
+
+            assert "a function partially applied twice with the same three parameters should be equal" $
+                applyEF (applyEF (applyEF add4 2) 5) 7 == applyEF (applyEF (applyEF add4 2) 5) 7
+
+            assert "a function partially applied twice with a different parameter should not be equal" $
+                applyEF add4 2 /= applyEF add4 3
+
+            assert "a function partially applied twice with two different parameters should not be equal" $
+                applyEF (applyEF add4 2) 3 /= applyEF (applyEF add4 3) 4
+
+            assert "a function partially applied twice with three different parameters should not be equal" $
+                applyEF (applyEF (applyEF add4 2) 3) 4 /= applyEF (applyEF (applyEF add4 3) 4) 5
+
+            assert "a partially applied function should actually work" $
+                ((((add4 =$= 2) =$= 3) =$= 4) =$= 5) == 14

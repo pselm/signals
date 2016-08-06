@@ -198,6 +198,11 @@ eqFunc5 func =
     mkEqFunc5 (uniqueTag func) func
 
 
+eqFunc6 :: ∀ a b c d e f g. (Eq a, Eq b, Eq c, Eq d, Eq e) => (a -> b -> c -> d -> e -> f -> g) -> (a ==> b ==> c ==> d ==> e ==> f ==> g)
+eqFunc6 func =
+    mkEqFunc6 (uniqueTag func) func
+
+
 applied :: ∀ a. Tag -> a -> (a -> a -> Boolean) -> Tag
 applied parentTag param eqParam =
     Applied $ mkExists $ AppliedRec {parentTag, param, eqParam}
@@ -211,10 +216,9 @@ mkEqFunc t func =
 mkEqFunc2 :: ∀ a b c. (Eq a) => Tag -> (a -> b -> c) -> (a ==> b ==> c)
 mkEqFunc2 t func =
     mkEqFunc t \a ->
-        EqFunc
-            { func: func a
-            , tag: applied t a eq
-            }
+        mkEqFunc
+            (applied t a eq)
+            (func a)
 
 
 mkEqFunc3 :: ∀ a b c d. (Eq a, Eq b) => Tag -> (a -> b -> c -> d) -> (a ==> b ==> c ==> d)
@@ -237,6 +241,14 @@ mkEqFunc5 :: ∀ a b c d e f. (Eq a, Eq b, Eq c, Eq d) => Tag -> (a -> b -> c ->
 mkEqFunc5 t func =
     mkEqFunc t \a ->
         mkEqFunc4
+            (applied t a eq)
+            (func a)
+
+
+mkEqFunc6 :: ∀ a b c d e f g. (Eq a, Eq b, Eq c, Eq d, Eq e) => Tag -> (a -> b -> c -> d -> e -> f -> g) -> (a ==> b ==> c ==> d ==> e ==> f ==> g)
+mkEqFunc6 t func =
+    mkEqFunc t \a ->
+        mkEqFunc5
             (applied t a eq)
             (func a)
 
