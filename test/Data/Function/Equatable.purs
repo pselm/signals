@@ -8,7 +8,7 @@ import Test.Unit.Assert (assert)
 
 import Data.Function.Equatable
 
-import Prelude (id, bind, ($), (<<<), (>>>), (+), (*), (-), (==), (<>))
+import Prelude (id, bind, ($), (<<<), (>>>), (+), (*), (-), (==), (/=), (<>))
 
 
 add5func :: Int -> Int
@@ -16,16 +16,26 @@ add5func = (_ + 5)
 
 
 add5 :: Int ==> Int
-add5 = mkEqFn (_ + 5)
+add5 = eqFunc (_ + 5)
+
+
+add :: Int ==> Int ==> Int
+add = eqFunc2 (+)
+
+
+add3 :: Int ==> Int ==> Int ==> Int
+add3 =
+    eqFunc3 \a b c ->
+        a + b + c
 
 
 times2 :: Int ==> Int
-times2 = mkEqFn (_ * 2)
+times2 = eqFunc (_ * 2)
 
 
 subtract7 :: Int ==> Int
 subtract7 =
-    mkEqFn \x ->
+    eqFunc \x ->
         x - 7
 
 
@@ -38,11 +48,11 @@ tests =
 
         test "repeatability" do
             assert "two EqFn's made from the same func should be equal" $
-                mkEqFn add5func == mkEqFn add5func
+                eqFunc add5func == eqFunc add5func
 
         test "running" do
             assert "running an EqFn should be like running the func" $
-                (runEqFn add5) 2 == 7
+                (applyEF add5) 2 == 7
 
         test "composing" do
             assert "composing equal functions should be equal" $
@@ -52,13 +62,13 @@ tests =
                 (add5 >>> (times2 >>> subtract7)) == ((add5 >>> times2) >>> subtract7)
 
             assert "the composed function should work" $
-                runEqFn (add5 >>> times2) 3 == 16
+                applyEF (add5 >>> times2) 3 == 16
 
             assert "the doubly-composed function should work" $
-                runEqFn (add5 >>> (times2 >>> subtract7)) 3 == 9
+                applyEF (add5 >>> (times2 >>> subtract7)) 3 == 9
 
             assert "the doubly-composed function should work the other way" $
-                runEqFn ((add5 >>> times2) >>> subtract7) 3 == 9
+                applyEF ((add5 >>> times2) >>> subtract7) 3 == 9
 
         test "category laws" do
             assert "id <<< p = p" $
@@ -71,7 +81,33 @@ tests =
                 id <<< subtract7 == subtract7 >>> id
 
             assert "id <<< p actually works" $
-                runEqFn (id <<< subtract7) 9 == 2
+                applyEF (id <<< subtract7) 9 == 2
 
             assert "p <<< id actually works" $
-                runEqFn (subtract7 <<< id) 9 == 2
+                applyEF (subtract7 <<< id) 9 == 2
+
+        test "partial application" do
+            assert "a function partially applied twice with the same parameter should be equal" $
+                (applyEF add 2) == (applyEF add 2)
+
+            assert "a function partially applied twice with a different parameter should not be equal" $
+                applyEF add 2 /= applyEF add 3
+
+            assert "a partially applied function should actually work" $
+                ((add =$= 2) =$= 3) == 5
+
+        test "partial application 3" do
+            assert "a function partially applied twice with the same parameter should be equal" $
+                (applyEF add3 2) == (applyEF add3 2)
+
+            assert "a function partially applied twice with the same two parameters should be equal" $
+                applyEF (applyEF add3 2) 5 == applyEF (applyEF add3 2) 5
+
+            assert "a function partially applied twice with a different parameter should not be equal" $
+                applyEF add3 2 /= applyEF add3 3
+
+            assert "a function partially applied twice with two different parameters should not be equal" $
+                applyEF (applyEF add3 2) 3 /= applyEF (applyEF add3 3) 4
+
+            assert "a partially applied function should actually work" $
+                (((add3 =$= 2) =$= 3) =$= 4) == 9

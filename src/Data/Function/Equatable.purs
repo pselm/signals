@@ -1,5 +1,5 @@
 
--- | It is often convenient, even necessary, to compare two functions in order to
+-- | One sometimes wants to compare two functions in order to
 -- | determine whether they are equal. This is, sadly, impossible, in the general
 -- | case -- that is, impossible if you know nothing about where the function came
 -- | from.
@@ -21,33 +21,141 @@
 -- |
 -- | So, what to do? The idea this module expresses is that we can make a kind
 -- | of reference equality less fragile by "wrapping" a function with a new type
--- | -- `EqFn` -- which contains a unique tag. Given the unique tag, we
+-- | -- `EqFunc` -- which contains a unique tag. Given the unique tag, we
 -- | can equate the wrapper -- and thus, by necessary implication, the function inside.
 -- |
--- | We can also provide for robust composition of the `EqFn`, preserving
+-- | We can also provide for robust composition of the `EqFunc`, preserving
 -- | the ability to equate the composed function.
 -- |
--- | So, in cases where you need to equate functions, you can ask for a `EqFn`
--- | instead. If two `EqFn` are equal, then the functions inside are
+-- | So, in cases where you need to equate functions, you can ask for a `EqFunc`
+-- | instead. If two `EqFunc` are equal, then the functions inside are
 -- | necessarily equal.
 -- |
--- | Now, if two `EqFn` are unequal, it is still possible for the wrapped
+-- | Now, if two `EqFunc` are unequal, it is still possible for the wrapped
 -- | functions to be equal, in the sense that they may be defined (separately) in the
 -- | same way. So, for best results, you need to follow certain rules which
--- | are specified in the documentation for `mkEqFn` and `runEqFn`.
+-- | are specified in the documentation for `mkEF` and `runEqFunc`.
+-- |
+-- | If possible, it's even better to refactor so that you don't have to compare
+-- | functions. But, at least `EqFunc` gives you some opportunity to do so when needed.
 
 module Data.Function.Equatable
-    ( EqFn, type (==>), mkEqFn, runEqFn
+    ( EqFunc, type (==>)
+    , eqFunc, eqFunc2, eqFunc3, eqFunc4
+    , applyEF, (=$=)
+    , applyFlippedEF, (=#=)
     ) where
 
 
-import Data.List (List(..), (:))
-import Prelude (class Eq, eq, class Semigroupoid, compose, class Category, id, (<>))
+import Data.List (List(..), (:), snoc)
+import Data.Exists (Exists, mkExists, runExists)
+import Data.Monoid (class Monoid)
+import Unsafe.Coerce (unsafeCoerce)
+
+import Prelude
+    ( class Eq, eq, (==)
+    , class Semigroup
+    , class Semigroupoid, compose, (<<<)
+    , class Category, id
+    , class Functor, map
+    , class Show, show
+    , (<>), flip, (#), ($)
+    )
 
 
-data EqFn a b = EqFn (a -> b) (List Int)
+newtype EqFunc a b = EqFunc
+    { func :: a -> b
+    , tag :: Tag
+    }
 
-infixr 4 type EqFn as ==>
+
+-- A nice type operator, so you can do things like ...
+infixr 4 type EqFunc as ==>
+
+
+instance showEqFunc :: Show (EqFunc a b) where
+    show (EqFunc func) = "(EqFunc {tag: " <> show func.tag <> "})"
+
+
+-- A tag that tracks things about how a function was created, so that
+-- we have some chance of determining that two functions are equal,
+-- even if they are not literally the same function.
+--
+-- The `Plain` tag covers the most primitive case, where we don't know
+-- anything about how the function was made. In that case, we just tag
+-- the function with a unique ID -- it is, after all, at least equal
+-- to itself, and that's all we know.
+--
+-- The other tags cover cases where we do know something about how the
+-- function was made, so we can make some inferences about which functions
+-- are equal to each other. As a simple example, `const 5` must be equal to
+-- `const 5`, even if they are produced separately (and thus not literally
+-- the same function).
+--
+-- The b type parameter represents the return type of the function.
+data Tag
+    = Plain Int
+    | Id
+    | Composed (List Tag)
+    | Applied (Exists AppliedRec)
+
+
+instance showTag :: Show Tag where
+    show (Plain id) = "(Plain " <> show id <> ")"
+    show (Id) = "Id"
+    show (Composed tags) = "(Composed " <> show tags <> ")"
+    show (Applied rec) =
+        rec # runExists \r ->
+            "(Applied " <> show r <> ")"
+
+
+instance semigroupTag :: Semigroup Tag where
+    append Id other = other
+    append other Id = other
+    append (Composed list1) (Composed list2) = Composed (list1 <> list2)
+    append (Composed list) tag2 = Composed (snoc list tag2)
+    append tag1 (Composed list) = Composed (Cons tag1 list)
+    append other1 other2 = Composed (other1 : other2 : Nil)
+
+
+instance monoidTag :: Monoid Tag where
+    mempty = Id
+
+
+instance eqTag :: Eq Tag where
+    eq (Plain id1) (Plain id2) = eq id1 id2
+    eq (Composed list1) (Composed list2) = eq list1 list2
+    eq Id Id = true
+
+    eq (Applied a) (Applied b) =
+        a # runExists \(AppliedRec aRec) ->
+            b # runExists \(AppliedRec bRec) ->
+                if aRec.parentTag == bRec.parentTag
+                    then multiEq aRec.eqParam aRec.param bRec.eqParam bRec.param
+                    else false
+
+    eq _ _ = false
+
+
+newtype AppliedRec a = AppliedRec
+    { parentTag :: Tag
+    , param :: a
+    , eqParam :: a -> a -> Boolean
+    }
+
+
+instance showAppliedRec :: Show (AppliedRec a) where
+    show (AppliedRec rec) = "(AppliedRec {parentTag: " <> show rec.parentTag <> "})"
+
+
+foreign import refEq :: ∀ a b. a -> b -> Boolean
+
+
+multiEq :: ∀ a b. (a -> a -> Boolean) -> a -> (b -> b -> Boolean) -> b -> Boolean
+multiEq eqA a eqB b =
+    if eqA `refEq` eqB
+        then a `eqA` (unsafeCoerce b)
+        else false
 
 
 -- | Given a top-level function, make an equatable function.
@@ -55,56 +163,125 @@ infixr 4 type EqFn as ==>
 -- | For best results, the function you provide should be defined at the top-level
 -- | of your module, rather than being the value returned by another function. The
 -- | problem if your function is generated by another function is that you'll get a
--- | differnt `EqFn` every time. So, they will never be equal to each other, even if
+-- | differnt `EqFunc` every time. So, they will never be equal to each other, even if
 -- | we know that they must be.
 -- |
 -- | As far as I know, there isn't any way in the type system to enforce that the
 -- | incoming function has not been produced by another function. So, you just have to
 -- | verify that for yourself.
-mkEqFn :: ∀ a b. (a -> b) -> EqFn a b
-mkEqFn func =
-    EqFn func (Cons (tag func) Nil)
+eqFunc :: ∀ a b. (a -> b) -> (a ==> b)
+eqFunc func =
+    mkEqFunc (uniqueTag func) func
 
 
--- Gets a unique tag for a function. Stores the tag as a property on the function, so
--- that if we call tag again on the same function, we get the same value.
-foreign import tag :: ∀ a b. (a -> b) -> Int
+eqFunc2 :: ∀ a b c. (Eq a) => (a -> b -> c) -> (a ==> b ==> c)
+eqFunc2 func =
+    mkEqFunc2 (uniqueTag func) func
 
 
--- | Once you have an `EqFn`, you can use `runEqFn` to apply the function to an
--- | argument.
--- |
--- | I suppose you can also extract the `Function` itself, given
--- | partial application. Note that you shouldn't supply such an extracted
--- | function back into `mkEqFn`, since that would have the problems mentioned
--- | in the documentation for `mkEqFn`.
--- |
--- | So, basically, you should:
--- |
--- | * Start with a top-level functions, and use `mkEqFn` to
--- |   prodduce `EqFn`.
--- |
--- | * If you want to produce a new `EqFn` based on an `EqFn`, do it by
--- |   manipulating the `EqFn`.
--- |
--- | * Only use `runEqFn` to actually perform the calculation.
-runEqFn :: ∀ a b. EqFn a b -> a -> b
-runEqFn (EqFn func _) = func
+eqFunc3 :: ∀ a b c d. (Eq a, Eq b) => (a -> b -> c -> d) -> (a ==> b ==> c ==> d)
+eqFunc3 func =
+    mkEqFunc3 (uniqueTag func) func
 
 
-instance eqEqFn :: Eq (EqFn a b) where
-    eq (EqFn _ tags1) (EqFn _ tags2) = eq tags1 tags2
+eqFunc4 :: ∀ a b c d e. (Eq a, Eq b, Eq c) => (a -> b -> c -> d -> e) -> (a ==> b ==> c ==> d ==> e)
+eqFunc4 func =
+    mkEqFunc4 (uniqueTag func) func
 
 
-instance semigroupoidEqFn :: Semigroupoid EqFn where
-    compose (EqFn func1 tags1) (EqFn func2 tags2) =
-        EqFn (compose func1 func2) (tags1 <> tags2)
+eqFunc5 :: ∀ a b c d e f. (Eq a, Eq b, Eq c, Eq d) => (a -> b -> c -> d -> e -> f) -> (a ==> b ==> c ==> d ==> e ==> f)
+eqFunc5 func =
+    mkEqFunc5 (uniqueTag func) func
 
 
-instance categoryEqFn :: Category EqFn where
-    -- So, our func is the usual `id`. The trick is that our
-    -- tag is empty, so that when we compose with another
-    -- `EqFn` we take on its tags, which of course is correct,
-    -- since we're not modifying that function. Nice, eh?
-    id = EqFn id Nil
+applied :: ∀ a. Tag -> a -> (a -> a -> Boolean) -> Tag
+applied parentTag param eqParam =
+    Applied $ mkExists $ AppliedRec {parentTag, param, eqParam}
 
+
+mkEqFunc :: ∀ a b. Tag -> (a -> b) -> (a ==> b)
+mkEqFunc t func =
+    EqFunc {tag: t, func}
+
+
+mkEqFunc2 :: ∀ a b c. (Eq a) => Tag -> (a -> b -> c) -> (a ==> b ==> c)
+mkEqFunc2 t func =
+    mkEqFunc t \a ->
+        EqFunc
+            { func: func a
+            , tag: applied t a eq
+            }
+
+
+mkEqFunc3 :: ∀ a b c d. (Eq a, Eq b) => Tag -> (a -> b -> c -> d) -> (a ==> b ==> c ==> d)
+mkEqFunc3 t func =
+    mkEqFunc t \a ->
+        mkEqFunc2
+            (applied t a eq)
+            (func a)
+
+
+mkEqFunc4 :: ∀ a b c d e. (Eq a, Eq b, Eq c) => Tag -> (a -> b -> c -> d -> e) -> (a ==> b ==> c ==> d ==> e)
+mkEqFunc4 t func =
+    mkEqFunc t \a ->
+        mkEqFunc3
+            (applied t a eq)
+            (func a)
+
+
+mkEqFunc5 :: ∀ a b c d e f. (Eq a, Eq b, Eq c, Eq d) => Tag -> (a -> b -> c -> d -> e -> f) -> (a ==> b ==> c ==> d ==> e ==> f)
+mkEqFunc5 t func =
+    mkEqFunc t \a ->
+        mkEqFunc4
+            (applied t a eq)
+            (func a)
+
+
+-- Generates a unique tag for a function, unless it already has a tag, in which
+-- case it returns that tag.
+foreign import uniqueTagImpl :: ∀ a b. (Int -> Tag) -> (a -> b) -> Tag
+
+
+uniqueTag :: ∀ a b. (a -> b) -> Tag
+uniqueTag = uniqueTagImpl Plain
+
+
+-- | Applies an `EqFunc` to an argument.
+applyEF :: ∀ a b. (a ==> b) -> (a -> b)
+applyEF (EqFunc func) = func.func
+
+
+infixr 0 applyEF as =$=
+
+
+applyFlippedEF :: ∀ a b. a -> (a ==> b) -> b
+applyFlippedEF = flip applyEF
+
+infixl 1 applyFlippedEF as =#=
+
+
+instance eqEqFunc :: Eq (EqFunc a b) where
+    eq (EqFunc func1) (EqFunc func2) = eq func1.tag func2.tag
+
+
+instance semigroupoidEqFunc :: Semigroupoid EqFunc where
+    compose (EqFunc func1) (EqFunc func2) =
+        EqFunc
+            { func: compose func1.func func2.func
+            , tag: func1.tag <> func2.tag
+            }
+
+
+instance categoryEqFunc :: Category EqFunc where
+    -- So, our func is the usual `id`. The tag is a special
+    -- tag that, when cmoposed, will simply take on the tag
+    -- of the other function.
+    id =
+        EqFunc
+            { func: id
+            , tag: Id
+            }
+
+
+mapEF :: ∀ f a b. Functor f => (a ==> b) -> f a -> f b
+mapEF = map <<< applyEF
