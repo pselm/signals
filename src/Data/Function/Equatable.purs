@@ -55,6 +55,8 @@ import Data.Profunctor (class Profunctor)
 import Data.Profunctor.Choice (class Choice, left, right)
 import Data.Profunctor.Cochoice (class Cochoice)
 import Data.Profunctor.Strong (class Strong, first, second)
+import Data.Profunctor.Costrong (class Costrong)
+import Data.Tuple (Tuple(..), fst, snd)
 import Unsafe.Coerce (unsafeCoerce)
 import Partial.Unsafe (unsafePartial)
 
@@ -65,7 +67,7 @@ import Prelude
     , class Category, id
     , class Functor, map
     , class Show, show
-    , (<>), flip, (#), ($)
+    , (<>), flip, (#), ($), unit
     )
 
 
@@ -145,6 +147,36 @@ instance strongEqFunc :: Strong EqFunc where
                  _ -> StrongSecond tag
 
             (second func)
+
+
+instance costrongEqFunc :: Costrong EqFunc where
+    -- unfirst :: forall a b c. p (Tuple a c) (Tuple b c) -> p a b
+    unfirst (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                StrongFirst parent -> parent
+                _ -> CostrongFirst tag
+
+            -- This is a bit dodgy ... it relies on the notion that
+            -- the func won't use the snd part of the Tuple, which
+            -- does seem a reasonable assumption. If Purescript were
+            -- lazy, we'd have some other alternatives.
+            \a ->
+                fst (func (Tuple a (unsafeCoerce unit)))
+
+    -- unsecond :: forall a b c. p (Tuple a b) (Tuple a c) -> p b c
+    unsecond (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                StrongSecond parent -> parent
+                _ -> CostrongSecond tag
+
+            -- This is a bit dodgy ... it relies on the notion that
+            -- the func won't use the fst part of the Tuple, which
+            -- does seem a reasonable assumption. If Purescript were
+            -- lazy, we'd have some other altternatives.
+            \b ->
+                snd (func (Tuple (unsafeCoerce unit) b))
 
 
 -- A tag that tracks things about how a function was created, so that
