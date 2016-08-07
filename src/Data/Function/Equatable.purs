@@ -49,16 +49,11 @@ module Data.Function.Equatable
 
 import Data.List (List(..), (:), snoc)
 import Data.Exists (Exists, mkExists, runExists)
-import Data.Either (Either(..), fromLeft, fromRight)
 import Data.Monoid (class Monoid)
 import Data.Profunctor (class Profunctor)
 import Data.Profunctor.Choice (class Choice, left, right)
-import Data.Profunctor.Cochoice (class Cochoice)
 import Data.Profunctor.Strong (class Strong, first, second)
-import Data.Profunctor.Costrong (class Costrong)
-import Data.Tuple (Tuple(..), fst, snd)
 import Unsafe.Coerce (unsafeCoerce)
-import Partial.Unsafe (unsafePartial)
 
 import Prelude
     ( class Eq, eq, (==)
@@ -67,7 +62,7 @@ import Prelude
     , class Category, id
     , class Functor, map
     , class Show, show
-    , (<>), flip, (#), ($), unit
+    , (<>), flip, (#), ($)
     )
 
 
@@ -96,87 +91,28 @@ instance profunctorEqFunc :: Profunctor EqFunc where
 instance choiceEqFunc :: Choice EqFunc where
     left (EqFunc {func, tag}) =
         mkEqFunc
-            case tag of
-                CochoseLeft parent -> parent
-                _ -> ChoseLeft tag
-
+            (ChoseLeft tag)
             (left func)
 
     right (EqFunc {func, tag}) =
         mkEqFunc
-            case tag of
-                 CochoseRight parent -> parent
-                 _ -> ChoseRight tag
-
+            (ChoseRight tag)
             (right func)
-
-
-instance cochoiceEqFunc :: Cochoice EqFunc where
-    -- unleft :: forall a b c. p (Either a c) (Either b c) -> p a b
-    unleft (EqFunc {func, tag}) =
-        mkEqFunc
-            case tag of
-                ChoseLeft parent -> parent
-                _ -> CochoseLeft tag
-
-            (unsafePartial $ fromLeft <<< func <<< Left)
-
-    -- unright :: forall a b c. p (Either a b) (Either a c) -> p b c
-    unright (EqFunc {func, tag}) =
-        mkEqFunc
-            case tag of
-                ChoseRight parent -> parent
-                _ -> CochoseRight tag
-
-            (unsafePartial $ fromRight <<< func <<< Right)
 
 
 instance strongEqFunc :: Strong EqFunc where
     first (EqFunc {func, tag}) =
         mkEqFunc
-            case tag of
-                CostrongFirst parent -> parent
-                _ -> StrongFirst tag
-
+            (StrongFirst tag)
             (first func)
 
     second (EqFunc {func, tag}) =
         mkEqFunc
-            case tag of
-                 CostrongSecond parent -> parent
-                 _ -> StrongSecond tag
-
+            (StrongSecond tag)
             (second func)
 
 
-instance costrongEqFunc :: Costrong EqFunc where
-    -- unfirst :: forall a b c. p (Tuple a c) (Tuple b c) -> p a b
-    unfirst (EqFunc {func, tag}) =
-        mkEqFunc
-            case tag of
-                StrongFirst parent -> parent
-                _ -> CostrongFirst tag
 
-            -- This is a bit dodgy ... it relies on the notion that
-            -- the func won't use the snd part of the Tuple, which
-            -- does seem a reasonable assumption. If Purescript were
-            -- lazy, we'd have some other alternatives.
-            \a ->
-                fst (func (Tuple a (unsafeCoerce unit)))
-
-    -- unsecond :: forall a b c. p (Tuple a b) (Tuple a c) -> p b c
-    unsecond (EqFunc {func, tag}) =
-        mkEqFunc
-            case tag of
-                StrongSecond parent -> parent
-                _ -> CostrongSecond tag
-
-            -- This is a bit dodgy ... it relies on the notion that
-            -- the func won't use the fst part of the Tuple, which
-            -- does seem a reasonable assumption. If Purescript were
-            -- lazy, we'd have some other altternatives.
-            \b ->
-                snd (func (Tuple (unsafeCoerce unit) b))
 
 
 -- A tag that tracks things about how a function was created, so that
@@ -203,13 +139,9 @@ data Tag
 
     | ChoseLeft Tag
     | ChoseRight Tag
-    | CochoseLeft Tag
-    | CochoseRight Tag
 
     | StrongFirst Tag
     | StrongSecond Tag
-    | CostrongFirst Tag
-    | CostrongSecond Tag
 
 
 instance showTag :: Show Tag where
@@ -219,13 +151,9 @@ instance showTag :: Show Tag where
 
     show (ChoseLeft tag) = "(ChoseLeft " <> show tag <> ")"
     show (ChoseRight tag) = "(ChoseRight " <> show tag <> ")"
-    show (CochoseLeft tag) = "(CochoseLeft " <> show tag <> ")"
-    show (CochoseRight tag) = "(CochoseRight " <> show tag <> ")"
 
     show (StrongFirst tag) = "(StrongFirst " <> show tag <> ")"
     show (StrongSecond tag) = "(StrongSecond " <> show tag <> ")"
-    show (CostrongFirst tag) = "(CostrongFirst " <> show tag <> ")"
-    show (CostrongSecond tag) = "(CostrongSecond " <> show tag <> ")"
 
     show (Applied rec) =
         rec # runExists \r ->
@@ -254,13 +182,9 @@ instance eqTag :: Eq Tag where
 
     eq (ChoseLeft tag1) (ChoseLeft tag2) = eq tag1 tag2
     eq (ChoseRight tag1) (ChoseRight tag2) = eq tag1 tag2
-    eq (CochoseLeft tag1) (CochoseLeft tag2) = eq tag1 tag2
-    eq (CochoseRight tag1) (CochoseRight tag2) = eq tag1 tag2
 
     eq (StrongFirst tag1) (StrongFirst tag2) = eq tag1 tag2
     eq (StrongSecond tag1) (StrongSecond tag2) = eq tag1 tag2
-    eq (CostrongFirst tag1) (CostrongFirst tag2) = eq tag1 tag2
-    eq (CostrongSecond tag1) (CostrongSecond tag2) = eq tag1 tag2
 
     eq (Applied a) (Applied b) =
         a # runExists \(AppliedRec aRec) ->
