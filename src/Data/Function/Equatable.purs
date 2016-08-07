@@ -49,13 +49,19 @@ module Data.Function.Equatable
 
 import Data.List (List(..), (:), snoc)
 import Data.Exists (Exists, mkExists, runExists)
+import Data.Either (Either(..), fromLeft, fromRight)
 import Data.Monoid (class Monoid)
+import Data.Profunctor (class Profunctor)
+import Data.Profunctor.Choice (class Choice, left, right)
+import Data.Profunctor.Cochoice (class Cochoice)
+import Data.Profunctor.Strong (class Strong, first, second)
 import Unsafe.Coerce (unsafeCoerce)
+import Partial.Unsafe (unsafePartial)
 
 import Prelude
     ( class Eq, eq, (==)
     , class Semigroup
-    , class Semigroupoid, compose, (<<<)
+    , class Semigroupoid, compose, (<<<), (>>>)
     , class Category, id
     , class Functor, map
     , class Show, show
@@ -81,6 +87,66 @@ instance functorEqFunc :: Functor (EqFunc a) where
     map func1 func2 = compose (eqFunc func1) func2
 
 
+instance profunctorEqFunc :: Profunctor EqFunc where
+    dimap a2b c2d b2c = (eqFunc a2b) >>> b2c >>> (eqFunc c2d)
+
+
+instance choiceEqFunc :: Choice EqFunc where
+    left (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                CochoseLeft parent -> parent
+                _ -> ChoseLeft tag
+
+            (left func)
+
+    right (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                 CochoseRight parent -> parent
+                 _ -> ChoseRight tag
+
+            (right func)
+
+
+instance cochoiceEqFunc :: Cochoice EqFunc where
+    -- unleft :: forall a b c. p (Either a c) (Either b c) -> p a b
+    unleft (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                ChoseLeft parent -> parent
+                _ -> CochoseLeft tag
+
+            (unsafePartial $ fromLeft <<< func <<< Left)
+
+    -- unright :: forall a b c. p (Either a b) (Either a c) -> p b c
+    unright (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                ChoseRight parent -> parent
+                _ -> CochoseRight tag
+
+            (unsafePartial $ fromRight <<< func <<< Right)
+
+
+instance strongEqFunc :: Strong EqFunc where
+    first (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                CostrongFirst parent -> parent
+                _ -> StrongFirst tag
+
+            (first func)
+
+    second (EqFunc {func, tag}) =
+        mkEqFunc
+            case tag of
+                 CostrongSecond parent -> parent
+                 _ -> StrongSecond tag
+
+            (second func)
+
+
 -- A tag that tracks things about how a function was created, so that
 -- we have some chance of determining that two functions are equal,
 -- even if they are not literally the same function.
@@ -103,11 +169,32 @@ data Tag
     | Composed (List Tag)
     | Applied (Exists AppliedRec)
 
+    | ChoseLeft Tag
+    | ChoseRight Tag
+    | CochoseLeft Tag
+    | CochoseRight Tag
+
+    | StrongFirst Tag
+    | StrongSecond Tag
+    | CostrongFirst Tag
+    | CostrongSecond Tag
+
 
 instance showTag :: Show Tag where
     show (Plain id) = "(Plain " <> show id <> ")"
     show (Id) = "Id"
     show (Composed tags) = "(Composed " <> show tags <> ")"
+
+    show (ChoseLeft tag) = "(ChoseLeft " <> show tag <> ")"
+    show (ChoseRight tag) = "(ChoseRight " <> show tag <> ")"
+    show (CochoseLeft tag) = "(CochoseLeft " <> show tag <> ")"
+    show (CochoseRight tag) = "(CochoseRight " <> show tag <> ")"
+
+    show (StrongFirst tag) = "(StrongFirst " <> show tag <> ")"
+    show (StrongSecond tag) = "(StrongSecond " <> show tag <> ")"
+    show (CostrongFirst tag) = "(CostrongFirst " <> show tag <> ")"
+    show (CostrongSecond tag) = "(CostrongSecond " <> show tag <> ")"
+
     show (Applied rec) =
         rec # runExists \r ->
             "(Applied " <> show r <> ")"
@@ -116,9 +203,11 @@ instance showTag :: Show Tag where
 instance semigroupTag :: Semigroup Tag where
     append Id other = other
     append other Id = other
+
     append (Composed list1) (Composed list2) = Composed (list1 <> list2)
     append (Composed list) tag2 = Composed (snoc list tag2)
     append tag1 (Composed list) = Composed (Cons tag1 list)
+
     append other1 other2 = Composed (other1 : other2 : Nil)
 
 
@@ -130,6 +219,16 @@ instance eqTag :: Eq Tag where
     eq (Plain id1) (Plain id2) = eq id1 id2
     eq (Composed list1) (Composed list2) = eq list1 list2
     eq Id Id = true
+
+    eq (ChoseLeft tag1) (ChoseLeft tag2) = eq tag1 tag2
+    eq (ChoseRight tag1) (ChoseRight tag2) = eq tag1 tag2
+    eq (CochoseLeft tag1) (CochoseLeft tag2) = eq tag1 tag2
+    eq (CochoseRight tag1) (CochoseRight tag2) = eq tag1 tag2
+
+    eq (StrongFirst tag1) (StrongFirst tag2) = eq tag1 tag2
+    eq (StrongSecond tag1) (StrongSecond tag2) = eq tag1 tag2
+    eq (CostrongFirst tag1) (CostrongFirst tag2) = eq tag1 tag2
+    eq (CostrongSecond tag1) (CostrongSecond tag2) = eq tag1 tag2
 
     eq (Applied a) (Applied b) =
         a # runExists \(AppliedRec aRec) ->
