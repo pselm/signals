@@ -44,6 +44,7 @@ module Data.Function.Equatable
     , eqFunc, eqFunc2, eqFunc3, eqFunc4
     , applyEF, (=$=)
     , applyFlippedEF, (=#=)
+    , constEF, flipEF
     ) where
 
 
@@ -62,7 +63,7 @@ import Prelude
     , class Category, id
     , class Functor, map
     , class Show, show
-    , (<>), flip, (#), ($)
+    , (<>), flip, (#), ($), const
     )
 
 
@@ -112,7 +113,19 @@ instance strongEqFunc :: Strong EqFunc where
             (second func)
 
 
+flipEF :: forall a b c. (Eq b) => (a ==> b ==> c) -> (b ==> a ==> c)
+flipEF (EqFunc {tag, func}) =
+    mkEqFunc2
+        case tag of
+            Flipped parent -> parent
+            _ -> Flipped tag
 
+        \b a ->
+            (applyEF (func a)) b
+
+
+constEF :: forall a b. (Eq a) => a -> (b ==> a)
+constEF = applyEF (eqFunc2 const)
 
 
 -- A tag that tracks things about how a function was created, so that
@@ -136,6 +149,7 @@ data Tag
     | Id
     | Composed (List Tag)
     | Applied (Exists AppliedRec)
+    | Flipped Tag
 
     | ChoseLeft Tag
     | ChoseRight Tag
@@ -148,6 +162,7 @@ instance showTag :: Show Tag where
     show (Plain id) = "(Plain " <> show id <> ")"
     show (Id) = "Id"
     show (Composed tags) = "(Composed " <> show tags <> ")"
+    show (Flipped tag) = "(Flipped " <> show tag <> ")"
 
     show (ChoseLeft tag) = "(ChoseLeft " <> show tag <> ")"
     show (ChoseRight tag) = "(ChoseRight " <> show tag <> ")"
@@ -178,6 +193,7 @@ instance monoidTag :: Monoid Tag where
 instance eqTag :: Eq Tag where
     eq (Plain id1) (Plain id2) = eq id1 id2
     eq (Composed list1) (Composed list2) = eq list1 list2
+    eq (Flipped tag1) (Flipped tag2) = eq tag1 tag2
     eq Id Id = true
 
     eq (ChoseLeft tag1) (ChoseLeft tag2) = eq tag1 tag2

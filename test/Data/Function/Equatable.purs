@@ -8,7 +8,7 @@ import Test.Unit.Assert (assert)
 
 import Data.Function.Equatable
 
-import Prelude (id, bind, ($), (<<<), (>>>), (+), (*), (-), (==), (/=), (<>))
+import Prelude (id, bind, ($), (<<<), (>>>), (+), (*), (-), (==), (/=), (<>), negate)
 
 
 add5func :: Int -> Int
@@ -42,6 +42,10 @@ subtract7 :: Int ==> Int
 subtract7 =
     eqFunc \x ->
         x - 7
+
+
+subtract :: Int ==> Int ==> Int
+subtract = eqFunc2 (-)
 
 
 tests :: ∀ e. TestSuite e
@@ -138,3 +142,23 @@ tests =
 
             assert "a partially applied function should actually work" $
                 ((((add4 =$= 2) =$= 3) =$= 4) =$= 5) == 14
+
+        test "constEF" do
+            assert "two constEF functions with the same result should be equal" $
+                constEF 7 == constEF 7
+
+            assert "two constEF functions with different results should be different" $
+                constEF 12 /= constEF 11
+
+            assert "constEF should actually work" $
+                applyEF (constEF 17) 12 == 17
+
+        test "flipEF" do
+            assert "two flipped functions should be equal to each other" $
+                flipEF subtract == flipEF subtract
+
+            assert "flipping something twice should equal itself" $
+                flipEF (flipEF (subtract)) == subtract
+
+            assert "flipEF actually works" $
+                applyEF (applyEF (flipEF subtract) 7) 5 == (-2)
