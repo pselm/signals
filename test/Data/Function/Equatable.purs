@@ -61,7 +61,7 @@ tests =
 
         test "running" do
             assert "running an EqFn should be like running the func" $
-                (applyEF add5) 2 == 7
+                add5 ~ 2 == 7
 
         test "composing" do
             assert "composing equal functions should be equal" $
@@ -71,13 +71,13 @@ tests =
                 (add5 >>> (times2 >>> subtract7)) == ((add5 >>> times2) >>> subtract7)
 
             assert "the composed function should work" $
-                applyEF (add5 >>> times2) 3 == 16
+                (add5 >>> times2) ~ 3 == 16
 
             assert "the doubly-composed function should work" $
-                applyEF (add5 >>> (times2 >>> subtract7)) 3 == 9
+                (add5 >>> (times2 >>> subtract7)) ~ 3 == 9
 
             assert "the doubly-composed function should work the other way" $
-                applyEF ((add5 >>> times2) >>> subtract7) 3 == 9
+                ((add5 >>> times2) >>> subtract7) ~ 3 == 9
 
         test "category laws" do
             assert "id <<< p = p" $
@@ -90,58 +90,58 @@ tests =
                 id <<< subtract7 == subtract7 >>> id
 
             assert "id <<< p actually works" $
-                applyEF (id <<< subtract7) 9 == 2
+                (id <<< subtract7) ~ 9 == 2
 
             assert "p <<< id actually works" $
-                applyEF (subtract7 <<< id) 9 == 2
+                (subtract7 <<< id) ~ 9 == 2
 
         test "eqFunc2" do
             assert "a function partially applied twice with the same parameter should be equal" $
-                (applyEF add 2) == (applyEF add 2)
+                add ~ 2 == add ~ 2
 
             assert "a function partially applied twice with a different parameter should not be equal" $
-                applyEF add 2 /= applyEF add 3
+                add ~ 2 /= add ~ 3
 
             assert "a partially applied function should actually work" $
-                ((add =$= 2) =$= 3) == 5
+                add ~ 2 ~ 3 == 5
 
         test "eqFunc3" do
             assert "a function partially applied twice with the same parameter should be equal" $
-                (applyEF add3 2) == (applyEF add3 2)
+                add3 ~ 2 == add3 ~ 2
 
             assert "a function partially applied twice with the same two parameters should be equal" $
-                applyEF (applyEF add3 2) 5 == applyEF (applyEF add3 2) 5
+                add3 ~ 2 ~ 5 == add3 ~ 2 ~ 5
 
             assert "a function partially applied twice with a different parameter should not be equal" $
-                applyEF add3 2 /= applyEF add3 3
+                add3 ~ 2 /= add3 ~ 3
 
             assert "a function partially applied twice with two different parameters should not be equal" $
-                applyEF (applyEF add3 2) 3 /= applyEF (applyEF add3 3) 4
+                add3 ~ 2 ~  3 /= add3 ~ 3 ~ 4
 
             assert "a partially applied function should actually work" $
-                (((add3 =$= 2) =$= 3) =$= 4) == 9
+                add3 ~ 2 ~ 3 ~ 4 == 9
 
         test "eqFunc4" do
             assert "a function partially applied twice with the same parameter should be equal" $
-                (applyEF add4 2) == (applyEF add4 2)
+                add4 ~ 2 == add4 ~ 2
 
             assert "a function partially applied twice with the same two parameters should be equal" $
-                applyEF (applyEF add4 2) 5 == applyEF (applyEF add4 2) 5
+                add4 ~ 2 ~ 5 == add4 ~ 2 ~ 5
 
             assert "a function partially applied twice with the same three parameters should be equal" $
-                applyEF (applyEF (applyEF add4 2) 5) 7 == applyEF (applyEF (applyEF add4 2) 5) 7
+                add4 ~ 2 ~ 5 ~ 7 == add4 ~ 2 ~ 5 ~ 7
 
             assert "a function partially applied twice with a different parameter should not be equal" $
-                applyEF add4 2 /= applyEF add4 3
+                add4 ~ 2 /= add4 ~ 3
 
             assert "a function partially applied twice with two different parameters should not be equal" $
-                applyEF (applyEF add4 2) 3 /= applyEF (applyEF add4 3) 4
+                add4 ~ 2 ~ 3 /= add4 ~ 3 ~ 4
 
             assert "a function partially applied twice with three different parameters should not be equal" $
-                applyEF (applyEF (applyEF add4 2) 3) 4 /= applyEF (applyEF (applyEF add4 3) 4) 5
+                add4 ~ 2 ~ 3 ~ 4 /= add4 ~ 3 ~ 4 ~ 5
 
             assert "a partially applied function should actually work" $
-                ((((add4 =$= 2) =$= 3) =$= 4) =$= 5) == 14
+                add4 ~ 2 ~ 3 ~ 4 ~ 5 == 14
 
         test "constEF" do
             assert "two constEF functions with the same result should be equal" $
@@ -151,7 +151,7 @@ tests =
                 constEF 12 /= constEF 11
 
             assert "constEF should actually work" $
-                applyEF (constEF 17) 12 == 17
+                (constEF 17) ~ 12 == 17
 
         test "flipEF" do
             assert "two flipped functions should be equal to each other" $
@@ -161,7 +161,7 @@ tests =
                 flipEF (flipEF (subtract)) == subtract
 
             assert "flipEF actually works" $
-                applyEF (applyEF (flipEF subtract) 7) 5 == (-2)
+                (flipEF subtract) ~ 7 ~ 5 == (-2)
 
             assert "a function flipped twice actually works" $
-                applyEF (applyEF (flipEF (flipEF subtract)) 7 ) 5 == 2
+                (flipEF (flipEF subtract)) ~ 7 ~ 5 == 2

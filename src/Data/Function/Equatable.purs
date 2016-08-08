@@ -41,9 +41,10 @@
 
 module Data.Function.Equatable
     ( EqFunc, type (==>)
-    , eqFunc, eqFunc2, eqFunc3, eqFunc4
-    , applyEF, (=$=)
-    , applyFlippedEF, (=#=)
+    , eqFunc, eqFunc2, eqFunc3, eqFunc4, eqFunc5, eqFunc6
+    , runEF, (=$=), (~)
+    , runEF2, runEF3, runEF4, runEF5, runEF6
+    , runFlippedEF, (=#=)
     , constEF, flipEF
     ) where
 
@@ -121,11 +122,11 @@ flipEF (EqFunc {tag, func}) =
             _ -> Flipped tag
 
         \b a ->
-            (applyEF (func a)) b
+            (func a) ~ b
 
 
 constEF :: forall a b. (Eq a) => a -> (b ==> a)
-constEF = applyEF (eqFunc2 const)
+constEF = runEF (eqFunc2 const)
 
 
 -- A tag that tracks things about how a function was created, so that
@@ -334,17 +335,34 @@ uniqueTag = uniqueTagImpl Plain
 
 
 -- | Applies an `EqFunc` to an argument.
-applyEF :: ∀ a b. (a ==> b) -> (a -> b)
-applyEF (EqFunc func) = func.func
+runEF :: ∀ a b. (a ==> b) -> (a -> b)
+runEF (EqFunc func) = func.func
 
 
-infixr 0 applyEF as =$=
+infixr 0 runEF as =$=
+infixl 9 runEF as ~
 
 
-applyFlippedEF :: ∀ a b. a -> (a ==> b) -> b
-applyFlippedEF = flip applyEF
+runFlippedEF :: ∀ a b. a -> (a ==> b) -> b
+runFlippedEF = flip runEF
 
-infixl 1 applyFlippedEF as =#=
+infixl 1 runFlippedEF as =#=
+
+
+runEF2 :: ∀ a b c. (a ==> b ==> c) -> (a -> b -> c)
+runEF2 (EqFunc func) = func.func >>> runEF
+
+runEF3 :: ∀ a b c d. (a ==> b ==> c ==> d) -> (a -> b -> c -> d)
+runEF3 (EqFunc func) = func.func >>> runEF2
+
+runEF4 :: ∀ a b c d e. (a ==> b ==> c ==> d ==> e) -> (a -> b -> c -> d -> e)
+runEF4 (EqFunc func) = func.func >>> runEF3
+
+runEF5 :: ∀ a b c d e f. (a ==> b ==> c ==> d ==> e ==> f) -> (a -> b -> c -> d -> e -> f)
+runEF5 (EqFunc func) = func.func >>> runEF4
+
+runEF6 :: ∀ a b c d e f g. (a ==> b ==> c ==> d ==> e ==> f ==> g) -> (a -> b -> c -> d -> e -> f -> g)
+runEF6 (EqFunc func) = func.func >>> runEF5
 
 
 instance eqEqFunc :: Eq (EqFunc a b) where
@@ -371,4 +389,4 @@ instance categoryEqFunc :: Category EqFunc where
 
 
 mapEF :: ∀ f a b. Functor f => (a ==> b) -> f a -> f b
-mapEF = map <<< applyEF
+mapEF = map <<< runEF
