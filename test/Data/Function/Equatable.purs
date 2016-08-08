@@ -162,3 +162,6 @@ tests =
 
             assert "flipEF actually works" $
                 applyEF (applyEF (flipEF subtract) 7) 5 == (-2)
+
+            assert "a function flipped twice actually works" $
+                applyEF (applyEF (flipEF (flipEF subtract)) 7 ) 5 == 2
