@@ -50,12 +50,11 @@ module Data.Function.Equatable
 
 
 import Data.List (List(..), (:), snoc)
-import Data.Exists (Exists, mkExists, runExists)
+import Data.Eq.Any (AnyEq, anyEq)
 import Data.Monoid (class Monoid)
 import Data.Profunctor (class Profunctor)
 import Data.Profunctor.Choice (class Choice, left, right)
 import Data.Profunctor.Strong (class Strong, first, second)
-import Unsafe.Coerce (unsafeCoerce)
 
 import Prelude
     ( class Eq, eq, (==)
@@ -64,7 +63,7 @@ import Prelude
     , class Category, id
     , class Functor, map
     , class Show, show
-    , (<>), flip, (#), ($), const
+    , (<>), flip, (#), ($), const, (&&)
     )
 
 
@@ -79,7 +78,7 @@ infixr 4 type EqFunc as ==>
 
 
 instance showEqFunc :: Show (EqFunc a b) where
-    show (EqFunc func) = "(EqFunc {tag: " <> show func.tag <> "})"
+    show (EqFunc {tag}) = "(EqFunc {tag: " <> show tag <> "})"
 
 
 instance functorEqFunc :: Functor (EqFunc a) where
@@ -114,7 +113,7 @@ instance strongEqFunc :: Strong EqFunc where
             (second func)
 
 
-flipEF :: forall a b c. (Eq b) => (a ==> b ==> c) -> (b ==> a ==> c)
+flipEF :: ∀ a b c. (Eq b) => (a ==> b ==> c) -> (b ==> a ==> c)
 flipEF (EqFunc {tag, func}) =
     mkEqFunc2
         case tag of
@@ -125,7 +124,7 @@ flipEF (EqFunc {tag, func}) =
             (func a) ~ b
 
 
-constEF :: forall a b. (Eq a) => a -> (b ==> a)
+constEF :: ∀ a b. (Eq a) => a -> (b ==> a)
 constEF = runEF (eqFunc2 const)
 
 
@@ -149,7 +148,7 @@ data Tag
     = Plain Int
     | Id
     | Composed (List Tag)
-    | Applied (Exists AppliedRec)
+    | Applied AppliedRec
     | Flipped Tag
 
     | ChoseLeft Tag
@@ -164,16 +163,13 @@ instance showTag :: Show Tag where
     show (Id) = "Id"
     show (Composed tags) = "(Composed " <> show tags <> ")"
     show (Flipped tag) = "(Flipped " <> show tag <> ")"
+    show (Applied rec) = "(Applied " <> show rec <> ")"
 
     show (ChoseLeft tag) = "(ChoseLeft " <> show tag <> ")"
     show (ChoseRight tag) = "(ChoseRight " <> show tag <> ")"
 
     show (StrongFirst tag) = "(StrongFirst " <> show tag <> ")"
     show (StrongSecond tag) = "(StrongSecond " <> show tag <> ")"
-
-    show (Applied rec) =
-        rec # runExists \r ->
-            "(Applied " <> show r <> ")"
 
 
 instance semigroupTag :: Semigroup Tag where
@@ -195,6 +191,7 @@ instance eqTag :: Eq Tag where
     eq (Plain id1) (Plain id2) = eq id1 id2
     eq (Composed list1) (Composed list2) = eq list1 list2
     eq (Flipped tag1) (Flipped tag2) = eq tag1 tag2
+    eq (Applied a) (Applied b) = eq a b
     eq Id Id = true
 
     eq (ChoseLeft tag1) (ChoseLeft tag2) = eq tag1 tag2
@@ -203,35 +200,22 @@ instance eqTag :: Eq Tag where
     eq (StrongFirst tag1) (StrongFirst tag2) = eq tag1 tag2
     eq (StrongSecond tag1) (StrongSecond tag2) = eq tag1 tag2
 
-    eq (Applied a) (Applied b) =
-        a # runExists \(AppliedRec aRec) ->
-            b # runExists \(AppliedRec bRec) ->
-                if aRec.parentTag == bRec.parentTag
-                    then multiEq aRec.eqParam aRec.param bRec.eqParam bRec.param
-                    else false
-
     eq _ _ = false
 
 
-newtype AppliedRec a = AppliedRec
+newtype AppliedRec = AppliedRec
     { parentTag :: Tag
-    , param :: a
-    , eqParam :: a -> a -> Boolean
+    , param :: AnyEq
     }
 
-
-instance showAppliedRec :: Show (AppliedRec a) where
-    show (AppliedRec rec) = "(AppliedRec {parentTag: " <> show rec.parentTag <> "})"
-
-
-foreign import refEq :: ∀ a b. a -> b -> Boolean
+instance eqAppliedRec :: Eq AppliedRec where
+    eq (AppliedRec a) (AppliedRec b) =
+        (a.parentTag == b.parentTag) &&
+        (a.param == b.param)
 
 
-multiEq :: ∀ a b. (a -> a -> Boolean) -> a -> (b -> b -> Boolean) -> b -> Boolean
-multiEq eqA a eqB b =
-    if eqA `refEq` eqB
-        then a `eqA` (unsafeCoerce b)
-        else false
+instance showAppliedRec :: Show AppliedRec where
+    show (AppliedRec {parentTag}) = "(AppliedRec {parentTag: " <> show parentTag <> "})"
 
 
 -- | Given a top-level function, make an equatable function.
@@ -277,7 +261,7 @@ eqFunc6 func =
 
 applied :: ∀ a. (Eq a) => Tag -> a -> Tag
 applied parentTag param =
-    Applied $ mkExists $ AppliedRec {parentTag, param, eqParam: eq}
+    Applied $ AppliedRec {parentTag, param: anyEq param}
 
 
 mkEqFunc :: ∀ a b. Tag -> (a -> b) -> (a ==> b)
