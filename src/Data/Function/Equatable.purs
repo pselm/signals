@@ -41,20 +41,34 @@
 
 module Data.Function.Equatable
     ( EqFunc, type (==>)
-    , eqFunc, eqFunc2, eqFunc3, eqFunc4, eqFunc5, eqFunc6
+    , eqFunc, eqFunc2, eqFunc3, eqFunc4, eqFunc5, eqFunc6, eqFunc7, eqFunc8, eqFunc9, eqFunc10
     , runEF, (=$=), (~)
-    , runEF2, runEF3, runEF4, runEF5, runEF6
+    , runEF2, runEF3, runEF4, runEF5, runEF6, runEF7, runEF8, runEF9, runEF10
     , runFlippedEF, (=#=)
     , constEF, flipEF
+    , curryEF, curryEF3, curryEF4, curryEF5, curryEF6, curryEF7, curryEF8, curryEF9, curryEF10
+    , uncurryEF, uncurryEF3, uncurryEF4, uncurryEF5, uncurryEF6, uncurryEF7, uncurryEF8, uncurryEF9, uncurryEF10
     ) where
 
 
 import Data.List (List(..), (:), snoc)
+import Data.Tuple (Tuple, curry, uncurry)
 import Data.Eq.Any (AnyEq, anyEq)
 import Data.Monoid (class Monoid)
 import Data.Profunctor (class Profunctor)
 import Data.Profunctor.Choice (class Choice, left, right)
 import Data.Profunctor.Strong (class Strong, first, second)
+
+import Data.Tuple.Nested
+    ( Tuple3, curry3, uncurry3
+    , Tuple4, curry4, uncurry4
+    , Tuple5, curry5, uncurry5
+    , Tuple6, curry6, uncurry6
+    , Tuple7, curry7, uncurry7
+    , Tuple8, curry8, uncurry8
+    , Tuple9, curry9, uncurry9
+    , Tuple10, curry10, uncurry10
+    )
 
 import Prelude
     ( class Eq, eq, (==)
@@ -63,7 +77,7 @@ import Prelude
     , class Category, id
     , class Functor, map
     , class Show, show
-    , (<>), flip, (#), ($), const, (&&)
+    , (<>), flip, (#), ($), const, (&&), (+), negate
     )
 
 
@@ -128,6 +142,138 @@ constEF :: ∀ a b. (Eq a) => a -> (b ==> a)
 constEF = runEF (eqFunc2 const)
 
 
+curried :: Int -> Tag -> Tag
+curried times (Curried level parent) | level + times == 0 = parent
+curried times (Curried level parent) = Curried (level + times) parent
+curried times parent = Curried times parent
+
+
+curryEF :: ∀ a b c. (Eq a) => (Tuple a b ==> c) -> (a ==> b ==> c)
+curryEF (EqFunc {tag, func}) =
+    mkEqFunc2
+        (curried 1 tag)
+        (curry func)
+
+
+curryEF3 :: ∀ a b c d. (Eq a, Eq b) => (Tuple3 a b c ==> d) -> (a ==> b ==> c ==> d)
+curryEF3 (EqFunc {tag, func}) =
+    mkEqFunc3
+        (curried 2 tag)
+        (curry3 func)
+
+
+curryEF4 :: ∀ a b c d e. (Eq a, Eq b, Eq c) => (Tuple4 a b c d ==> e) -> (a ==> b ==> c ==> d ==> e)
+curryEF4 (EqFunc {tag, func}) =
+    mkEqFunc4
+        (curried 3 tag)
+        (curry4 func)
+
+
+curryEF5 :: ∀ a b c d e f. (Eq a, Eq b, Eq c, Eq d) => (Tuple5 a b c d e ==> f) -> (a ==> b ==> c ==> d ==> e ==> f)
+curryEF5 (EqFunc {tag, func}) =
+    mkEqFunc5
+        (curried 4 tag)
+        (curry5 func)
+
+
+curryEF6 :: ∀ a b c d e f g. (Eq a, Eq b, Eq c, Eq d, Eq e) => (Tuple6 a b c d e f ==> g) -> (a ==> b ==> c ==> d ==> e ==> f ==> g)
+curryEF6 (EqFunc {tag, func}) =
+    mkEqFunc6
+        (curried 5 tag)
+        (curry6 func)
+
+
+curryEF7 :: ∀ a b c d e f g h. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f) => (Tuple7 a b c d e f g ==> h) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h)
+curryEF7 (EqFunc {tag, func}) =
+    mkEqFunc7
+        (curried 6 tag)
+        (curry7 func)
+
+
+curryEF8 :: ∀ a b c d e f g h i. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g) => (Tuple8 a b c d e f g h ==> i) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i)
+curryEF8 (EqFunc {tag, func}) =
+    mkEqFunc8
+        (curried 7 tag)
+        (curry8 func)
+
+
+curryEF9 :: ∀ a b c d e f g h i j. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h) => (Tuple9 a b c d e f g h i ==> j) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j)
+curryEF9 (EqFunc {tag, func}) =
+    mkEqFunc9
+        (curried 8 tag)
+        (curry9 func)
+
+
+curryEF10 :: ∀ a b c d e f g h i j k. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i) => (Tuple10 a b c d e f g h i j ==> k) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j ==> k)
+curryEF10 (EqFunc {tag, func}) =
+    mkEqFunc10
+        (curried 9 tag)
+        (curry10 func)
+
+
+uncurryEF :: ∀ a b c. (a ==> b ==> c) -> (Tuple a b ==> c)
+uncurryEF (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-1) tag)
+        (uncurry (func >>> runEF))
+
+
+uncurryEF3 :: ∀ a b c z. (a ==> b ==> c ==> z) -> (Tuple3 a b c ==> z)
+uncurryEF3 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-2) tag)
+        (uncurry3 (func >>> runEF2))
+
+
+uncurryEF4 :: ∀ a b c d z. (a ==> b ==> c ==> d ==> z) -> (Tuple4 a b c d ==> z)
+uncurryEF4 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-3) tag)
+        (uncurry4 (func >>> runEF3))
+
+
+uncurryEF5 :: ∀ a b c d e z. (a ==> b ==> c ==> d ==> e ==> z) -> (Tuple5 a b c d e ==> z)
+uncurryEF5 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-4) tag)
+        (uncurry5 (func >>> runEF4))
+
+
+uncurryEF6 :: ∀ a b c d e f z. (a ==> b ==> c ==> d ==> e ==> f ==> z) -> (Tuple6 a b c d e f ==> z)
+uncurryEF6 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-5) tag)
+        (uncurry6 (func >>> runEF5))
+
+
+uncurryEF7 :: ∀ a b c d e f g z. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> z) -> (Tuple7 a b c d e f g ==> z)
+uncurryEF7 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-6) tag)
+        (uncurry7 (func >>> runEF6))
+
+
+uncurryEF8 :: ∀ a b c d e f g h z. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> z) -> (Tuple8 a b c d e f g h ==> z)
+uncurryEF8 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-7) tag)
+        (uncurry8 (func >>> runEF7))
+
+
+uncurryEF9 :: ∀ a b c d e f g h i z. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> z) -> (Tuple9 a b c d e f g h i ==> z)
+uncurryEF9 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-8) tag)
+        (uncurry9 (func >>> runEF8))
+
+
+uncurryEF10 :: ∀ a b c d e f g h i j z. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j ==> z) -> (Tuple10 a b c d e f g h i j ==> z)
+uncurryEF10 (EqFunc {tag, func}) =
+    mkEqFunc
+        (curried (-9) tag)
+        (uncurry10 (func >>> runEF9))
+
+
 -- A tag that tracks things about how a function was created, so that
 -- we have some chance of determining that two functions are equal,
 -- even if they are not literally the same function.
@@ -150,6 +296,7 @@ data Tag
     | Composed (List Tag)
     | Applied AppliedRec
     | Flipped Tag
+    | Curried Int Tag
 
     | ChoseLeft Tag
     | ChoseRight Tag
@@ -164,6 +311,7 @@ instance showTag :: Show Tag where
     show (Composed tags) = "(Composed " <> show tags <> ")"
     show (Flipped tag) = "(Flipped " <> show tag <> ")"
     show (Applied rec) = "(Applied " <> show rec <> ")"
+    show (Curried level parent) = "(Curried " <> show level <> " " <> show parent <> ")"
 
     show (ChoseLeft tag) = "(ChoseLeft " <> show tag <> ")"
     show (ChoseRight tag) = "(ChoseRight " <> show tag <> ")"
@@ -192,6 +340,7 @@ instance eqTag :: Eq Tag where
     eq (Composed list1) (Composed list2) = eq list1 list2
     eq (Flipped tag1) (Flipped tag2) = eq tag1 tag2
     eq (Applied a) (Applied b) = eq a b
+    eq (Curried level1 parent1) (Curried level2 parent2) = level1 == level2 && parent1 == parent2
     eq Id Id = true
 
     eq (ChoseLeft tag1) (ChoseLeft tag2) = eq tag1 tag2
@@ -259,6 +408,26 @@ eqFunc6 func =
     mkEqFunc6 (uniqueTag func) func
 
 
+eqFunc7 :: ∀ a b c d e f g h. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f) => (a -> b -> c -> d -> e -> f -> g -> h) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h)
+eqFunc7 func =
+    mkEqFunc7 (uniqueTag func) func
+
+
+eqFunc8 :: ∀ a b c d e f g h i. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g) => (a -> b -> c -> d -> e -> f -> g -> h -> i) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i)
+eqFunc8 func =
+    mkEqFunc8 (uniqueTag func) func
+
+
+eqFunc9 :: ∀ a b c d e f g h i j. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h) => (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j)
+eqFunc9 func =
+    mkEqFunc9 (uniqueTag func) func
+
+
+eqFunc10 :: ∀ a b c d e f g h i j k. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i) => (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j ==> k)
+eqFunc10 func =
+    mkEqFunc10 (uniqueTag func) func
+
+
 applied :: ∀ a. (Eq a) => Tag -> a -> Tag
 applied parentTag param =
     Applied $ AppliedRec {parentTag, param: anyEq param}
@@ -309,6 +478,38 @@ mkEqFunc6 t func =
             (func a)
 
 
+mkEqFunc7 :: ∀ a b c d e f g h. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f) => Tag -> (a -> b -> c -> d -> e -> f -> g -> h) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h)
+mkEqFunc7 t func =
+    mkEqFunc t \a ->
+        mkEqFunc6
+            (applied t a)
+            (func a)
+
+
+mkEqFunc8 :: ∀ a b c d e f g h i. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g) => Tag -> (a -> b -> c -> d -> e -> f -> g -> h -> i) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i)
+mkEqFunc8 t func =
+    mkEqFunc t \a ->
+        mkEqFunc7
+            (applied t a)
+            (func a)
+
+
+mkEqFunc9 :: ∀ a b c d e f g h i j. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h) => Tag -> (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j)
+mkEqFunc9 t func =
+    mkEqFunc t \a ->
+        mkEqFunc8
+            (applied t a)
+            (func a)
+
+
+mkEqFunc10 :: ∀ a b c d e f g h i j k. (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i) => Tag -> (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j ==> k)
+mkEqFunc10 t func =
+    mkEqFunc t \a ->
+        mkEqFunc9
+            (applied t a)
+            (func a)
+
+
 -- Generates a unique tag for a function, unless it already has a tag, in which
 -- case it returns that tag.
 foreign import uniqueTagImpl :: ∀ a b. (Int -> Tag) -> (a -> b) -> Tag
@@ -334,19 +535,31 @@ infixl 1 runFlippedEF as =#=
 
 
 runEF2 :: ∀ a b c. (a ==> b ==> c) -> (a -> b -> c)
-runEF2 (EqFunc func) = func.func >>> runEF
+runEF2 (EqFunc {func}) = func >>> runEF
 
 runEF3 :: ∀ a b c d. (a ==> b ==> c ==> d) -> (a -> b -> c -> d)
-runEF3 (EqFunc func) = func.func >>> runEF2
+runEF3 (EqFunc {func}) = func >>> runEF2
 
 runEF4 :: ∀ a b c d e. (a ==> b ==> c ==> d ==> e) -> (a -> b -> c -> d -> e)
-runEF4 (EqFunc func) = func.func >>> runEF3
+runEF4 (EqFunc {func}) = func >>> runEF3
 
 runEF5 :: ∀ a b c d e f. (a ==> b ==> c ==> d ==> e ==> f) -> (a -> b -> c -> d -> e -> f)
-runEF5 (EqFunc func) = func.func >>> runEF4
+runEF5 (EqFunc {func}) = func >>> runEF4
 
 runEF6 :: ∀ a b c d e f g. (a ==> b ==> c ==> d ==> e ==> f ==> g) -> (a -> b -> c -> d -> e -> f -> g)
-runEF6 (EqFunc func) = func.func >>> runEF5
+runEF6 (EqFunc {func}) = func >>> runEF5
+
+runEF7 :: ∀ a b c d e f g h. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h) -> (a -> b -> c -> d -> e -> f -> g -> h)
+runEF7 (EqFunc {func}) = func >>> runEF6
+
+runEF8 :: ∀ a b c d e f g h i. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i) -> (a -> b -> c -> d -> e -> f -> g -> h -> i)
+runEF8 (EqFunc {func}) = func >>> runEF7
+
+runEF9 :: ∀ a b c d e f g h i j. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j) -> (a -> b -> c -> d -> e -> f -> g -> h -> i -> j)
+runEF9 (EqFunc {func}) = func >>> runEF8
+
+runEF10 :: ∀ a b c d e f g h i j k. (a ==> b ==> c ==> d ==> e ==> f ==> g ==> h ==> i ==> j ==> k) -> (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k)
+runEF10 (EqFunc {func}) = func >>> runEF9
 
 
 instance eqEqFunc :: Eq (EqFunc a b) where
