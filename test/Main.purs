@@ -17,6 +17,7 @@ import DOM (DOM)
 import DOM.JSDOM (JSDOM)
 import Graphics.Canvas (CANVAS)
 
+import Test.Data.Eq.Any as EqAny
 import Test.Data.Function.Equatable as Equatable
 import Test.Elm.TextTest as TextTest
 import Test.Elm.ColorTest as ColorTest
@@ -54,3 +55,4 @@ main =
         VirtualDomTest.tests
         StaticElementTest.tests
         Equatable.tests
+        EqAny.tests
