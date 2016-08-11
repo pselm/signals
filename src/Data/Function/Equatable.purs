@@ -1,43 +1,215 @@
+-- | It would sometimes be useful to be able to compare two functions in order to
+-- | determine whether they are equal. This is famously impossible, in the general
+-- | case, in the sense that there is no general algorithm to determine whether one
+-- | function is equivalent to another function.
+-- |
+-- | Now, when faced with the desire to test whether two functions are equal, the
+-- | right answer is often: don't do that! Instead, refactor your code so that
+-- | you the things you are comparing are just data.
+-- |
+-- | However, there are some patterns in which you treat a function as part of a
+-- | larger data type, and in those cases you may want to be able to determine
+-- | whether two values of that type are equal. Hence, you want to determine whether
+-- | two functions are equal.
+-- |
+-- | So, how can we accommodate that, to some degree? This module provides a kind
+-- | of "wrapper" type -- `EqFunc` -- which can be tested for equality. The typical
+-- | life-cycle is:
+-- |
+-- | * Construct an `EqFunc` from a regular function.
+-- | * Possibly manipulate the `EqFunc` or combine it with other `EqFunc`s.
+-- | * Test the `EqFunc` for equality with another `EqFunc`.
+-- | * Use `runEF` (and friends) to turn it back into a function.
+-- |
+-- | The manipulation of an `EqFunc` includes things such as composition, partial
+-- | application, currying, uncurrying, and flipping -- all preserving the ability
+-- | to check the results for equality with another `EqFunc`.
+-- |
+-- | ## Simple Functions
+-- |
+-- | Let's start with a simple function. Consider a function which adds two to an
+-- | integer.
+-- |
+-- |     add2 :: Int -> Int
+-- |     add2 x = x + 2
+-- |
+-- | We can turn this into an `EqFunc` using `eqFunc`, like this:
+-- |
+-- |     add2func :: EqFunc Int Int
+-- |     add2func = eqFunc add2
+-- |
+-- | Now, we define `==>` as an infix type operator for `EqFunc`.  So, we can write
+-- | `add2Func` like this instead, making it look a little like more like a function
+-- | type. Isn't that nice?
+-- |
+-- |     nicerAdd2func :: Int ==> Int
+-- |     nicerAdd2func = eqFunc add2
+-- |
+-- | `EqFunc` remembers that both `add2func` and `nicerAdd2func` were made from the
+-- | very same function. So, it knows that they are equal.
+-- |
+-- |     add2func == nicerAdd2func    -- true
+-- |
+-- | But, this isn't magic ... if you separately define the original function,
+-- | `EqFunc` won't know that they are equal, even if they are equivalent.
+-- |
+-- |     eqFunc (\x -> x + 2) == eqFunc (\x -> x + 2)    -- false
+-- |
+-- | So, the moral of the story is that for `EqFunc` to work as expected, you need
+-- | to initially supply it with functions defined at the top-level, not functions
+-- | separately defined each time. If this strikes you as a significant limitation,
+-- | read ahead to "Partial Application" to see a workaround.
+-- |
+-- | But first, what about actually running the function? You can use `runEF` to
+-- | extract the original function.
+-- |
+-- |     (runEF add2func) 5 == 7
+-- |
+-- | Or, we've defined `~` as an infix operator for function application.  So, you
+-- | can do something like this:
+-- |
+-- |     add2func ~ 5 == 7
+-- |
+-- | So, that is how `EqFunc` deals with simple functions. But that's not all it can
+-- | do!
+-- |
+-- | ## Partial Application
+-- |
+-- | What about functions with two parameters? Now, strictly speaking, there are no
+-- | functions with two parameters. There are only functions with one parameter which,
+-- | when given that parameter, return another function. But suppose you provide such
+-- | a function to `eqFunc`. What will happen?
+-- |
+-- | Consider an `EqFunc` made from `+` itself, whith is `Int -> Int -> Int`
+-- |
+-- |     add :: Int ==> (Int -> Int)
+-- |     add = eqFunc (+)
+-- |
+-- | Now, of course, basic `EqFunc` equality will work here, as expected.
+-- |
+-- |     eqFunc (+) == eqFunc (+)    -- true
+-- |
+-- | But what if we partially apply the parameters, to return a function?  Since we
+-- | literally return a function, equality won't even compile.
+-- |
+-- |     add ~ 7 == add ~ 7   -- doesn't even compile
+-- |
+-- | So, what we want is something where partial application actually returns an
+-- | `EqFunc`. For 2 parameters, we can get this with `eqFunc2`
+-- |
+-- |     nicerAdd :: Int ==> Int ==> Int
+-- |     nicerAdd = eqFunc2 (+)
+-- |
+-- | And now, if we partially apply, the resulting `EqFunc`s can be compared
+-- |
+-- |     nicerAdd ~ 2 == nicerAdd ~ 2           -- true
+-- |     nicerAdd ~ 2 == nicerAdd ~ 3           -- false
+-- |
+-- |     (eqFunc2 (+)) ~ 2 == (eqFunc (+)) ~ 2  -- true
+-- |     (eqFunc2 (+)) ~ 2 == (eqFunc (+)) ~ 3  -- false
+-- |
+-- | To fully apply the two paramter `EqFunc` we can just keep using `~`.
+-- |
+-- |     nicerAdd ~ 2 ~ 4 == 6
+-- |
+-- | Or, we can use `runEF2` to extract a two parameter function.
+-- |
+-- |     (runEF2 nicerAdd) 2 4 == 6
+-- |
+-- | And, as you might have guessed, there is an `eqFunc3` through `eqFunc10`,
+-- | as well as a `runEF3` to `runEF10`, that follow the same pattern, with
+-- | the specified number of parameters.
+-- |
+-- | I mentioned earlier that partial application provides a workaround for
+-- | the fact that `EqFunc` needs to start with functions defined at the
+-- | top-level. The main reason you want to define functions inline is to
+-- | capture values in a closure. For instance, you might use `\y -> x + y`
+-- | somewhere, where `x` represents some computed value that is in scope.
+-- | Making an `EqFunc` out of this won't work well, because the function
+-- | gets generated separately each time, depending on what `x` is.
+-- |
+-- |     x = 5    -- imagine a more complex computation!
+-- |
+-- |     eqFunc (\y -> x + y) ==
+-- |     eqFunc (\y -> x + y)       -- sadly, false
+-- |
+-- | However, you can get the same result via partial application -- e.g. `(+) x`.
+-- | And you can represent that as an `EqFunc` which starts at the top-level.  Two
+-- | `EqFunc`s defined in this way will be equal so long as `x` is equal.
+-- |
+-- |     x = 5    -- again, imagine a more complex computation
+-- |
+-- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ x   -- true
+-- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ 5   -- true
+-- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ 7   -- false
+-- |
+-- | So, the pattern you want to follow is to "lift" top-level functions
+-- | into `EqFunc`, and then do your function manipulation at the `EqFunc`
+-- | level. And partial application isn't the only manipulation you can do!
+-- |
+-- | ## Composition
+-- |
+-- | You will probably guess by now that `EqFunc` doesn't like functions
+-- | that are already the product of composition, because it has no way
+-- | of knowing that they are equal.
+-- |
+-- |     add3 :: Int -> Int
+-- |     add3 = (+) 3
+-- |
+-- |     add6 :: Int -> Int
+-- |     add6 = (+) 6
+-- |
+-- |     eqFunc (add3 >>> add6) ==
+-- |     eqFunc (add3 >>> add6)                -- sadly, false
+-- |
+-- | However, `EqFunc` has a `Semigroupoid` instance, just like `Function` does.
+-- | So, you can just construct the `EqFunc`s first, and then compose them:
+-- |
+-- |     (eqFunc add3) >>> (eqFunc add6) ==
+-- |     (eqFunc add3) >>> (eqFunc add6)       -- true
+-- |
+-- | And `EqFunc` obeys the `Semigroupid` laws, so you can compose multiple times,
+-- | and the order doesn't matter, etc. There is also a `Category` instance, so you
+-- | can use `id` as well.
+-- |
+-- | But that's not all!
+-- |
+-- | ## `const`, `flip`, `curry` and `uncurry`
+-- |
+-- | In principle, I'd like to have `EqFunc` versions of any useful function that
+-- | takes a function as a parameter and returns a function. So far, I've done
+-- | `constEF`, `flipEF`, `curryEF` and `uncurryEF`.
+-- |
+-- | For `constEF`, the resulting functions are equal if the const value is equal.
+-- |
+-- |     constEF 5 == constEF 5    -- true
+-- |     constEF 5 == constEF 8    -- false
+-- |
+-- | For `flipEF`, flipping equal `EqFunc`s preserves equality:
+-- |
+-- |     flipEF (eqFunc2 (-)) == flipEF (eqFunc2 (-))    -- true
+-- |
+-- | And, if you flip twice, it's equal to the original:
+-- |
+-- |     flipEF (flipEF (eqFunc2 (-))) == eqFunc2 (-)    -- true
+-- |
+-- | The same principle applies to `curryEF`, `uncurryEF`, and their friends
+-- | with a higher parameter count.
+-- |
+-- |     add = eqFunc2 (+)
+-- |
+-- |     curryEF add == curryEF add       -- true
+-- |     uncurryEF (curryEF add) == add   -- true
+-- |
+-- | If I'm missing other interesting functions that return functions, I'd
+-- | be happy to add them!
+-- |
+-- | ## And More!
+-- |
+-- | There are also `EqFunc` instances for `Profunctor`, `Choice` and `Strong`.
+-- | To be honest, I'm not entirely sure how one would use them, but they sound
+-- | interesting.
 
--- | One sometimes wants to compare two functions in order to
--- | determine whether they are equal. This is, sadly, impossible, in the general
--- | case -- that is, impossible if you know nothing about where the function came
--- | from.
--- |
--- | However, it is possible to determine that two functions came from the same
--- | place -- that is, that they are the same function. One way to do this is via
--- | referential equality in the FFI. However, there are at least two problems
--- | with this:
--- |
--- | * It is, in principle, fragile in the face of optimizations that the compiler
--- |   may or may not do.
--- |
--- | * It does not always compose well. Of course, if two referentially-equal functions are
--- |   composed at the top-level, that is done once, and the resulting function will
--- |   be referentially equal to itself. However, if the referentially-equal functions
--- |   are composed under other circumstances, it is possible for a new function to
--- |   be created each time -- not referentially equal, even though we could infer
--- |   equality.
--- |
--- | So, what to do? The idea this module expresses is that we can make a kind
--- | of reference equality less fragile by "wrapping" a function with a new type
--- | -- `EqFunc` -- which contains a unique tag. Given the unique tag, we
--- | can equate the wrapper -- and thus, by necessary implication, the function inside.
--- |
--- | We can also provide for robust composition of the `EqFunc`, preserving
--- | the ability to equate the composed function.
--- |
--- | So, in cases where you need to equate functions, you can ask for a `EqFunc`
--- | instead. If two `EqFunc` are equal, then the functions inside are
--- | necessarily equal.
--- |
--- | Now, if two `EqFunc` are unequal, it is still possible for the wrapped
--- | functions to be equal, in the sense that they may be defined (separately) in the
--- | same way. So, for best results, you need to follow certain rules which
--- | are specified in the documentation for `mkEF` and `runEqFunc`.
--- |
--- | If possible, it's even better to refactor so that you don't have to compare
--- | functions. But, at least `EqFunc` gives you some opportunity to do so when needed.
 
 module Data.Function.Equatable
     ( EqFunc, type (==>)
@@ -81,13 +253,29 @@ import Prelude
     )
 
 
+-- | A wrapper for a function which remembers things about how
+-- | the function was generated, allowing a test for equality.
+-- |
+-- | * Use `eqFunc` through `eqFunc10` to create an `EqFunc`
+-- |   from an arbitrary top-level function.
+-- |
+-- | * Use partial application (via `~` or `runEF`), composition,
+-- |   `flipEF`, `curryEF`, etc. to manipulate an `EqFunc`.
+-- |
+-- | * Use the `Eq` instance to compare two `EqFunc`s.
+-- |
+-- | * Use `~` or `runEF` to apply an argument to the `EqFunc`.
 newtype EqFunc a b = EqFunc
     { func :: a -> b
     , tag :: Tag
     }
 
 
--- A nice type operator, so you can do things like ...
+-- | An infix operator for the `EqFunc` type, so you can do
+-- | things like this:
+-- |
+-- |     add :: Int ==> Int ==> Int
+-- |     add = eqFunc2 (+)
 infixr 4 type EqFunc as ==>
 
 
@@ -127,6 +315,16 @@ instance strongEqFunc :: Strong EqFunc where
             (second func)
 
 
+-- | Like `flip` for plain old functions, but equatable.
+-- |
+-- |      subtract :: Int ==> Int ==> Int
+-- |      subtract = eqFunc2 (-)
+-- |
+-- |      flipEF subtract == flipEF subtract
+-- |      flipEF (flipEF subtract)) == subtract
+-- |
+-- |      (flipEF subtract) ~ 2 ~ 7 == 5
+-- |      (flipEF (flipEF subtract)) ~ 2 ~ 7 == (-5)
 flipEF :: ∀ a b c. (Eq b) => (a ==> b ==> c) -> (b ==> a ==> c)
 flipEF (EqFunc {tag, func}) =
     mkEqFunc2
@@ -138,6 +336,12 @@ flipEF (EqFunc {tag, func}) =
             (func a) ~ b
 
 
+-- | Like `const` for plain old functions, but equatable.
+-- |
+-- |      constEF 5 == constEF 5
+-- |      constEF 5 /= constEF 6
+-- |
+-- |      (constEF 5) ~ 7 == 5
 constEF :: ∀ a b. (Eq a) => a -> (b ==> a)
 constEF = runEF (eqFunc2 const)
 
@@ -148,6 +352,15 @@ curried times (Curried level parent) = Curried (level + times) parent
 curried times parent = Curried times parent
 
 
+-- | Like `curry` for plain old functions, but equatable.
+-- |
+-- |     add :: Tuple Int Int -> Int
+-- |     add = uncurry (+)
+-- |
+-- |     curryEF (eqFunc add) == curryEF (eqFunc add)
+-- |     uncurryEF (curryEF (eqFunc add)) == eqFunc add
+-- |
+-- |     (curryEF (eqFunc add)) ~ 2 ~ 3 == 5
 curryEF :: ∀ a b c. (Eq a) => (Tuple a b ==> c) -> (a ==> b ==> c)
 curryEF (EqFunc {tag, func}) =
     mkEqFunc2
@@ -211,6 +424,15 @@ curryEF10 (EqFunc {tag, func}) =
         (curry10 func)
 
 
+-- | Like `uncurry` for plain old functions, but equatable.
+-- |
+-- |     add :: Int ==> Int ==> Int
+-- |     add = eqFunc2 (+)
+-- |
+-- |     uncurryEF add == uncurryEF add
+-- |     curryEF (uncurryEF add) == add
+-- |
+-- |     (uncurryEF add) ~ (Tuple 2 3) == 5
 uncurryEF :: ∀ a b c. (a ==> b ==> c) -> (Tuple a b ==> c)
 uncurryEF (EqFunc {tag, func}) =
     mkEqFunc
@@ -288,8 +510,6 @@ uncurryEF10 (EqFunc {tag, func}) =
 -- are equal to each other. As a simple example, `const 5` must be equal to
 -- `const 5`, even if they are produced separately (and thus not literally
 -- the same function).
---
--- The b type parameter represents the return type of the function.
 data Tag
     = Plain Int
     | Id
@@ -321,9 +541,11 @@ instance showTag :: Show Tag where
 
 
 instance semigroupTag :: Semigroup Tag where
+    -- This is special so that the Category laws are obeyed for EqFunc
     append Id other = other
     append other Id = other
 
+    -- These are special again for obyeing the Category laws for EqFunc
     append (Composed list1) (Composed list2) = Composed (list1 <> list2)
     append (Composed list) tag2 = Composed (snoc list tag2)
     append tag1 (Composed list) = Composed (Cons tag1 list)
@@ -383,6 +605,7 @@ eqFunc func =
     mkEqFunc (uniqueTag func) func
 
 
+-- | Given a function of two parameters, make an equatable function.
 eqFunc2 :: ∀ a b c. (Eq a) => (a -> b -> c) -> (a ==> b ==> c)
 eqFunc2 func =
     mkEqFunc2 (uniqueTag func) func
@@ -520,6 +743,10 @@ uniqueTag = uniqueTagImpl Plain
 
 
 -- | Applies an `EqFunc` to an argument.
+-- |
+-- | You can also use `~` as an infix operator, with the precedence of
+-- } ordinary function application. Or, you can use `=$=`, with a precedence
+-- | like `$`.
 runEF :: ∀ a b. (a ==> b) -> (a -> b)
 runEF (EqFunc func) = func.func
 
@@ -528,6 +755,8 @@ infixr 0 runEF as =$=
 infixl 9 runEF as ~
 
 
+-- | Like `runEF`, but with its arguments flipped. You can also use the
+-- | infix operator `=#=`, with a precedence like `#`.
 runFlippedEF :: ∀ a b. a -> (a ==> b) -> b
 runFlippedEF = flip runEF
 
