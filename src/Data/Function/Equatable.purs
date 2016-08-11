@@ -48,12 +48,12 @@
 -- | `EqFunc` remembers that both `add2func` and `nicerAdd2func` were made from the
 -- | very same function. So, it knows that they are equal.
 -- |
--- |     add2func == nicerAdd2func    -- true
+-- |     add2func == nicerAdd2func
 -- |
 -- | But, this isn't magic ... if you separately define the original function,
 -- | `EqFunc` won't know that they are equal, even if they are equivalent.
 -- |
--- |     eqFunc (\x -> x + 2) == eqFunc (\x -> x + 2)    -- false
+-- |     eqFunc (\x -> x + 2) /= eqFunc (\x -> x + 2)    -- sadly
 -- |
 -- | So, the moral of the story is that for `EqFunc` to work as expected, you need
 -- | to initially supply it with functions defined at the top-level, not functions
@@ -85,9 +85,12 @@
 -- |     add :: Int ==> (Int -> Int)
 -- |     add = eqFunc (+)
 -- |
+-- |     addAgain :: Int ==> (Int -> Int)
+-- |     addAgain = eqFunc (+)
+-- }
 -- | Now, of course, basic `EqFunc` equality will work here, as expected.
 -- |
--- |     eqFunc (+) == eqFunc (+)    -- true
+-- |     add == addAgain
 -- |
 -- | But what if we partially apply the parameters, to return a function?  Since we
 -- | literally return a function, equality won't even compile.
@@ -102,11 +105,11 @@
 -- |
 -- | And now, if we partially apply, the resulting `EqFunc`s can be compared
 -- |
--- |     nicerAdd ~ 2 == nicerAdd ~ 2           -- true
--- |     nicerAdd ~ 2 == nicerAdd ~ 3           -- false
+-- |     nicerAdd ~ 2 == nicerAdd ~ 2
+-- |     nicerAdd ~ 2 /= nicerAdd ~ 3
 -- |
--- |     (eqFunc2 (+)) ~ 2 == (eqFunc (+)) ~ 2  -- true
--- |     (eqFunc2 (+)) ~ 2 == (eqFunc (+)) ~ 3  -- false
+-- |     (eqFunc2 (+)) ~ 2 == (eqFunc (+)) ~ 2
+-- |     (eqFunc2 (+)) ~ 2 /= (eqFunc (+)) ~ 3
 -- |
 -- | To fully apply the two paramter `EqFunc` we can just keep using `~`.
 -- |
@@ -130,8 +133,7 @@
 -- |
 -- |     x = 5    -- imagine a more complex computation!
 -- |
--- |     eqFunc (\y -> x + y) ==
--- |     eqFunc (\y -> x + y)       -- sadly, false
+-- |     eqFunc (\y -> (x :: Int) + y) /= eqFunc (\y -> (x :: Int) + y) -- sadly
 -- |
 -- | However, you can get the same result via partial application -- e.g. `(+) x`.
 -- | And you can represent that as an `EqFunc` which starts at the top-level.  Two
@@ -139,9 +141,9 @@
 -- |
 -- |     x = 5    -- again, imagine a more complex computation
 -- |
--- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ x   -- true
--- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ 5   -- true
--- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ 7   -- false
+-- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ x
+-- |     (eqFunc2 (+)) ~ x == (eqFunc2 (+)) ~ 5
+-- |     (eqFunc2 (+)) ~ x /= (eqFunc2 (+)) ~ 7
 -- |
 -- | So, the pattern you want to follow is to "lift" top-level functions
 -- | into `EqFunc`, and then do your function manipulation at the `EqFunc`
@@ -159,14 +161,12 @@
 -- |     add6 :: Int -> Int
 -- |     add6 = (+) 6
 -- |
--- |     eqFunc (add3 >>> add6) ==
--- |     eqFunc (add3 >>> add6)                -- sadly, false
+-- |     eqFunc (add3 >>> add6) /= eqFunc (add3 >>> add6) -- sadly
 -- |
 -- | However, `EqFunc` has a `Semigroupoid` instance, just like `Function` does.
 -- | So, you can just construct the `EqFunc`s first, and then compose them:
 -- |
--- |     (eqFunc add3) >>> (eqFunc add6) ==
--- |     (eqFunc add3) >>> (eqFunc add6)       -- true
+-- |     (eqFunc add3) >>> (eqFunc add6) == (eqFunc add3) >>> (eqFunc add6)
 -- |
 -- | And `EqFunc` obeys the `Semigroupid` laws, so you can compose multiple times,
 -- | and the order doesn't matter, etc. There is also a `Category` instance, so you
@@ -182,24 +182,25 @@
 -- |
 -- | For `constEF`, the resulting functions are equal if the const value is equal.
 -- |
--- |     constEF 5 == constEF 5    -- true
--- |     constEF 5 == constEF 8    -- false
+-- |     constEF 5 == constEF 5
+-- |     constEF 5 /= constEF 8
 -- |
 -- | For `flipEF`, flipping equal `EqFunc`s preserves equality:
 -- |
--- |     flipEF (eqFunc2 (-)) == flipEF (eqFunc2 (-))    -- true
+-- |     flipEF (eqFunc2 (-)) == flipEF (eqFunc2 (-))
 -- |
 -- | And, if you flip twice, it's equal to the original:
 -- |
--- |     flipEF (flipEF (eqFunc2 (-))) == eqFunc2 (-)    -- true
+-- |     flipEF (flipEF (eqFunc2 (-))) == eqFunc2 (-)
 -- |
 -- | The same principle applies to `curryEF`, `uncurryEF`, and their friends
 -- | with a higher parameter count.
 -- |
+-- |     add :: Int ==> Int ==> Int
 -- |     add = eqFunc2 (+)
 -- |
--- |     curryEF add == curryEF add       -- true
--- |     uncurryEF (curryEF add) == add   -- true
+-- |     curryEF add == curryEF add
+-- |     uncurryEF (curryEF add) == add
 -- |
 -- | If I'm missing other interesting functions that return functions, I'd
 -- | be happy to add them!
