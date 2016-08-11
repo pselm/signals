@@ -225,7 +225,7 @@ module Data.Function.Equatable
 
 import Data.List (List(..), (:), snoc)
 import Data.Tuple (Tuple, curry, uncurry)
-import Data.Eq.Any (AnyEq, anyEq)
+import Data.Exists.Eq (SomeEq, someEq)
 import Data.Monoid (class Monoid)
 import Data.Profunctor (class Profunctor)
 import Data.Profunctor.Choice (class Choice, left, right)
@@ -576,7 +576,7 @@ instance eqTag :: Eq Tag where
 
 newtype AppliedRec = AppliedRec
     { parentTag :: Tag
-    , param :: AnyEq
+    , param :: SomeEq
     }
 
 instance eqAppliedRec :: Eq AppliedRec where
@@ -653,7 +653,7 @@ eqFunc10 func =
 
 applied :: ∀ a. (Eq a) => Tag -> a -> Tag
 applied parentTag param =
-    Applied $ AppliedRec {parentTag, param: anyEq param}
+    Applied $ AppliedRec {parentTag, param: someEq param}
 
 
 mkEqFunc :: ∀ a b. Tag -> (a -> b) -> (a ==> b)

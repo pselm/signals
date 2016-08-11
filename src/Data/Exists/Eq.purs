@@ -2,7 +2,7 @@
 -- | Ordinarily, you can only check two values for equality if the type-checker
 -- | knows that they are the same type.
 -- |
--- | This module provides an `anyEq` function which loosens that restriction. It
+-- | This module provides an `someEq` function which loosens that restriction. It
 -- | works with any two values, no matter their type, so long as each has an `Eq`
 -- | instance. To do so, it checks whether the two `Eq` instances are implemented
 -- | with the same function. If so, clearly that function can take both values,
@@ -14,13 +14,13 @@
 -- | This is a little like what `Data.Exists` does, except that `Data.Exists`
 -- | doesn't remember anything at all about the original type.
 -- |
--- | So, this module provides an `anyEq` function, which turns any value with an
--- | `Eq` instance into an `AnyEq`. All you can do with an `AnyEq` is compare it
--- | for equality with another `AnyEq`. The nice thing is that the two `AnyEq`
--- | values may originally have been different types.
+-- | So, this module provides a `someEq` function, which turns any value with an
+-- | `Eq` instance into a `SomeEq` (with no type variable). All you can do with a
+-- | SomeEq` is compare it for equality with another `SomeEq`. The nice thing is
+-- | that the two `SomeEq` values may originally have been different types.
 
-module Data.Eq.Any
-    ( AnyEq, anyEq, eqAny
+module Data.Exists.Eq
+    ( SomeEq, someEq, eqAny
     ) where
 
 
@@ -31,25 +31,25 @@ import Data.Eq (class Eq, eq)
 -- | A type for values that have forgotten everything but how to determine whether
 -- | they are equal to another value.
 -- |
--- | You can produce an `AnyEq` via the `anyEq` function. Once you have an `AnyEq`,
--- | the only thing you can do with it is check it for equality with another `AnyEq`.
+-- | You can produce an `SomeEq` via the `someEq` function. Once you have an `SomeEq`,
+-- | the only thing you can do with it is check it for equality with another `SomeEq`.
 -- |
--- |     anyEq 5 == anyEq 5
--- |     anyEq 5 /= anyEq 6
--- |     anyEq 5 /= anyEq "five"
--- |     anyEq "five" == anyEq "five"
--- |     anyEq "five" /= anyEq "six"
-newtype AnyEq = AnyEq (∀ b. (∀ a. (Eq a) => a -> b) -> b)
+-- |     someEq 5 == someEq 5
+-- |     someEq 5 /= someEq 6
+-- |     someEq 5 /= someEq "five"
+-- |     someEq "five" == someEq "five"
+-- |     someEq "five" /= someEq "six"
+newtype SomeEq = SomeEq (∀ b. (∀ a. (Eq a) => a -> b) -> b)
 
 
 -- | Given a value with an `Eq` instance, forget everything except how to determine
--- | whether you are equal to another `AnyEq`.
-anyEq :: ∀ a. (Eq a) => a -> AnyEq
-anyEq a = AnyEq \c -> c a
+-- | whether you are equal to another `SomeEq`.
+someEq :: ∀ a. (Eq a) => a -> SomeEq
+someEq a = SomeEq \c -> c a
 
 
-instance eqAnyEq :: Eq AnyEq where
-    eq (AnyEq func1) (AnyEq func2) =
+instance eqSomeEq :: Eq SomeEq where
+    eq (SomeEq func1) (SomeEq func2) =
         func1 (func2 eqAny)
 
 
