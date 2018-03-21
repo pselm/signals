@@ -220,7 +220,7 @@ in syntax.
 Initialization is via a `:` rather than `=`, e.g.
 
 ```purescript
-let record =
+let record :
     { x: 7
     , y: 32
     }
@@ -239,7 +239,7 @@ underscore.
 
 #### Access and accesor function
 
-Acces is via the expected `record.x`.
+Access is via the expected `record.x`.
 
 There are also polymorphic accessor functions like Elm's, but instead of `.x`
 you use `_.x` (which is kind of logical, if you think about it). If you were to
