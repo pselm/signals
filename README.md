@@ -237,9 +237,9 @@ Generally speaking, Purescript gets a vast amount of use out of the lowly
 underscore.
 
 
-#### Access and accesor function
+#### Access and accessor function
 
-Acces is via the expected `record.x`.
+Access is via the expected `record.x`.
 
 There are also polymorphic accessor functions like Elm's, but instead of `.x`
 you use `_.x` (which is kind of logical, if you think about it). If you were to
