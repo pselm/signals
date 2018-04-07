@@ -8,3 +8,11 @@ exports.refEq = function (a) {
         return a === b;
     };
 };
+
+exports.setEventNode = function (eventNode) {
+    return function (domNode) {
+        return function () {
+            domNode.elm_event_node_ref = eventNode;
+        };
+    };
+};

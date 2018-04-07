@@ -117,7 +117,7 @@ DOM node, it may also know how to efficiently `update` that node.
   some reason. However, you can manually write out a trivial update function
   in this way:
 
-      update rendered = render
+      update rendered = render rendered.document
 
 * So, calling `render` and `update` should produce the same results,
   so long as the `Rendered` parameter provided to `update` follows the rules.
@@ -130,6 +130,7 @@ DOM node, it may also know how to efficiently `update` that node.
 ##### Instances
 ``` purescript
 Renderable AnyRenderable
+Renderable String
 ```
 
 #### `defaultUpdate`

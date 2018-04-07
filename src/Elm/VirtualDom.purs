@@ -40,7 +40,7 @@ import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeGet)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Exists (Exists, mkExists)
+import Data.Exists (Exists, mkExists, runExists)
 import Data.Foreign (readString)
 import Data.Ord (abs, max)
 import Data.Either (Either(..))
@@ -654,6 +654,7 @@ var rAF =
 
 render :: ∀ e msg. Document -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 render doc vNode eventNode = do
+    -- Should consider using tailRecM here.
     case vNode of
         Thunk t ->
             unsafeCrashWith "TODO"
@@ -710,34 +711,51 @@ render doc vNode eventNode = do
 
             pure (elementToNode domNode)
 
-        Tagger rec ->
-            unsafeCrashWith "TODO"
+        Tagger t ->
+            t #
+                runExists \(TaggerRecord rec) -> do
+                    let
+                        subRoot =
+                            mkExists $
+                                EventNodeRecord
+                                    { tagger: rec.tagger
+                                    , parent: Just eventNode
+                                    }
+                    
+                    domNode <-
+                        render doc rec.child subRoot
+                    
+                    -- The original Elm code stores the EventNode on the subNode.
+                    -- Presumably this becomes important when we construct the
+                    -- event handler. Once I get there, I may want to handle this
+                    -- differently.
+                    --
+                    -- Also, the original Elm code consolidates case where the child node
+                    -- is itself a tagger. This is a bit awkward type-wise, so I'm trying
+                    -- something different here for the moment. I'm just recusring in a
+                    -- way that will generate a chain of event nodes, that ought to preserve 
+                    -- everything we need. The one trick is that we don't want to write the
+                    -- EventNode to the DOM until we're coming back up from something
+                    -- that wasn't a `Tagger`. Otherwise, we'll over-write something that
+                    -- was already complete.
+                    --
+                    -- I do need to remember to test this! (I.e. taggers within taggers).
+                    -- Once I have the full algorithm worked out, there is probably a
+                    -- better way of doing this.
+                    case rec.child of
+                        Tagger _ ->
+                            pure unit
 
-{-
-			var subNode = vNode.node;
-			var tagger = vNode.tagger;
+                        _ ->
+                            setEventNode subRoot domNode
 
-			while (subNode.type === 'tagger')
-			{
-				typeof tagger !== 'object'
-					? tagger = [tagger, subNode.tagger]
-					: tagger.push(subNode.tagger);
-
-				subNode = subNode.node;
-			}
-
-			var subEventRoot = {
-				tagger: tagger,
-				parent: eventNode
-			};
-
-			var domNode = render(subNode, subEventRoot);
-			domNode.elm_event_node_ref = subEventRoot;
-			return domNode;
--}
+                    pure domNode
 
         Custom renderable -> do
             Renderable.render doc renderable
+
+
+foreign import setEventNode :: ∀ e msg. EventNode msg -> DOM.Node -> Eff (dom :: DOM | e) Unit
 
 
 -- APPLY FACTS
@@ -930,10 +948,10 @@ data Traversal
 
 
 type SiblingRec =
-    { up :: Int
-    , from :: Int
+    { up :: Int             -- First, go up to the parent this many times
+    , from :: Int           -- Then, go sideways `from` an index `to` an index
     , to :: Int
-    , down :: List Int
+    , down :: List Int      -- Finally, go to children.
     }
 
 
@@ -956,8 +974,15 @@ costOfTraversal (TSibling s) = s.up + (max 3 (abs (s.from - s.to))) + ((length s
 
 -- The first param is a sibling offset ... i.e. +1 for next sibling, -1 for
 -- previous sibling, +2 for two siblings ahead, etc.
+--
+-- Note that we're using `MaybeT` here and in `performTraversal` in order to thread
+-- the possibility of failure through ... that is, the possibility that
+-- we'll try to go to a node that doesn't actually exist (which would indicate
+-- a bug of some kind).
 goSibling :: ∀ e. Int -> DOM.Node -> MaybeT (Eff (dom :: DOM | e)) DOM.Node
 goSibling =
+    -- I like the point-free form here, because you can just name the incoming
+    -- parameters inside the `tailRecM2` callback.
     tailRecM2 \which domNode ->
         if which == 0
             then
@@ -1108,7 +1133,16 @@ diffHelp a b patches index =
                     unsafeCrashWith "TODO"
 
                 {a: Tagger aTagger, b: Tagger bTagger} ->
-                    unsafeCrashWith "TODO"
+                    -- The Elm implementation does some unwrapping of nested taggers
+                    -- here, which would be awkward to manage with types. So, I'll
+                    -- adopt the same strategy as above, and just handle nested
+                    -- taggers recursively. Which, again, I must remember to test!
+                    aTagger #
+                        runExists \aRec ->
+                            bTagger #
+                                runExists \bRec ->
+                                    unsafeCrashWith "TODO"
+
 
                     {-
                     // gather nested taggers
@@ -1817,7 +1851,7 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 				subNode = subNode.node;
 			}
 
-			return addDomNodesHelp(domNode, subNode, patches, i, low + 1, high, domNode.elm_event_node_ref);
+			return addDomNodesHelp(domNode, subNode, patches, i, low + 1, high, domNode.lm_event_node_ref);
 
 		case 'node':
 			var vChildren = vNode.children;

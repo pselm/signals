@@ -13,6 +13,7 @@ An immutable chunk of data representing a DOM node. This can be HTML or SVG.
 
 ##### Instances
 ``` purescript
+Functor Node
 Renderable (Node msg)
 ```
 
@@ -38,16 +39,31 @@ a list of child nodes.
         [ property "id" (Json.string "greeting") ]
         [ text "Hello!" ]
 
-#### `text`
+#### `keyedNode`
 
 ``` purescript
-text :: forall msg. String -> Node msg
+keyedNode :: forall msg. String -> List (Property msg) -> List (Tuple String (Node msg)) -> Node msg
 ```
 
 Works just like `node`, but you add a unique identifier to each child
 node. You want this when you have a list of nodes that is changing: adding
 nodes, removing nodes, etc. In these cases, the unique identifiers help make
 the DOM modifications more efficient.
+
+#### `fromRenderable`
+
+``` purescript
+fromRenderable :: forall a msg. Renderable a => a -> Node msg
+```
+
+Create a `Node` from anything that has a `Renderable` instance.
+
+#### `text`
+
+``` purescript
+text :: forall msg. String -> Node msg
+```
+
 Just put plain text in the DOM. It will escape the string so that it appears
 exactly as you specify.
 
