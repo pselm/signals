@@ -9,7 +9,8 @@
 module Elm.Task
     ( module Virtual
     , Task, TaskE, toAff
-    , TaskCallback, makeTask
+    , makeTask
+    , EffFnTask, fromEffFnTask
     , succeed, fail
     , mapError, onError
     , toMaybe, fromMaybe
@@ -29,12 +30,15 @@ import Data.Traversable (sequence) as Virtual
 
 -- Internal
 
-import Control.Monad.Aff (Aff, makeAff, forkAff, later')
+import Control.Monad.Aff (Aff, Error, Canceler(..), makeAff, forkAff, delay, nonCanceler)
+import Control.Monad.Aff.Compat (EffFnCanceler(..), EffFnCb)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Uncurried (EffFn3, mkEffFn1, runEffFn3)
 import Control.Monad.Except.Trans (ExceptT(..), runExceptT, withExceptT)
 import Control.Monad.Error.Class (throwError)
-import Prelude (Unit, unit, map, pure, (<<<), (>>=), const, ($))
+import Prelude (Unit, unit, discard, bind, map, pure, (<<<), (>>=), const, ($), (<$>))
 import Data.Either (Either(..), either)
+import Data.Time.Duration (Milliseconds(..), toDuration)
 import Elm.Result (Result(..))
 import Elm.Maybe (Maybe(..))
 import Data.Int (round)
@@ -66,7 +70,7 @@ type TaskE e x a = ExceptT x (Aff e) a
 -- | Note that you can use "do notation" directly with the `Task` type -- you
 -- | don't have to unwrap it first. Essentially, you only need to unwrap the
 -- | `Task` if you need to interact with the `Aff` type.
-toAff :: forall eff x a. Task x a -> Aff eff (Either x a)
+toAff :: forall eff x a. TaskE eff x a -> Aff eff (Either x a)
 toAff = runExceptT
 
 
@@ -88,28 +92,66 @@ fail :: forall x a. x -> Task x a
 fail = throwError
 
 
--- | A callback for error and success, to be used when constructing a `Task`
--- | via `makeTask`.
-type TaskCallback e x a = ((x -> Eff e Unit) -> (a -> Eff e Unit) -> Eff e Unit)
+-- | Like `makeAff`, but you get a `Task` back.
+makeTask ∷ ∀ e x a. ((Either Error (Either x a) → Eff e Unit) → Eff e (Canceler e)) → TaskE e x a
+makeTask =
+    ExceptT <<< makeAff
 
 
--- | Creates a `Task` from a function that accepts error and success callbacks.
--- | To create a `Task` using the foreign function interface (FFI), you would typically
--- | pass this function to the FFI as a parameter. Then, you can do your computation,
--- | and callback with the first parameter to indicate failure or the second callback
--- | to indicate success.
+newtype EffFnTask e x a = EffFnTask (EffFn3 e (EffFnCb e Error) (EffFnCb e x) (EffFnCb e a) (EffFnCanceler e))
+
+-- | Lifts an FFI function into a `Task`, in the simplest possibly way. This
+-- | is like Purescript's `fromEffFnAff`, but allows the Javascript function
+-- | to call back with either:
 -- |
--- | Note that the return value you get from this function can be used as if it were
--- | a `Task x a` ... it's just a bit tricky to ignore the effects types in this case.
-makeTask :: forall e x a. TaskCallback e x a -> TaskE e x a
-makeTask cb =
-    ExceptT (
-        -- Everything that `Task` does is "success" from the point of view of `Aff`, since
-        -- `Aff` can only fail with a genuine Javascript exception. So, the function we
-        -- give to makeAff just goes Left or Right on the success side.
-        makeAff \error success ->
-            cb (success <<< Left) (success <<< Right)
-    )
+-- | - A Javascript exception
+-- | - The error type of the Task itself
+-- | - The success type
+-- |
+-- | A definition might look like this
+-- |
+-- | ```javascript
+-- | exports.myTaskImpl = function (onException, onError, onSuccess) {
+-- |   var cancel = doSomethingAsync(function (err, res) {
+-- |     if (err) {
+-- |       // This must be the Task's error type
+-- |       onError(err);
+-- |
+-- |       // Or, if err is a Javascript exception that you don't
+-- |       // want to handle in the Tasks error type, you can do this
+-- |       // instead.
+-- |       // onException(err);
+-- |     } else {
+-- |       // This must be the Task's success type
+-- |       onSuccess(res);
+-- |     }
+-- |   });
+-- |   return function (cancelError, onCancelerError, onCancelerSuccess) {
+-- |     cancel();
+-- |     onCancelerSuccess();
+-- |   };
+-- | };
+-- | ```
+-- |
+-- | ```purescript
+-- | foreign import myTaskImpl :: ∀ eff. EffFnTask (myeffect :: MYEFFECT | eff) Int String
+-- |
+-- | myTask :: ∀ eff. TaskE (myeffect :: MYEFFECT | eff) Int String
+-- | myTask = fromEffFnTask myTaskImpl
+-- | ````
+fromEffFnTask ∷ ∀ e x a. EffFnTask e x a → TaskE e x a
+fromEffFnTask (EffFnTask ffi) =
+    makeTask \k → do
+        EffFnCanceler canceler ←
+            runEffFn3 ffi
+                (mkEffFn1 (k <<< Left)) -- the JS exception callback
+                (mkEffFn1 (k <<< Right <<< Left)) -- the Task fail
+                (mkEffFn1 (k <<< Right <<< Right)) -- the Task succeed
+        pure $ Canceler \e → makeAff \k2 → do
+            runEffFn3 canceler e
+                (mkEffFn1 (k2 <<< Left))
+                (mkEffFn1 (k2 <<< Right))
+            pure nonCanceler
 
 
 -- ERRORS
@@ -226,5 +268,4 @@ spawn task =
 -- |     sleep 1000 `andThen` \_ -> succeed 42
 sleep :: forall x. Time -> Task x Unit
 sleep time =
-    ExceptT $ later' (round time) (pure (Right unit))
-
+    ExceptT $ Right <$> delay (toDuration $ Milliseconds time)

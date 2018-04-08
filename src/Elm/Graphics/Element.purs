@@ -65,7 +65,7 @@ import Graphics.Canvas (CANVAS)
 import Prelude
     ( class Show, class Eq, Unit, unit
     , flip, map, (<$>), (<#>), ($), (>>>)
-    , bind, (>>=), pure
+    , bind, discard, (>>=), pure, void
     , (+), (-), (/), (*), (<>)
     , (==), (/=), (>), (||), (&&), negate
     )
@@ -747,7 +747,7 @@ setProps document (Element {props, element}) node = do
     when (props.opacity /= 1.0) $
         setStyle "opacity" (Prelude.show props.opacity) node
 
-    for props.color \c ->
+    for_ props.color \c ->
         setStyle "backgroundColor" (toCss c) node
 
     when (props.tag /= "") $
@@ -775,7 +775,7 @@ setProps document (Element {props, element}) node = do
             setStyle "pointerEvents" "auto" anchor
             setAttribute "href" props.href anchor
 
-            appendChild (elementToNode node) (elementToNode anchor)
+            void $ appendChild (elementToNode node) (elementToNode anchor)
             pure anchor
 
 
@@ -932,7 +932,7 @@ makeImage document props imageStyle imageWidth imageHeight src =
             addEventListener load listener false (elementToEventTarget img)
             setAttribute "src" src img
             setAttribute "name" src img
-            appendChild (elementToNode img) (elementToNode e)
+            void $ appendChild (elementToNode img) (elementToNode e)
             pure e
 
         Tiled -> do
@@ -994,7 +994,7 @@ makeFlow document dir elist = do
         goDir =
             directionTable dir
 
-    for possiblyReversed \elem -> do
+    for_ possiblyReversed \elem -> do
         rendered <- render document elem
         goDir rendered
         appendChild (elementToNode rendered) (elementToNode parent)
@@ -1077,7 +1077,7 @@ makeContainer document pos elem = do
     setStyle "position" "relative" div
     setStyle "overflow" "hidden" div
 
-    appendChild (elementToNode e) (elementToNode div)
+    void $ appendChild (elementToNode e) (elementToNode div)
     pure div
 
 
@@ -1129,7 +1129,7 @@ makeElement document (Element {element, props}) =
             -- if it's not in fact an element.
             wrapper <- createNode document "div"
             child <- Renderable.render document renderable
-            appendChild child (elementToNode wrapper)
+            void $ appendChild child (elementToNode wrapper)
             pure wrapper
 
 
@@ -1141,7 +1141,7 @@ updateAndReplace document node curr next = do
 
     unless (same newNode node) do
         nullableParent <- parentNode (elementToNode node)
-        for_ (toMaybe nullableParent) \parent ->
+        for_ nullableParent \parent ->
             replaceChild (elementToNode newNode) (elementToNode node) parent
 
     pure newNode
@@ -1165,7 +1165,7 @@ update document outerNode (Element curr) (Element next) = do
         if tagName outerNode == "A"
             then do
                 nullableChild <- ParentNode.firstElementChild (elementToParentNode outerNode)
-                case toMaybe nullableChild of
+                case nullableChild of
                      Just child -> pure child
                      Nothing -> pure outerNode
 
@@ -1258,7 +1258,7 @@ update document outerNode (Element curr) (Element next) = do
                                                     then len - (i + 1)
                                                     else i
 
-                                        kid <- toMaybe <$> HTMLCollection.item kidIndex kids
+                                        kid <- HTMLCollection.item kidIndex kids
                                         innerOld <- pure $ index oldList i
                                         innerNext <- pure $ index list i
 
@@ -1275,7 +1275,7 @@ update document outerNode (Element curr) (Element next) = do
                 , currE: Container oldRawPos oldElem
                 } -> do
                     nullableSubnode <- ParentNode.firstElementChild (elementToParentNode innerNode)
-                    for_ (toMaybe nullableSubnode) \subnode -> do
+                    for_ nullableSubnode \subnode -> do
                         newSubNode <- updateAndReplace document subnode oldElem elem
                         setPos rawPos elem newSubNode
 
@@ -1289,7 +1289,7 @@ update document outerNode (Element curr) (Element next) = do
                     -- Because we wrap custom stuff in a div, we need to actually dive down one level
                     nullableWrapped <- firstChild (elementToNode innerNode)
 
-                    case toMaybe nullableWrapped of
+                    case nullableWrapped of
                         Just oldResult -> do
                             updatedNode <-
                                 Renderable.update
@@ -1362,18 +1362,18 @@ updateProps document node (Element curr) (Element next) = do
                 setAttribute "href" nextProps.href anchor
 
                 nullableParent <- parentNode (elementToNode node)
-                for_ (toMaybe nullableParent) \parent -> do
-                    replaceChild (elementToNode anchor) (elementToNode node) parent
-                    appendChild (elementToNode node) (elementToNode anchor)
+                for_ nullableParent \parent -> do
+                    void $ replaceChild (elementToNode anchor) (elementToNode node) parent
+                    void $ appendChild (elementToNode node) (elementToNode anchor)
 
             else do
                 nullableAnchor <- parentElement (elementToNode node)
-                for_ (toMaybe nullableAnchor) \anchor ->
+                for_ nullableAnchor \anchor ->
                     if nextProps.href == ""
                         then do
                             nullableParent <- parentNode (elementToNode anchor)
-                            for_ (toMaybe nullableParent) \parent ->
-                                replaceChild (elementToNode node) (elementToNode anchor) parent
+                            for_ nullableParent \parent ->
+                                void $ replaceChild (elementToNode node) (elementToNode anchor) parent
 
                         else
                             setAttribute "href" nextProps.href anchor

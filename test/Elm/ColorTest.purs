@@ -4,13 +4,13 @@ import Test.Unit (TestSuite, Test, suite, test, success, failure)
 import Test.Unit.Assert (equal)
 
 import Elm.Color 
-import Prelude (flip, bind, class Eq, class Show, show, ($), (-), (<), (<>))
+import Prelude (flip, discard, class Eq, class Show, show, ($), (-), (<), (<>))
 import Elm.Basics (abs)
 
 
 infixl 9 equals as ===
 
-equals :: ∀ a e. (Eq a, Show a) => a -> a -> Test e
+equals :: ∀ a e. Eq a => Show a => a -> a -> Test e
 equals = flip equal
 
 

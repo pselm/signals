@@ -29,7 +29,7 @@ main = do
     nullableContainer <-
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
-    for_ (toMaybe nullableContainer) \container -> do
+    for_ nullableContainer \container -> do
         element <- render (htmlDocumentToDocument doc) scene
         appendChild element (elementToNode container)
 

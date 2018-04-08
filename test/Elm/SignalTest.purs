@@ -1,6 +1,6 @@
 module Test.Elm.SignalTest (tests) where
 
-import Test.Unit (TIMER, TestSuite, Test, suite, test)
+import Test.Unit (TestSuite, Test, suite, test)
 import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Assert (equal)
 
@@ -9,21 +9,29 @@ import Elm.Signal
 import Data.Array (cons)
 import Data.Maybe (Maybe(..))
 import Data.List ((:), List(..))
+import Data.Time.Duration (Milliseconds(..))
 
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Aff (later')
+import Control.Monad.Aff (delay)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Now (NOW)
 
-import Prelude (pure, flip, bind, class Eq, class Show, show, ($), (+), (-), (<), (>), (<>))
+import Prelude (Unit, pure, flip, bind, discard, class Eq, class Show, show, ($), (+), (-), (<), (>), (<>))
 
 
 infixl 9 equals as ===
 
-equals :: forall a e. (Eq a, Show a) => a -> a -> Test e
+equals :: forall a e. Eq a => Show a => a -> a -> Test e
 equals = flip equal
+
+
+later :: ∀ e. Aff e Unit -> Aff e Unit
+later doThen = do
+    delay (Milliseconds 1.0)
+    doThen
 
 
 tests :: ∀ e. TestSuite
@@ -31,7 +39,6 @@ tests :: ∀ e. TestSuite
     , delay :: DELAY
     , console :: CONSOLE
     , now :: NOW
-    , timer :: TIMER
     , avar :: AVAR
     , testOutput :: TESTOUTPUT
     | e)
@@ -53,7 +60,7 @@ tests = suite "Elm.Signal" do
 
         liftEff (send mbox.address 24)
 
-        later' 1 do
+        later do
             result <- liftEff $ current mbox.signal
             result === 24
 
@@ -69,7 +76,7 @@ tests = suite "Elm.Signal" do
 
             pure folded
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === 22
 
@@ -87,7 +94,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === [7, 4]
 
@@ -111,7 +118,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === [11, 23]
 
@@ -129,7 +136,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === ["7", "11", "23", "4"]
 
@@ -148,7 +155,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === [1, 14, 2, 8]
 
@@ -173,7 +180,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === ["gfz", "gfc", "dfc", "dec", "dbc"]
 
@@ -200,7 +207,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === ["gfzr", "gfzd", "gfcd", "dfcd", "decd", "dbcd"]
 
@@ -229,7 +236,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === ["gfzra", "gfzre", "gfzde", "gfcde", "dfcde", "decde", "dbcde"]
 
@@ -256,7 +263,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === [9, 17, 17]
 
@@ -276,7 +283,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === [4, 7, 11, 4]
 
@@ -310,7 +317,7 @@ tests = suite "Elm.Signal" do
 
             pure {sig2, sig3, sig6, sig7}
 
-        later' 1 do
+        later do
             result <- liftEff $ current sigs.sig2
             result === "gfedcb"
 
@@ -343,7 +350,7 @@ tests = suite "Elm.Signal" do
 
             pure sig2
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === "gfedicb"
 
@@ -362,6 +369,6 @@ tests = suite "Elm.Signal" do
 
             pure folded
 
-        later' 1 do
+        later do
             result <- liftEff $ current sig
             result === "9876"

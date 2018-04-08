@@ -13,16 +13,16 @@ module Elm.Window
 
 import Elm.Signal (Signal, DELAY, GraphState, Graph, send, mailbox, map, current, delay)
 
-import Prelude (pure, ($), bind, unit, const, (<<<), (>>=), (==), (&&))
+import Prelude (pure, ($), bind, discard, unit, const, (<<<), (>>=), (==), (&&))
 import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Partial.Unsafe (unsafeCrashWith)
 
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
-import Control.Monad.Reader.Class (reader)
+import Control.Monad.Reader.Class (asks)
 import Control.Monad.State.Trans (StateT)
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Ref (REF)
@@ -111,7 +111,7 @@ makeWindowState node = do
             Nothing -> do
                 nullableBody <- liftEff $ document win >>= body
 
-                case toMaybe nullableBody of
+                case nullableBody of
                     Just nb -> pure nb
                     Nothing -> unsafeCrashWith "Couldn't find document.body"
 
@@ -185,7 +185,7 @@ setupGlobalWindow cb = do
 -- | The current width and height of the window (i.e. the area viewable to the
 -- | user, not including scroll bars).
 dimensions :: ∀ e m. (MonadEff (ref :: REF | e) m) => WindowCallback m (Signal (Tuple Int Int))
-dimensions = reader _.dimensions
+dimensions = asks _.dimensions
 
 
 -- | The current width of the window.

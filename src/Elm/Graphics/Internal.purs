@@ -17,7 +17,7 @@ module Elm.Graphics.Internal
 
 
 import DOM (DOM)
-import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode)
+import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode, readHTMLDocument)
 import DOM.HTML.Document (body)
 import DOM.Node.Document (createElement)
 import DOM.Node.Types (Document, Element, Node, elementToNode)
@@ -27,11 +27,12 @@ import Data.Nullable (Nullable, toMaybe)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (either)
 import Data.Foreign (Foreign, toForeign)
-import Data.Foreign.Class (read)
+import Control.Comonad (extract)
 import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Except.Trans (runExceptT)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude (bind, (>>=), (>>>), pure, Unit, (<#>), (<$>), const)
+import Prelude (bind, discard, (>>=), (>>>), pure, void, Unit, (<#>), (<$>), ($), const)
 
 
 -- Sets the style named in the first param to the value of the second param
@@ -70,7 +71,6 @@ documentForNode node =
     -- The unsafeCoerce should be safe, because if `ownerDocument`
     -- returns null, then the node itself must be the document.
     ownerDocument node
-        <#> toMaybe
         <#> fromMaybe (unsafeCoerce node)
 
 
@@ -124,7 +124,7 @@ measure node = do
     maybeBody <-
         case maybeHtmlDoc of
             Just doc ->
-                toMaybe <$> body doc
+                body doc
 
             Nothing ->
                 pure Nothing
@@ -143,27 +143,27 @@ measure node = do
             oldSibling <- nextSibling node
             oldParent <- parentNode node
 
-            appendChild node (elementToNode temp)
+            void $ appendChild node (elementToNode temp)
 
             let bodyDoc = htmlElementToNode b
-            appendChild (elementToNode temp) bodyDoc
+            void $ appendChild (elementToNode temp) bodyDoc
 
             dim <- getDimensions temp
 
-            removeChild (elementToNode temp) bodyDoc
+            void $ removeChild (elementToNode temp) bodyDoc
 
             -- Now, we should put it back ...
-            case toMaybe oldParent of
+            case oldParent of
                 Just p ->
-                    case toMaybe oldSibling of
+                    case oldSibling of
                         Just s ->
-                            insertBefore node s p
+                            void $ insertBefore node s p
 
                         Nothing ->
-                            appendChild node p
+                            void $ appendChild node p
 
                 Nothing ->
-                    removeChild node (elementToNode temp)
+                    void $ removeChild node (elementToNode temp)
 
             pure dim
 
@@ -192,4 +192,5 @@ nodeToElement node =
 
 documentToHtmlDocument :: Document -> Maybe HTMLDocument
 documentToHtmlDocument doc =
-    either (const Nothing) Just (read (toForeign doc))
+    extract $ either (const Nothing) Just <$>
+        runExceptT (readHTMLDocument (toForeign doc))

@@ -7,6 +7,7 @@ import Elm.Color (red, blue, yellow)
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
+import Control.Monad.Except.Trans (runExceptT)
 import Control.Comonad (extract)
 import Graphics.Canvas (CANVAS)
 
@@ -25,12 +26,12 @@ import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
 import Data.Either (Either(..))
-import Data.Foreign (toForeign)
-import Data.Foreign.Class (readProp)
+import Data.Foreign (toForeign, readInt)
+import Data.Foreign.Index (readProp)
 import Data.List.Zipper (Zipper(..), up, down, beginning) as Zipper
 import Data.Tuple (Tuple(..))
 
-import Prelude (bind, Unit, unit, (>>=), ($), (>>>), pure)
+import Prelude (bind, discard, Unit, unit, void, (>>=), ($), (>>>), pure)
 
 
 main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, ref :: REF | e) Unit
@@ -41,7 +42,7 @@ main = do
     nullableContainer <-
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
-    for_ (toMaybe nullableContainer) \container -> do
+    for_ nullableContainer \container -> do
         zippedScenes <-
             newRef scenes
 
@@ -57,8 +58,8 @@ main = do
                     nullableChild <-
                         ParentNode.firstElementChild (elementToParentNode container)
 
-                    for_ (toMaybe nullableChild) \child -> do
-                        updateDOM
+                    for_ nullableChild \child -> do
+                        void $ updateDOM
                             { result: (elementToNode child)
                             , value: extract current
                             , document: htmlDocumentToDocument doc
@@ -71,7 +72,7 @@ main = do
                 eventListener \event -> do
                     current <- readRef zippedScenes
 
-                    case readProp "keyCode" (toForeign event) of
+                    case extract $ runExceptT $ readProp "keyCode" (toForeign event) >>= readInt of
                         -- left key
                         Right 37 ->
                             move current (Zipper.up current)

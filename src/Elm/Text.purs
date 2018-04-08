@@ -21,10 +21,11 @@ import Elm.Regex (Regex, regex, HowMany(All), replace) as ER
 import Elm.String (repeat)
 
 import Data.List as List
-import Data.String (joinWith, contains, length, split)
+import Data.String (Pattern(..), joinWith, contains, length, split)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (class Foldable, foldr)
-import Data.String.Regex (RegexFlags, noFlags, replace, regex)
+import Data.String.Regex (replace, regex)
+import Data.String.Regex.Flags (global)
 import Data.Array (catMaybes)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (for)
@@ -38,7 +39,7 @@ import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, modifySTRef, runST)
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
 
-import Prelude (class Show, class Semigroup, ($), (<#>), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, pure, negate)
+import Prelude (class Show, class Semigroup, ($), (<#>), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, discard, pure, negate, void)
 
 
 -- | Represents styled text. It can be rendered with collages or with elements.
@@ -357,7 +358,7 @@ italicToCss isItalic =
 
 quoteSpaces :: String -> String
 quoteSpaces string =
-    if contains " " string
+    if contains (Pattern " ") string
         then "'" <> string <> "'"
         else string
 
@@ -376,10 +377,6 @@ typefaceToCss list =
                             List.toUnfoldable list
 
 
-global :: RegexFlags
-global = noFlags { global = true }
-
-
 -- Compose the escapes together
 escapes :: String -> String
 escapes =
@@ -396,7 +393,7 @@ makeLines :: String -> String
 makeLines string =
     joinWith "<br/>" $
         map makeSpaces $
-            split "\n" string
+            split (Pattern "\n") string
 
 
 {- The original Elm algorithm isn't the easiest thing to follow, but I think it
@@ -580,8 +577,8 @@ drawCanvas :: ∀ e.
 
 drawCanvas draw text ctx =
     runST do
-        Canvas.save ctx
-        Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+        void $ Canvas.save ctx
+        void $ Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
 
         -- To avoid multiple iterations ...
         maxHeightRef <- newSTRef 0.0
@@ -596,15 +593,15 @@ drawCanvas draw text ctx =
                     font = toFont chunk.props
                     chunkHeight = fromMaybe defaultHeight chunk.props.height
 
-                Canvas.setFont font ctx
+                void $ Canvas.setFont font ctx
 
                 metrics <-
                     Canvas.measureText ctx chunk.text
 
-                modifySTRef maxHeightRef \h ->
+                void $ modifySTRef maxHeightRef \h ->
                     if h > chunkHeight then h else chunkHeight
 
-                modifySTRef totalWidthRef \w ->
+                void $ modifySTRef totalWidthRef \w ->
                     w + metrics.width
 
                 pure
@@ -619,15 +616,15 @@ drawCanvas draw text ctx =
 
         xRef <- newSTRef $ (-totalWidth) / 2.0
 
-        for measured \m -> do
-            Canvas.setFont m.font ctx
-            Canvas.setFillStyle (fromMaybe "black" $ map toCss m.chunk.props.color) ctx
+        void $ for measured \m -> do
+            void $ Canvas.setFont m.font ctx
+            void $ Canvas.setFillStyle (fromMaybe "black" $ map toCss m.chunk.props.color) ctx
 
             x <- readSTRef xRef
-            draw ctx m.chunk.text x (maxHeight / 2.0)
+            void $ draw ctx m.chunk.text x (maxHeight / 2.0)
             writeSTRef xRef $ x + m.width
 
-        Canvas.restore ctx
+        void $ Canvas.restore ctx
         pure ctx
 
 
@@ -674,8 +671,8 @@ type Chunk =
 -- Convert the object returned by the text module
 -- into something we can use for styling canvas text
 chunkText :: Props -> Text -> List Chunk
-chunkText props text =
-    case text of
+chunkText props t =
+    case t of
         Append left right ->
             chunkText props left <> chunkText props right
 

@@ -4,7 +4,7 @@ import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert (equal)
 
 import Elm.Text
-import Prelude (bind, ($), map)
+import Prelude (discard, ($), map)
 import Data.List (List(..), (:), fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), uncurry)

@@ -24,7 +24,7 @@ import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonEl
 import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Node (appendChild)
 
-import Prelude (Unit, ($), bind, (<$>), (>>=))
+import Prelude (Unit, ($), void, bind, discard, (<$>), (>>=))
 
 
 main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM | e) Unit
@@ -36,14 +36,14 @@ main = do
     nullableContainer <-
         getElementById (ElementId "contents") (documentToNonElementParentNode doc)
 
-    for_ (toMaybe nullableContainer) \container -> do
+    for_ nullableContainer \container -> do
         table <- elementToNode <$> createElement "table" doc
         tbody <- elementToNode <$> createElement "tbody" doc
         thead <- elementToNode <$> createElement "thead" doc
 
-        appendChild thead table
-        appendChild tbody table
-        appendChild table (elementToNode container)
+        void $ appendChild thead table
+        void $ appendChild tbody table
+        void $ appendChild table (elementToNode container)
 
         column1 <- elementToNode <$> createElement "th" doc
         column2 <- elementToNode <$> createElement "th" doc
@@ -55,15 +55,15 @@ main = do
         text3 <- textToNode <$> createTextNode "Should look like" doc
         text4 <- textToNode <$> createTextNode "Difference" doc
 
-        appendChild text1 column1
-        appendChild text2 column2
-        appendChild text3 column3
-        appendChild text4 column4
+        void $ appendChild text1 column1
+        void $ appendChild text2 column2
+        void $ appendChild text3 column3
+        void $ appendChild text4 column4
 
-        appendChild column1 thead
-        appendChild column2 thead
-        appendChild column3 thead
-        appendChild column4 thead
+        void $ appendChild column1 thead
+        void $ appendChild column2 thead
+        void $ appendChild column3 thead
+        void $ appendChild column4 thead
 
         for_ examples $
             renderIntoDOM AfterLastChild tbody

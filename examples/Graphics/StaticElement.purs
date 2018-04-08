@@ -23,10 +23,11 @@ import DOM.Node.Node (appendChild)
 import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:), fromFoldable)
+import Data.NonEmpty (NonEmpty(..))
 import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..))
 
-import Prelude (bind, Unit, (>>=), ($), (<>), (<$>), map)
+import Prelude (bind, discard, Unit, (>>=), ($), (<>), (<$>), map)
 import Prelude (show) as Prelude
 
 
@@ -38,17 +39,17 @@ main = do
     nullableContainer <-
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
-    for_ (toMaybe nullableContainer) \container -> do
+    for_ nullableContainer \container -> do
         element <- render (htmlDocumentToDocument doc) scene
         appendChild element (elementToNode container)
 
 
 scene :: Element
 scene =
-    flow down elements
+    flow down (fromFoldable elements)
 
 
-elements :: List Element
+elements :: NonEmpty Array Element
 elements =
     map makeExample expectations
 
@@ -68,34 +69,33 @@ type Expectation =
     }
 
 
-expectations :: List Expectation
+expectations :: NonEmpty Array Expectation
 expectations =
-    ( helloWorld
-    : testLink
-    : testEmpty
-    : testWidthOfHeightOfSizeOf
-    : testHeight
-    : testSize
-    : testWidth
-    : testOpacity
-    : testTag
-    : testColor
-    : testImage
-    : testFittedImage
-    : testTiledImage
-    : testCroppedImage
-    : testCroppedImage2
-    : testTextAlignment
-    : testShow
-    : testContainer
-    : testAbove
-    : testBelow
-    : testBeside
-    : testLayers
-    : testPositions
-    : testBigPositions
-    : testFlowDirections
-    )
+    NonEmpty helloWorld $
+        [ testLink
+        , testEmpty
+        , testWidthOfHeightOfSizeOf
+        , testHeight
+        , testSize
+        , testWidth
+        , testOpacity
+        , testTag
+        , testColor
+        , testImage
+        , testFittedImage
+        , testTiledImage
+        , testCroppedImage
+        , testCroppedImage2
+        , testTextAlignment
+        , testShow
+        , testContainer
+        , testAbove
+        , testBelow
+        , testBeside
+        , testLayers
+        , testPositions
+        , testBigPositions
+        ] <> testFlowDirections
 
 
 title :: String -> Element
@@ -398,71 +398,70 @@ testBigPositions =
 
 
 -- The background-color doesn't show up in all of these -- it seems to be a JSDOM problem.
-testFlowDirections :: List Expectation
+testFlowDirections :: Array Expectation
 testFlowDirections =
-    ( { title: "25. flow down (red, blue, yellow)"
+    [ { title: "25. flow down (red, blue, yellow)"
       , elements: [ flow down (smallRedBox : smallBlueBox : smallYellowBox : Nil) ]
       , expected: Just $
-            "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
-                "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
-                "</div>" <>
-            "</div>"
+              "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
+                  "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
+                  "</div>" <>
+              "</div>"
       }
-    : { title: "26. flow up (red, blue, yellow)"
+    , { title: "26. flow up (red, blue, yellow)"
       , elements: [ flow up (smallRedBox : smallBlueBox : smallYellowBox : Nil) ]
       , expected: Just $
-            "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
-                "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
-                "</div>" <>
-            "</div>"
+              "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
+                  "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 60px;\">" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px;\"></div>" <>
+                  "</div>" <>
+              "</div>"
       }
-    : { title: "27. flow left (red, blue, yellow)"
+    , { title: "27. flow left (red, blue, yellow)"
       , elements: [ flow left (smallRedBox : smallBlueBox : smallYellowBox : Nil) ]
       , expected: Just $
-            "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
-                "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
-                "</div>" <>
-            "</div>"
+              "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
+                  "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
+                  "</div>" <>
+              "</div>"
       }
-    : { title: "28. flow right (red, blue, yellow)"
+    , { title: "28. flow right (red, blue, yellow)"
       , elements: [ flow right (smallRedBox : smallBlueBox : smallYellowBox : Nil) ]
       , expected: Just $
-            "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
-                "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
-                "</div>" <>
-            "</div>"
+              "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
+                  "<div style=\"padding: 0px; margin: 0px; width: 60px; height: 20px;\">" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; float: left;\"></div>" <>
+                  "</div>" <>
+              "</div>"
       }
-    : { title: "29. flow outward (big blue, red)"
+    , { title: "29. flow outward (big blue, red)"
       , elements: [ flow outward (bigBlueBox : smallRedBox : Nil) ]
       , expected: Just $
-            "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px;\">" <>
-                "<div style=\"padding: 0px; margin: 0px; pointer-events: none; width: 40px; height: 40px;\">" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px; position: absolute;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; position: absolute;\"></div>" <>
-                "</div>" <>
-            "</div>"
+              "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px;\">" <>
+                  "<div style=\"padding: 0px; margin: 0px; pointer-events: none; width: 40px; height: 40px;\">" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px; position: absolute;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; position: absolute;\"></div>" <>
+                  "</div>" <>
+              "</div>"
       }
-    : { title: "30. flow inward (red, big blue) -- so, the same as above"
+    , { title: "30. flow inward (red, big blue) -- so, the same as above"
       , elements: [ flow inward (smallRedBox : bigBlueBox : Nil) ]
       , expected: Just $
-            "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px;\">" <>
-                "<div style=\"padding: 0px; margin: 0px; pointer-events: none; width: 40px; height: 40px;\">" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px; position: absolute;\"></div>" <>
-                    "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; position: absolute;\"></div>" <>
-                "</div>" <>
-            "</div>"
+              "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px;\">" <>
+                  "<div style=\"padding: 0px; margin: 0px; pointer-events: none; width: 40px; height: 40px;\">" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 40px; height: 40px; position: absolute;\"></div>" <>
+                      "<div style=\"padding: 0px; margin: 0px; width: 20px; height: 20px; position: absolute;\"></div>" <>
+                  "</div>" <>
+              "</div>"
       }
-    : Nil
-    )
+    ]

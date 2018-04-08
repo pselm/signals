@@ -104,7 +104,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Exists (Exists, runExists, mkExists)
 import Unsafe.Coerce (unsafeCoerce)
 import Graphics.Canvas (CANVAS)
-import Prelude (Unit, bind, pure, unit, not, void, ($), (#), (<$>), (<#>), (/=))
+import Prelude (Unit, bind, discard, pure, unit, not, void, ($), (#), (<$>), (<#>), (/=))
 
 
 -- | A `Renderable` is somethng that knows how to render some data type as a DOM
@@ -290,7 +290,6 @@ documentForNode node =
     -- The unsafeCoerce should be safe, because if `ownerDocument`
     -- returns null, then the node itself must be the document.
     ownerDocument node
-        <#> toMaybe
         <#> fromMaybe (unsafeCoerce node)
 
 
@@ -310,27 +309,28 @@ renderIntoDOM position node value = do
     document <- documentForNode node
     result <- render document value
 
-    case position of
-        BeforeFirstChild -> do
-            existingChild <- firstChild node
+    _ <-
+        case position of
+            BeforeFirstChild -> do
+                existingChild <- firstChild node
 
-            case toMaybe existingChild of
-                Just child ->
-                    insertBefore result child node
+                case existingChild of
+                    Just child ->
+                        insertBefore result child node
 
-                Nothing ->
-                    appendChild result node
+                    Nothing ->
+                        appendChild result node
 
-        AfterLastChild ->
-            appendChild result node
+            AfterLastChild ->
+                appendChild result node
 
-        ReplacingChildren -> do
-            removeChildren node
-            appendChild result node
+            ReplacingChildren -> do
+                removeChildren node
+                appendChild result node
 
-        ReplacingItself -> do
-            replaceNode node result
-            pure node
+            ReplacingItself -> do
+                replaceNode node result
+                pure node
 
     pure { value, result, document }
 
@@ -340,9 +340,9 @@ removeChildren parent =
     untilE do
         child <- firstChild parent
 
-        case toMaybe child of
+        case child of
             Just c -> do
-                removeChild c parent
+                void $ removeChild c parent
                 pure false
 
             Nothing ->
@@ -353,7 +353,7 @@ replaceNode :: ∀ e. Node -> Node -> Eff (canvas :: CANVAS, dom :: DOM | e) Uni
 replaceNode old new = do
     parent <- parentNode old
 
-    case toMaybe parent of
+    case parent of
         Just p ->
             void $ replaceChild new old p
 
@@ -398,7 +398,7 @@ renderOrUpdate element renderable = do
         toMaybe <$> getRenderable element
 
     node <-
-        toMaybe <$> firstChild (elementToNode element)
+        firstChild (elementToNode element)
 
     case {old, node} of
         { old: Just value
@@ -406,11 +406,11 @@ renderOrUpdate element renderable = do
         } -> do
             -- We've got both an old value and a child, so try an update
             document <- documentForNode result
-            updateDOM {value, result, document} new
+            void $ updateDOM {value, result, document} new
 
         _ ->
             -- Otherwise, we need a render
-            renderIntoDOM ReplacingChildren (elementToNode element) new
+            void $ renderIntoDOM ReplacingChildren (elementToNode element) new
 
     -- In either case, remember the anyRenderable
     setRenderable element new

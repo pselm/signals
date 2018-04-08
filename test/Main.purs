@@ -1,6 +1,5 @@
 module Test.Main where
 
-import Test.Unit (TIMER)
 import Test.Unit.Main (runTest)
 import Test.Unit.Console (TESTOUTPUT)
 
@@ -25,15 +24,14 @@ import Test.Elm.SignalTest as SignalTest
 import Test.Elm.VirtualDomTest as VirtualDomTest
 import Test.Elm.Graphics.StaticElementTest as StaticElementTest
 
-import Prelude (Unit, bind)
+import Prelude (Unit, bind, discard)
 
 
 main :: Eff
     ( testOutput :: TESTOUTPUT
     , avar :: AVAR
-    , timer :: TIMER
     , random :: RANDOM
-    , err :: EXCEPTION
+    , exception :: EXCEPTION
     , console :: CONSOLE
     , ref :: REF
     , delay :: DELAY

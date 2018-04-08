@@ -4,18 +4,19 @@ import Test.Unit (TestSuite, Test, suite, test)
 import Test.Unit.Assert (equal)
 
 import Elm.Task
-import Prelude (flip, bind, class Eq, class Show, ($), (+), (<$>), (<>), show, Unit)
+import Prelude (flip, bind, discard, class Eq, class Show, ($), (+), (<$>), (<>), (>>>), show, pure, Unit)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Elm.Result (Result(..))
 import Data.List (List(..), (:))
 import Control.Monad.Eff (Eff)
+import Control.Monad.Aff (nonCanceler)
 import Math (sqrt)
 
 
 infixl 9 equals as ===
 
-equals :: forall a e. (Eq a, Show a) => a -> a -> Test e
+equals :: forall a e. Eq a => Show a => a -> a -> Test e
 equals = flip equal
 
 
@@ -38,13 +39,11 @@ no :: Task String String
 no = fail "No"
 
 
-foreign import _evenAfter50 :: forall e. (String -> Eff e Unit) -> (Int -> Eff e Unit) -> Int -> Eff e Unit
+foreign import _evenAfter50 :: ∀ e. Int -> EffFnTask e String Int
 
-evenAfter50 :: Int -> Task String Int
-evenAfter50 int =
-    makeTask (\error success ->
-        _evenAfter50 error success int
-    )
+evenAfter50 :: ∀ e. Int -> TaskE e String Int
+evenAfter50 =
+    _evenAfter50 >>> fromEffFnTask
 
 
 tests :: forall e. TestSuite e
@@ -250,7 +249,7 @@ tests = suite "Elm.Task" do
     test "Task.spawn" do
         -- Not really testing the spawning as such ...
         task <- toAff do
-            spawn (succeed 17)
+            _ <- spawn (succeed 17)
             succeed 14
 
         task === Right 14 :: Either String Int
@@ -264,11 +263,20 @@ tests = suite "Elm.Task" do
         task === Right 42 :: Either String Int
 
     test "Task.makeTask" do
-        errorTask <- toAff do makeTask (\error success -> error "No")
+        errorTask <-
+            toAff $
+                makeTask \cb -> do
+                    cb $ Right $ Left "No"
+                    pure nonCanceler
         errorTask === Left "No" :: Either String Int
 
-        successTask <- toAff do makeTask (\error success -> success 42)
+        successTask <-
+            toAff $
+                makeTask \cb -> do
+                    cb $ Right $ Right $ 42
+                    pure nonCanceler
         successTask === Right 42 :: Either String Int
+
 
     test "Task FFI" do
         success <- toAff do evenAfter50 12

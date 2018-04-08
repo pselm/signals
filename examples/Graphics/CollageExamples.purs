@@ -18,6 +18,7 @@ import Math (sin, cos)
 import Data.List (List(..), (..), (:), toUnfoldable)
 import Data.Tuple (Tuple(..))
 import Data.Int (toNumber)
+import Data.NonEmpty (NonEmpty(..))
 
 import DOM.Renderable (class Renderable, render)
 import DOM.Node.Types (elementToNode, textToNode)
@@ -25,7 +26,7 @@ import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Element (setAttribute)
 import DOM.Node.Node (appendChild)
 
-import Prelude (bind, pure, unit, (>>=), ($), (<$>), negate, (/=), (#), (*), map)
+import Prelude (bind, discard, pure, void, unit, (>>=), ($), (<$>), negate, (/=), (#), (*), map)
 
 
 newtype Example = Example
@@ -48,43 +49,43 @@ instance renderableExample :: Renderable Example where
         setStyle "border" "1px solid blue" column3
         setStyle "border" "1px solid blue" column4
 
-        appendChild (elementToNode column1) row
-        appendChild (elementToNode column2) row
-        appendChild (elementToNode column3) row
-        appendChild (elementToNode column4) row
+        void $ appendChild (elementToNode column1) row
+        void $ appendChild (elementToNode column2) row
+        void $ appendChild (elementToNode column3) row
+        void $ appendChild (elementToNode column4) row
 
         caption <- elementToNode <$> createElement "pre" doc
         text <- textToNode <$> createTextNode example.caption doc
-        appendChild text caption
-        appendChild caption (elementToNode column1)
+        void $ appendChild text caption
+        void $ appendChild caption (elementToNode column1)
 
         collage <- render doc example.collage
-        appendChild collage (elementToNode column2)
+        void $ appendChild collage (elementToNode column2)
 
         when (example.reference /= "") do
             image <- createElement "img" doc
             setAttribute "src" example.reference image
-            appendChild (elementToNode image) (elementToNode column3)
+            void $ appendChild (elementToNode image) (elementToNode column3)
 
             setStyle "background-color" "black" column4
 
             mixed <- createElement "div" doc
             setStyle "position" "relative" mixed
             setStyle "isolation" "isolate" mixed
-            appendChild (elementToNode mixed) (elementToNode column4)
+            void $ appendChild (elementToNode mixed) (elementToNode column4)
 
             -- This one is just to take up space ...
             image2 <- createElement "img" doc
             setAttribute "src" example.reference image2
             setAttribute "visibility" "hidden" image2
-            appendChild (elementToNode image2) (elementToNode column4)
+            void $ appendChild (elementToNode image2) (elementToNode column4)
 
             image3 <- createElement "img" doc
             setAttribute "src" example.reference image3
             setStyle "position" "absolute" image3
             setStyle "left" "0px" image3
             setStyle "top" "0px" image3
-            appendChild (elementToNode image3) (elementToNode mixed)
+            void $ appendChild (elementToNode image3) (elementToNode mixed)
 
             collage2 <- render doc example.collage
             div <- createElement "div" doc
@@ -92,8 +93,8 @@ instance renderableExample :: Renderable Example where
             setStyle "left" "0px" div
             setStyle "top" "0px" div
             setStyle "mix-blend-mode" "difference" div
-            appendChild collage2 (elementToNode div)
-            appendChild (elementToNode div) (elementToNode mixed)
+            void $ appendChild collage2 (elementToNode div)
+            void $ appendChild (elementToNode div) (elementToNode mixed)
 
             pure unit
 
@@ -110,27 +111,22 @@ instance renderableExample :: Renderable Example where
 
 instance arbitraryExample :: Arbitrary Example where
     arbitrary =
-        case examples of
-            Cons head tail ->
-                elements head (toUnfoldable tail)
-
-            Nil ->
-                pure example1
+        elements examples
 
 
-examples :: List Example
+examples :: NonEmpty Array Example
 examples =
-    ( example1 : example2 : example3 : example4 : example5 : example6
-    : example7 : example8 : example9 : example10
-    : example15 : example16 : example17 : example18
-    : example19 : example20 : example21 : example22 : example23 : example24
-    : example25 : example26 : example27 : example28 : example29
-    : Nil
-    )
+    NonEmpty example1
+        [ example2, example3, example4, example5, example6
+        , example7, example8, example9, example10
+        , example15, example16, example17, example18
+        , example19, example20, example21, example22, example23, example24
+        , example25, example26, example27, example28, example29
+        ]
 
 
 -- | Just pull the collages themselves out of the example
-collages :: List Collage
+collages :: NonEmpty Array Collage
 collages =
     examples #
         map \(Example example) ->
