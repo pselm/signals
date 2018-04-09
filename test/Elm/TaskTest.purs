@@ -282,6 +282,6 @@ tests = suite "Elm.Task" do
         success === Right 12 :: Either String Int
 
         failure <- toAff do evenAfter50 13
-        failure === Left "Not even"
+        failure === Left "Not even or divisible by 3"
 
 
