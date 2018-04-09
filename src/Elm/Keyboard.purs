@@ -16,22 +16,23 @@ module Elm.Keyboard
 import Elm.Basics (Bool)
 import Elm.Signal (DELAY, Signal, GraphState, Graph, foldp, map, dropRepeats, Mailbox, mailbox, send, mergeMany)
 
-import Data.Foreign (toForeign)
-import Data.Foreign.Class (readProp)
+import Data.Foreign (toForeign, readBoolean, readInt)
+import Data.Foreign.Index (readProp)
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.Set (Set, insert, delete, member)
 import Data.Set (empty) as Set
 
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
-import Control.Monad.Reader.Class (reader)
+import Control.Monad.Reader.Class (asks)
 import Control.Monad.State.Trans (StateT)
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE, errorShow)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Now (NOW)
+import Control.Monad.Except (runExcept)
 
 import DOM (DOM)
 import DOM.HTML (window)
@@ -41,7 +42,7 @@ import DOM.HTML.Event.EventTypes (blur, keypress, keydown, keyup)
 import DOM.Event.Types (EventType, Event)
 import DOM.Event.EventTarget (eventListener, addEventListener)
 
-import Prelude (class Eq, Unit, unit, bind, ($), const, pure, (>>=), (-), (&&), (==), class Show, show, (<>))
+import Prelude (class Eq, Unit, unit, bind, discard, ($), const, pure, (>>=), (-), (&&), (==), class Show, show, (<>))
 
 
 -- | The Keyboard API uses some hidden state, managed by this type.
@@ -140,7 +141,7 @@ arrows ::
     Keyboard m (Signal XY)
 
 arrows = do
-    kd <- reader _.keysDown
+    kd <- asks _.keysDown
     lift $
         dropMap
             (toXY {up: 38, down: 40, left: 37, right: 39})
@@ -154,7 +155,7 @@ wasd ::
     Keyboard m (Signal XY)
 
 wasd = do
-    kd <- reader _.keysDown
+    kd <- asks _.keysDown
     lift $
         dropMap
             (toXY {up: 87, down: 83, left: 65, right: 68})
@@ -167,14 +168,14 @@ isDown ::
     KeyCode -> Keyboard m (Signal Bool)
 
 isDown keyCode = do
-    kd <- reader _.keysDown
+    kd <- asks _.keysDown
     lift $ dropMap (member keyCode) kd
 
 
 -- | Whether the alt key is pressed.
 alt :: ∀ e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
 alt = do
-    model <- reader _.model
+    model <- asks _.model
     lift $ dropMap _.alt model
 
 
@@ -188,7 +189,7 @@ ctrl = isDown 17
 -- | The meta key is the Windows key on Windows and the Command key on Mac.
 meta :: ∀ e m. (MonadEff (ref :: REF | e) m) => Keyboard m (Signal Bool)
 meta = do
-    model <- reader _.model
+    model <- asks _.model
     lift $ dropMap _.meta model
 
 
@@ -209,7 +210,7 @@ enter = isDown 13
 
 -- | Set of keys that are currently down.
 keysDown :: ∀ e m. (MonadEff (ref :: REF | e) m) =>  Keyboard m (Signal (Set KeyCode))
-keysDown = reader _.keysDown
+keysDown = asks _.keysDown
 
 
 -- | The latest key that has been pressed.
@@ -297,7 +298,7 @@ rawEvents = do
 
 
 dropMap ::
-    ∀ e m a b. (MonadEff (ref :: REF | e) m, Eq b) =>
+    ∀ e m a b. MonadEff (ref :: REF | e) m => Eq b =>
     (a -> b) -> Signal a -> GraphState m (Signal b)
 
 dropMap func signal =
@@ -320,9 +321,9 @@ keyListener mbox event = do
         eventInfo = do
             let foreignEvent = toForeign event
 
-            altProp <- readProp "altKey" foreignEvent
-            metaProp <- readProp "metaKey" foreignEvent
-            keyCodeProp <- readProp "keyCode" foreignEvent
+            altProp <- readProp "altKey" foreignEvent >>= readBoolean
+            metaProp <- readProp "metaKey" foreignEvent >>= readBoolean
+            keyCodeProp <- readProp "keyCode" foreignEvent >>= readInt
 
             pure
                 { alt: altProp
@@ -330,7 +331,7 @@ keyListener mbox event = do
                 , keyCode: keyCodeProp
                 }
 
-    case eventInfo of
+    case runExcept eventInfo of
         Right info ->
             send mbox.address info
 

@@ -32,7 +32,7 @@ import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Foldable (for_)
-import Data.Traversable (traverse)
+import Data.Traversable (traverse_)
 import Data.Nullable (toMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Bifunctor (bimap)
@@ -55,7 +55,7 @@ import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
 import Control.Monad.State.Trans (StateT, evalStateT)
 import Control.Monad.State.Class (gets, modify)
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
-import Control.Monad.Reader.Class (reader)
+import Control.Monad.Reader.Class (asks)
 import Control.Comonad (extract)
 import Control.Monad (when)
 import Control.Bind ((=<<), (>=>))
@@ -66,12 +66,12 @@ import Graphics.Canvas
     ( LineCap(..), LineJoin(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore
     , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath, getContext2D
     , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate, save, transform
-    , withImage, createPattern, fill, translate, drawImageFull, setLineJoin, setMiterLimit
+    , tryLoadImage, createPattern, fill, translate, drawImageFull, setLineJoin, setMiterLimit
     ) as Canvas
 
 import Prelude
     ( class Eq, eq, not, (<<<), (>>>), Unit, unit, (||)
-    , bind, (>>=), pure, void
+    , bind, discard, (>>=), pure, void
     , (*), (/), ($), (#), map, (<$>), (<#>), (+), (-), (<>)
     , show, (<), negate, (/=), (==)
     )
@@ -514,7 +514,7 @@ render document model@(Collage {w, h}) = do
     setStyle "width" ((show w) <> "px") div
     setStyle "height" ((show h) <> "px") div
 
-    update true (elementToNode div) model
+    void $ update true (elementToNode div) model
     pure div
 
 
@@ -541,7 +541,7 @@ render document model@(Collage {w, h}) = do
 update :: ∀ e. Boolean -> Node -> Collage -> Eff (dom :: DOM, canvas :: CANVAS | e) Node
 update redoWhenImageLoads parent c@(Collage {forms}) = do
     evalUpdate redoWhenImageLoads parent c $
-        traverse renderForm forms
+        traverse_ renderForm forms
 
     pure parent
 
@@ -612,7 +612,7 @@ evalUpdate redoWhenImageLoads parent c cb = do
 
     current <-
         liftEff $
-            toMaybe <$> firstChild parent
+            firstChild parent
 
     let
         env =
@@ -639,9 +639,9 @@ setStrokeStyle style = do
     ctx <- getContext
 
     liftEff do
-        Canvas.setLineWidth style.width ctx
-        Canvas.setLineCap (lineCap2Canvas style.cap) ctx
-        setLineJoin style.join ctx
+        void $ Canvas.setLineWidth style.width ctx
+        void $ Canvas.setLineCap (lineCap2Canvas style.cap) ctx
+        void $ setLineJoin style.join ctx
         Canvas.setStrokeStyle (toCss style.color) ctx
 
 
@@ -673,7 +673,7 @@ trace closed list = do
     liftEff
         case list of
             Cons (Tuple firstX firstY) rest -> do
-                Canvas.moveTo ctx firstX firstY
+                void $ Canvas.moveTo ctx firstX firstY
 
                 for_ rest \(Tuple nextX nextY) ->
                     Canvas.lineTo ctx nextX nextY
@@ -711,7 +711,7 @@ line style closed pointList = do
                     -- through both the points and the dashes, and each has to give up
                     -- control to the other at certain points. So, probably the right way
                     -- to do this would be with continuations. But that might be overkill.
-                    liftEff $ runST do
+                    liftEff $ void $ runST do
 
                         -- The dashes are basically a list of on/off lengths which we
                         -- want to iterate through, and then go back to the beginning.
@@ -734,7 +734,7 @@ line style closed pointList = do
                         position <- newSTRef firstPoint
 
                         -- First, move to our first point
-                        Canvas.moveTo ctx firstX firstY
+                        void $ Canvas.moveTo ctx firstX firstY
 
                         let
                             -- If we're closed, we add the first point to those remaining
@@ -761,14 +761,14 @@ line style closed pointList = do
                                         -- Aha, we'll complete this point with the current
                                         -- segment. So, first we draw or move, to our
                                         -- destination.
-                                        operation ctx nextX nextY
+                                        void $ operation ctx nextX nextY
 
                                         -- Now, we'll remain with our current segment ... but
                                         -- we've used some of it, so we decrement
-                                        writeSTRef leftInPattern (currentSegment - distance)
+                                        void $ writeSTRef leftInPattern (currentSegment - distance)
 
                                         -- And record our new position
-                                        writeSTRef position (Tuple nextX nextY)
+                                        void $ writeSTRef position (Tuple nextX nextY)
 
                                         -- And, we tell the untilE that we're done with this point,
                                         -- so move to the next destination
@@ -786,14 +786,14 @@ line style closed pointList = do
                                                         (\y -> y + (dy * currentSegment / distance))
 
                                         -- So, actually do the operation
-                                        operation ctx (fst nextPosition) (snd nextPosition)
+                                        void $ operation ctx (fst nextPosition) (snd nextPosition)
 
                                         -- And record our new position
-                                        writeSTRef position nextPosition
+                                        void $ writeSTRef position nextPosition
 
                                         -- Now, we've used up this segment, so we need to flip our
                                         -- drawing state.
-                                        writeSTRef drawing (not currentlyDrawing)
+                                        void $ writeSTRef drawing (not currentlyDrawing)
 
                                         -- And get the next pattern
                                         currentPattern <- readSTRef pattern
@@ -801,8 +801,8 @@ line style closed pointList = do
                                         -- We go down, and if at end back to first
                                         let nextPattern = fromMaybe firstPattern (down currentPattern)
 
-                                        writeSTRef pattern nextPattern
-                                        writeSTRef leftInPattern (toNumber (extract nextPattern))
+                                        void $ writeSTRef pattern nextPattern
+                                        void $ writeSTRef leftInPattern (toNumber (extract nextPattern))
 
                                         -- And, tell the untilE that we're not done with this destination yet
                                         pure false
@@ -812,11 +812,11 @@ line style closed pointList = do
 
                 _ ->
                     -- This the case where we have no dashing, so we can just trace the line
-                    trace closed pointList
+                    void $ trace closed pointList
 
             -- In either event, with or without dashing, we scale and stroke
             liftEff do
-                Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
+                void $ Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
                 Canvas.stroke ctx
 
         _ ->
@@ -826,7 +826,7 @@ line style closed pointList = do
 
 drawLine :: ∀ e. LineStyle -> Boolean -> List Point -> UpdateEffects e Context2D
 drawLine style closed points = do
-    setStrokeStyle style
+    void $ setStrokeStyle style
     line style closed points
 
 
@@ -835,12 +835,12 @@ texture src = do
     ctx <- getContext
 
     liftEff $
-        Canvas.withImage src \source -> do
-            pattern <-
-                Canvas.createPattern source Repeat ctx
+        Canvas.tryLoadImage src \maybeSource ->
+            for_ maybeSource \source -> do
+                pattern <-
+                    Canvas.createPattern source Repeat ctx
 
-            Canvas.setPatternFillStyle pattern ctx
-            pure unit
+                void $ Canvas.setPatternFillStyle pattern ctx
 
     pure unit
             -- redo
@@ -850,11 +850,11 @@ drawShape :: ∀ e. FillStyle -> Boolean -> List Point -> UpdateEffects e Contex
 drawShape style closed points = do
     ctx <- getContext
 
-    liftEff $
+    liftEff $ void $
         Canvas.scale {scaleX: 1.0, scaleY: (-1.0)} ctx
 
-    trace closed points
-    setFillStyle style
+    void $ trace closed points
+    void $ setFillStyle style
 
     liftEff $
         Canvas.fill ctx
@@ -875,7 +875,7 @@ strokeText :: ∀ e. LineStyle -> Text -> UpdateEffects e Context2D
 strokeText style t = do
     ctx <- getContext
 
-    setStrokeStyle style
+    void $ setStrokeStyle style
 
     liftEff do
         when (style.dashing /= Nil) $ void $
@@ -908,7 +908,7 @@ foreign import devicePixelRatio :: ∀ e. Window -> Eff (dom :: DOM | e) Number
 redo :: ∀ e. UpdateEffects e Unit
 redo = do
     env <-
-        reader \(UpdateEnv e) -> e
+        asks \(UpdateEnv e) -> e
 
     when env.redoWhenImageLoads $
         liftEff $
@@ -921,7 +921,7 @@ drawInContext (Form f) cb = do
     ctx <- getContext
 
     liftEff do
-        Canvas.save ctx
+        void $ Canvas.save ctx
 
         when (f.x /= 0.0 || f.y /= 0.0) $ void $
             Canvas.translate
@@ -938,15 +938,15 @@ drawInContext (Form f) cb = do
 
         when (f.alpha /= 1.0) do
             ga <- globalAlpha ctx
-            Canvas.setGlobalAlpha ctx (ga * f.alpha)
+            void $ Canvas.setGlobalAlpha ctx (ga * f.alpha)
             pure unit
 
-        Canvas.beginPath ctx
+        void $ Canvas.beginPath ctx
 
     result <-
         cb
 
-    liftEff $
+    liftEff $ void $
         Canvas.restore ctx
 
     pure result
@@ -963,7 +963,7 @@ getGroupAlpha =
 makeTransform :: ∀ e. {width :: Number, height :: Number} -> Form -> UpdateEffects e String
 makeTransform dim f = do
     c <-
-        reader \(UpdateEnv {collage: Collage c}) ->
+        asks \(UpdateEnv {collage: Collage c}) ->
             c
 
     let
@@ -1013,17 +1013,22 @@ renderForm f@(Form innerForm) = do
 
         FImage w h pos src ->
             drawInContext f do
-                liftEff $ Canvas.withImage src \source -> do
-                    Canvas.scale { scaleX: 1.0, scaleY: (-1.0) } ctx
-                    Canvas.drawImageFull
-                        ctx source
-                        (toNumber pos.top) (toNumber pos.left)
-                        (toNumber w) (toNumber h)
-                        (toNumber (-w) / 2.0) (toNumber (-h) / 2.0)
-                        (toNumber w) (toNumber h)
+                liftEff $
+                    Canvas.tryLoadImage src \maybeSource ->
+                        for_ maybeSource \source -> do
+                            void $ Canvas.scale { scaleX: 1.0, scaleY: (-1.0) } ctx
+                            void $ Canvas.drawImageFull ctx source
+                                (toNumber pos.top)
+                                (toNumber pos.left)
+                                (toNumber w)
+                                (toNumber h)
+                                (toNumber (-w) / 2.0)
+                                (toNumber (-h) / 2.0)
+                                (toNumber w)
+                                (toNumber h)
 
-                    pure unit
-                    -- redo
+                            pure unit
+                            -- redo
                 pure ctx
 
         FShape shapeStyle points ->
@@ -1058,21 +1063,21 @@ renderForm f@(Form innerForm) = do
                                 Just divKid -> do
                                     -- We've got a previous wrapper. Should check for
                                     -- an old renderable ...
-                                    renderIntoDOM ReplacingChildren (elementToNode divKid) renderable
+                                    void $ renderIntoDOM ReplacingChildren (elementToNode divKid) renderable
                                     pure divKid
 
                                 Nothing -> do
                                     -- It wasn't a div, so insert ...
                                     w <- createNode document "div"
-                                    insertBefore (elementToNode w) k parent
-                                    renderIntoDOM AfterLastChild (elementToNode w) renderable
+                                    void $ insertBefore (elementToNode w) k parent
+                                    void $ renderIntoDOM AfterLastChild (elementToNode w) renderable
                                     pure w
 
                         Nothing -> do
                             -- There were no more children, so append
                             w <- createNode document "div"
-                            appendChild (elementToNode w) parent
-                            renderIntoDOM AfterLastChild (elementToNode w) renderable
+                            void $ appendChild (elementToNode w) parent
+                            void $ renderIntoDOM AfterLastChild (elementToNode w) renderable
                             pure w
 
             dim <-
@@ -1127,23 +1132,24 @@ renderForm f@(Form innerForm) = do
 
             -- Then we save our context and actually apply the alpha and transform
             liftEff do
-                Canvas.save ctx
-                Canvas.transform trans ctx
-                Canvas.setGlobalAlpha ctx groupAlpha
+                void $ Canvas.save ctx
+                void $ Canvas.transform trans ctx
+                void $ Canvas.setGlobalAlpha ctx groupAlpha
 
             -- Now, traverse the forms and render them. Isn't this fun? The original
             -- Javascript code actually does something clever here to avoid the recursion.
             -- But I think I'll try the recursive version first and see if it causes any
             -- trouble. You wouldn't think that FGruops would go so deep as to exhaust
             -- the function stack.
-            traverse renderForm forms
+            traverse_ renderForm forms
 
             -- So, we've rendered our forms, and possibly their sub-forms, and the
             -- sub-forms' sub-forms, and the sub-forms' sub-forms' sub-forms, and
             -- the sub-forms' sub-forms' sub-forms' sub-forms, and so on. So, it's
             -- time to restore the context, and pop the stuff off the stack of
             -- groupSettings.
-            liftEff (Canvas.restore ctx)
+            liftEff $ void $
+                Canvas.restore ctx
 
             popStuffOffTheStackOfGroupSettings
 
@@ -1181,7 +1187,7 @@ makeCanvas = do
         setStyle "display" "block" canvas
         setStyle "position" "absolute" canvas
 
-    setCanvasProps canvas
+    void $ setCanvasProps canvas
 
     -- The unsafeCoerce should be fine, since we just created it and we know it's a canvas ...
     pure $
@@ -1191,15 +1197,15 @@ makeCanvas = do
 setCanvasProps :: ∀ e. DOM.Element -> UpdateEffects e DOM.Element
 setCanvasProps canvas = do
     env <-
-        reader \(UpdateEnv {devicePixelRatio, collage: Collage collage}) ->
-            {devicePixelRatio, collage}
+        asks \(UpdateEnv {devicePixelRatio: dpr, collage: Collage coll}) ->
+            {dpr, coll}
 
     liftEff do
-        setStyle "width" ((show env.collage.w) <> "px") canvas
-        setStyle "height" ((show env.collage.h) <> "px") canvas
+        setStyle "width" ((show env.coll.w) <> "px") canvas
+        setStyle "height" ((show env.coll.h) <> "px") canvas
 
-        setAttribute "width" (show $ (toNumber env.collage.w) * env.devicePixelRatio) canvas
-        setAttribute "height" (show $ (toNumber env.collage.h) * env.devicePixelRatio) canvas
+        setAttribute "width" (show $ (toNumber env.coll.w) * env.dpr) canvas
+        setAttribute "height" (show $ (toNumber env.coll.h) * env.dpr) canvas
 
     pure canvas
 
@@ -1248,7 +1254,7 @@ moveToNextChild = do
     setNextChild =<<
         case current of
             Just node ->
-                liftEff $ toMaybe <$> nextSibling node
+                liftEff $ nextSibling node
 
             Nothing ->
                 pure Nothing
@@ -1263,13 +1269,13 @@ setNextChild node = do
 
 getDocument :: ∀ e. UpdateEffects e Document
 getDocument =
-    reader \(UpdateEnv env) ->
+    asks \(UpdateEnv env) ->
         env.document
 
 
 getParent :: ∀ e. UpdateEffects e Node
 getParent =
-    reader \(UpdateEnv env) ->
+    asks \(UpdateEnv env) ->
         env.parent
 
 
@@ -1297,7 +1303,7 @@ getContext = do
                             -- so we're now pointing at the next thing.
                             moveToNextChild
 
-                            setCanvasProps $
+                            void $ setCanvasProps $
                                 canvasElementToElement canvas
 
                             ctx <-
@@ -1311,7 +1317,7 @@ getContext = do
                             moveToNextChild
 
                             -- Not a canvas, so remove it.
-                            liftEff $
+                            liftEff $ void $
                                 removeChild node parent
 
                             -- And we recurse. Should figure out how to use purescript-tailrec
@@ -1324,7 +1330,7 @@ getContext = do
                     canvas <- makeCanvas
 
                     ctx <- liftEff do
-                        appendChild (elementToNode (canvasElementToElement canvas)) parent
+                        void $ appendChild (elementToNode (canvasElementToElement canvas)) parent
                         Canvas.getContext2D canvas
 
                     useContext ctx
@@ -1337,8 +1343,8 @@ useContext ctx = do
             s { context = Just ctx }
 
     env <-
-        reader \(UpdateEnv {devicePixelRatio, collage: Collage {w, h}}) ->
-            {devicePixelRatio, w, h}
+        asks \(UpdateEnv {devicePixelRatio: dpr, collage: Collage {w, h}}) ->
+            {dpr, w, h}
 
     groupSettings <-
         gets \(UpdateState state) ->
@@ -1346,17 +1352,17 @@ useContext ctx = do
 
     liftEff do
         -- Start the alpha at 1.0 ... we'll restore the groupSettings below
-        Canvas.setGlobalAlpha ctx 1.0
+        void $ Canvas.setGlobalAlpha ctx 1.0
 
-        Canvas.translate
-            { translateX: (toNumber env.w) / 2.0 * env.devicePixelRatio
-            , translateY: (toNumber env.h) / 2.0 * env.devicePixelRatio
+        void $ Canvas.translate
+            { translateX: (toNumber env.w) / 2.0 * env.dpr
+            , translateY: (toNumber env.h) / 2.0 * env.dpr
             }
             ctx
 
-        Canvas.scale
-            { scaleX: env.devicePixelRatio
-            , scaleY: -env.devicePixelRatio
+        void $ Canvas.scale
+            { scaleX: env.dpr
+            , scaleY: -env.dpr
             }
             ctx
 
@@ -1365,9 +1371,9 @@ useContext ctx = do
             -- we will have done a save in the previous context, and we'll expect
             -- to be able to do restores on the way back out. So, we'll do a save
             -- here before we re-apply each transform.
-            Canvas.save ctx
-            Canvas.transform setting.trans ctx
-            Canvas.setGlobalAlpha ctx setting.alpha
+            void $ Canvas.save ctx
+            void $ Canvas.transform setting.trans ctx
+            void $ Canvas.setGlobalAlpha ctx setting.alpha
 
         pure ctx
 
@@ -1387,13 +1393,13 @@ clearRest = do
     case child of
         Just c -> do
             parent <-
-                reader \(UpdateEnv env) ->
+                asks \(UpdateEnv env) ->
                     env.parent
 
             -- Advance the index before we lose our reference point
             moveToNextChild
 
-            liftEff $
+            liftEff $ void $
                 removeChild c parent
 
             -- And recurse ... should investigate purescript-tailrec

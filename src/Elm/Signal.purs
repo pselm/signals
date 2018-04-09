@@ -42,8 +42,8 @@ import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 
 import Control.Monad (when)
-import Control.Monad.Eff (Eff, foreachE)
-import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
+import Control.Monad.Eff (Eff, kind Effect, foreachE)
+import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef, modifyRef, newRef)
@@ -52,7 +52,7 @@ import Control.Monad.State.Trans (StateT, evalStateT)
 import Control.Monad.State.Class (gets, modify)
 
 import Prelude
-    ( class Eq, class Monad, Unit, unit, ($), (<>), bind, (+)
+    ( class Eq, class Monad, Unit, unit, ($), (<>), bind, discard, (+)
     , pure, (==), (/=), (&&), (||), const, id
     )
 
@@ -449,7 +449,7 @@ output name handler (Signal parent) = do
         notifyKids ts update parentID kid = do
             when update do
                 parentValue <- readRef parent.value
-                unsafeInterleaveEff $ handler parentValue
+                unsafeCoerceEff $ handler parentValue
             pure unit
 
         node =
@@ -937,7 +937,7 @@ sampleOn (Signal ticker) (Signal parent) = do
 -- |     --  numbers => 0 0 3 3 5 5 5 4 ...
 -- |     --  noDups  => 0   3   5     4 ...
 dropRepeats ::
-    forall e m a. (MonadEff (ref :: REF | e) m, Eq a) =>
+    forall e m a. MonadEff (ref :: REF | e) m => Eq a =>
     Signal a -> GraphState m (Signal a)
 
 dropRepeats (Signal parent) = do
@@ -1256,7 +1256,7 @@ when running tests. It turned out that purescript-test-unit and
 purescript-timers both use a `timer` effect, but specify a different type for
 it. So, I think that was causing the problem.
 -}
-foreign import data DELAY :: !
+foreign import data DELAY :: Effect
 
 foreign import delay :: forall eff a.
     Int ->

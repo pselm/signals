@@ -3,18 +3,22 @@
 
 // module Test.Elm.TaskTest
 
-exports._evenAfter50 = function (error) {
-    return function (success) {
-        return function (int) {
-            return function () {
-                setTimeout(function () {
-                    if (int % 2 === 0) {
-                        success(int)();
-                    } else {
-                        error("Not even")();
-                    }
-                }, 50);
+exports._evenAfter50 = function (int) {
+    return function (onException, onError, onSuccess) {
+        setTimeout(function () {
+            try {
+                if (int % 2 === 0) {
+                    onSuccess(int);
+                } else if (int % 3 === 0) {
+                    throw(new Error("Divisible by 3"));
+                } else {
+                    onError("Not even or divisible by 3");
+                }
             }
-        }
+            catch (ex) {
+                onException(ex);
+            }
+        }, 50);
     }
 };
+

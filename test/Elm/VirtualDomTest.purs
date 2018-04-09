@@ -18,23 +18,22 @@ import DOM.Node.Types (Element, ElementId(..), documentToNonElementParentNode, e
 
 import Elm.Json.Encode as Json
 import Graphics.Canvas (CANVAS)
-import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.List (List(..), (:), toUnfoldable)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (traverse_)
-import Data.Either (Either(..))
+import Data.NonEmpty (NonEmpty(..))
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Random (RANDOM)
-import Control.Monad.Rec.Class (tailRecM3)
+import Control.Monad.Rec.Class (Step(..), tailRecM3)
 import Partial.Unsafe (unsafePartial, unsafeCrashWith)
 
-import Prelude (class Show, class Eq, flip, bind, ($), (<>), show, (<#>), (>>>), pure, unit, (<=), (==), (/=), (-))
+import Prelude (class Show, class Eq, flip, bind, discard, void, ($), (<>), show, pure, unit, (<=), (==), (/=), (-))
 
 
 infixl 9 equals as ===
 
-equals :: forall a e. (Eq a, Show a) => a -> a -> Test e
+equals :: forall a e. Eq a => Show a => a -> a -> Test e
 equals = flip equal
 
 
@@ -59,7 +58,7 @@ withContainer callback = do
             getElementById (ElementId "contents") (documentToNonElementParentNode doc)
 
     -- Should be safe, because the HTML is just above
-    unsafePartial (callback (fromJust (toMaybe node)))
+    unsafePartial (callback (fromJust node))
 
 
 tests :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
@@ -125,7 +124,7 @@ runFor container =
     tailRecM3 \remaining genState previous ->
         if remaining <= 0
             then
-                pure $ Right unit
+                pure $ Done unit
 
             else do
                 let
@@ -134,7 +133,7 @@ runFor container =
 
                 makeUpdateTest container remaining (fst state) previous
 
-                pure $ Left
+                pure $ Loop
                     { a: remaining - 1
                     , b: snd state
                     , c: Just (fst state)
@@ -177,7 +176,7 @@ makeStaticTest (NodeTest nodeTest) =
         container <-
             liftEff $
                 withContainer \c -> do
-                    renderIntoDOM ReplacingChildren (elementToNode c) nodeTest.node
+                    void $ renderIntoDOM ReplacingChildren (elementToNode c) nodeTest.node
                     pure c
 
         result <-
@@ -200,7 +199,7 @@ instance arbitraryNodeTest :: Arbitrary (NodeTest msg) where
     arbitrary =
         case nodeTests of
             Cons first rest ->
-                elements first (toUnfoldable rest)
+                elements $ NonEmpty first (toUnfoldable rest)
 
             _ ->
                 unsafeCrashWith "Can't get here, because it's not an empty list"

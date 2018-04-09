@@ -14,11 +14,10 @@ import DOM.Node.Types (elementToNode, ElementId(..))
 import DOM.Node.Node (appendChild)
 import Graphics.Canvas (CANVAS)
 
-import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
 
-import Prelude (bind, Unit, (>>=), ($), (<>), (<$>))
+import Prelude (bind, Unit, (>>=))
 
 
 main :: Eff (canvas :: CANVAS, dom :: DOM) Unit
@@ -29,7 +28,7 @@ main = do
     nullableContainer <-
         getElementById (ElementId "contents") (htmlDocumentToNonElementParentNode doc)
 
-    for_ (toMaybe nullableContainer) \container -> do
+    for_ nullableContainer \container -> do
         element <- render (htmlDocumentToDocument doc) scene
         appendChild element (elementToNode container)
 

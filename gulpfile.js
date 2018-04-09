@@ -112,7 +112,7 @@ bundles.map(function (bundle) {
     var bundleName = "bundle-" + bundle.module;
 
     gulp.task(bundleName, ["make"], function () {
-        return purescript.pscBundle({
+        return purescript.bundle({
             src: "output/**/*.js",
             output: output(bundle.module),
             module: bundle.module,
@@ -140,14 +140,14 @@ gulp.task("bundle", bundles.map(function (bundle) {
 gulp.task("test", ["Test.Main"]);
 
 gulp.task("make", function () {
-    return purescript.psc({
+    return purescript.compile({
         src: sources,
         ffi: foreigns
     });
 });
 
 gulp.task("docs", ["make"], function () {
-    return purescript.pscDocs({
+    return purescript.docs({
         src: sources,
         format: "markdown",
         docgen: {

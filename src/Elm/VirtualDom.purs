@@ -24,7 +24,9 @@ import Elm.Graphics.Internal
 
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import Control.Monad.Eff (Eff, runPure, forE)
-import Control.Monad.Rec.Class (tailRecM2)
+import Control.Monad.Except.Trans (runExceptT)
+import Control.Comonad (extract)
+import Control.Monad.Rec.Class (Step(..), tailRecM2)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad (when, unless, (>=>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -32,20 +34,19 @@ import Partial.Unsafe (unsafeCrashWith)
 
 import Data.Array (null) as Array
 import Data.Tuple (Tuple(..))
-import Data.List (List(..), length, reverse, singleton, snoc, drop, zip, (:))
+import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, singleton, null) as List
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Foldable (class Foldable, foldl, for_)
 import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
-import Data.StrMap.ST.Unsafe (unsafeGet)
+import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Exists (Exists, mkExists)
 import Data.Foreign (readString)
 import Data.Ord (abs, max)
 import Data.Either (Either(..))
 import Data.Lazy (Lazy, defer)
-import Data.Nullable (toNullable, toMaybe)
 
 import DOM (DOM)
 import DOM.Node.NodeList (item)
@@ -62,15 +63,15 @@ import Prelude
     ( class Eq, (==), (/=), (<), (>), not, (||)
     , class Show, show, (<>)
     , Unit, unit, void
-    , flip, ($), (#), const, (>>>), (<<<)
-    , class Functor, (<$>), (<#>)
-    , bind, pure, (>>=)
+    , flip, ($), (#), const, (<<<)
+    , class Functor, (<#>)
+    , bind, discard, pure, (>>=)
     , (+), (-), (*)
     )
 
 
 -- Will suggest these for Data.Exists if they work
-foreign import data Exists2 :: (* -> * -> *) -> *
+foreign import data Exists2 :: (Type -> Type -> Type) -> Type
 
 mkExists2 :: ∀ f a b. f a b -> Exists2 f
 mkExists2 = unsafeCoerce
@@ -79,7 +80,7 @@ runExists2 :: ∀ f r. (∀ a b. f a b -> r) -> Exists2 f -> r
 runExists2 = unsafeCoerce
 
 
-foreign import data Exists3 :: (* -> * -> * -> *) -> *
+foreign import data Exists3 :: (Type -> Type -> Type -> Type) -> Type
 
 mkExists3 :: ∀ f a b c. f a b c -> Exists3 f
 mkExists3 = unsafeCoerce
@@ -374,15 +375,15 @@ organizeFacts factList =
                                 Nothing ->
                                     new
 
-                    poke submap key value
-                    poke mutableAttributesNS ns submap
+                    void $ poke submap key value
+                    void $ poke mutableAttributesNS ns submap
 
                 OnEvent key options decoder ->
                     void $ poke mutableEvents key (Tuple options decoder)
 
                 Styles list ->
                     for_ list \(Tuple key value) ->
-                        poke mutableStyles key value
+                        void $ poke mutableStyles key value
 
                 CustomProperty key value ->
                     -- So, the normal case here is that we're setting an arbitrary property
@@ -392,7 +393,7 @@ organizeFacts factList =
                     -- explicit API for namespaced nodes.
                     if key == "namespace"
                         then
-                            case readString value of
+                            case extract $ runExceptT $ readString value of
                                 Left _ ->
                                     -- It wasn't a string, so don't handle specially
                                     void $ poke mutableProperties key value
@@ -408,21 +409,21 @@ organizeFacts factList =
         -- versions would also modify the pure. So, we won't do that ...
         -- The alternative is freezeST, but that actually does a copy, which in
         -- this context isn't really necessary.
-        attributes <- unsafeGet mutableAttributes
-        events <- unsafeGet mutableEvents
-        styles <- unsafeGet mutableStyles
-        properties <- unsafeGet mutableProperties
+        attributes <- unsafeFreeze mutableAttributes
+        events <- unsafeFreeze mutableEvents
+        styles <- unsafeFreeze mutableStyles
+        properties <- unsafeFreeze mutableProperties
 
         -- I also need to iterate over all of the submaps and "freeze" them ...
         -- and then freeze the resulting outer map
-        pureOuterMap <- unsafeGet mutableAttributesNS
+        pureOuterMap <- unsafeFreeze mutableAttributesNS
         accumulator <- new
 
-        foldM (\accum key submap ->
-            unsafeGet submap >>= poke accum key
+        void $ foldM (\accum key submap ->
+            unsafeFreeze submap >>= poke accum key
         ) accumulator pureOuterMap
 
-        attributesNS <- unsafeGet accumulator
+        attributesNS <- unsafeFreeze accumulator
 
         -- And read the namespace
         namespace <- readSTRef mutableNamespace
@@ -555,13 +556,13 @@ lazy func arg =
 
 
 -- | Same as `lazy` but checks on two arguments.
-lazy2 :: ∀ a b msg. (Eq a, Eq b) => (a -> b -> Node msg) -> a -> b -> Node msg
+lazy2 :: ∀ a b msg. Eq a => Eq b => (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2 func arg1 arg2 =
     Thunk2 (mkExists2 (ThunkRecord2 {func, arg1, arg2, lazy: defer \_ -> func arg1 arg2}))
 
 
 -- | Same as `lazy` but checks on three arguments.
-lazy3 :: ∀ a b c msg. (Eq a, Eq b, Eq c) => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
+lazy3 :: ∀ a b c msg. Eq a => Eq b => Eq c => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3 func arg1 arg2 arg3 =
     Thunk3 (mkExists3 (ThunkRecord3 {func, arg1, arg2, arg3, lazy: defer \_ -> func arg1 arg2 arg3}))
 
@@ -680,7 +681,7 @@ render doc vNode eventNode = do
             domNode <-
                 case rec.namespace of
                     Just ns ->
-                        createElementNS (toNullable rec.namespace) rec.tag doc
+                        createElementNS rec.namespace rec.tag doc
 
                     Nothing ->
                         createElement rec.tag doc
@@ -697,7 +698,7 @@ render doc vNode eventNode = do
             domNode <-
                 case rec.namespace of
                     Just ns ->
-                        createElementNS (toNullable rec.namespace) rec.tag doc
+                        createElementNS rec.namespace rec.tag doc
 
                     Nothing ->
                         createElement rec.tag doc
@@ -961,21 +962,21 @@ goSibling =
     tailRecM2 \which domNode ->
         if which == 0
             then
-                pure $ Right domNode
+                pure $ Done domNode
 
             else
                 if which > 0
                     then
                         nextSibling domNode
-                        <#> toMaybe # MaybeT
+                        # MaybeT
                         <#> {a: which - 1, b: _}
-                        <#> Left
+                        <#> Loop
 
                     else
                         previousSibling domNode
-                        <#> toMaybe # MaybeT
+                        # MaybeT
                         <#> {a: which + 1, b: _}
-                        <#> Left
+                        <#> Loop
 
 
 -- Actually do the traversal ..
@@ -984,28 +985,28 @@ performTraversal =
     tailRecM2 \t domNode ->
         case t of
             TRoot ->
-                pure $ Right domNode
+                pure $ Done domNode
 
             TParent x ->
                 if x > 0
                     then
                         parentNode domNode
-                        <#> toMaybe # MaybeT
+                        # MaybeT
                         <#> {a: TParent (x - 1), b: _}
-                        <#> Left
+                        <#> Loop
 
                     else
-                        pure $ Right domNode
+                        pure $ Done domNode
 
             TChild (Cons c cs) ->
                 childNodes domNode
                 >>= item c
-                <#> toMaybe # MaybeT
+                # MaybeT
                 <#> {a: TChild cs, b: _}
-                <#> Left
+                <#> Loop
 
             TChild Nil ->
-                pure $ Right domNode
+                pure $ Done domNode
 
             TSibling s ->
                 let
@@ -1025,7 +1026,7 @@ performTraversal =
                     performTraversal (TParent s.up) domNode
                     >>= sideways
                     <#> {a: TChild s.down, b: _}
-                    <#> Left
+                    <#> Loop
 
 
 -- So, figure out how to move from current to destination.
@@ -1933,11 +1934,10 @@ applyPatch patch domNode = do
         PRemoveLast howMany -> do
             -- There must be a replicateM somewhere I'm forgetting ...
             forE 0 howMany \_ ->
-                lastChild domNode <#> toMaybe >>=
+                lastChild domNode >>=
                     case _ of
                         Just child -> do
-                            removeChild child domNode
-                            pure unit
+                            void $ removeChild child domNode
 
                         Nothing ->
                             pure unit
@@ -2034,7 +2034,7 @@ applyPatch patch domNode = do
 redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 redraw domNode vNode eventNode = do
     document <- documentForNode domNode
-    parentNode <- toMaybe <$> parentNode domNode
+    parentNode <- parentNode domNode
     newNode <- render document vNode eventNode
 
     {-
@@ -2045,7 +2045,7 @@ redraw domNode vNode eventNode = do
 
     case parentNode of
         Just p -> do
-            replaceChild newNode domNode p
+            void $ replaceChild newNode domNode p
             pure newNode
 
         Nothing ->

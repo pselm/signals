@@ -16,33 +16,32 @@
     "output"
   ],
   "dependencies": {
-    "purescript-prelude": "^1.0.0",
-    "purescript-colors": "^1.0.0",
-    "purescript-elm-compat": "git://github.com/rgrempel/purescript-elm-compat#77e4116bd2f17ff2b3828e636c77ddb8ee2dc91f",
-    "purescript-list-zipper": "git://github.com/DavidHarrison/purescript-list-zipper#62517ee248e3e7fcaceb919cb53834271cffb4c0",
-    "purescript-nullable": "^1.0.0",
-    "purescript-refs": "^1.0.0",
-    "purescript-dom": "^1.0.0",
-    "purescript-exists": "^1.0.0",
-    "purescript-format": "^1.0.0",
-    "purescript-timers": "^1.0.0",
-    "purescript-canvas": "^1.0.0",
-    "purescript-unsafe-coerce": "^1.0.0",
-    "purescript-now": "^1.0.0",
-    "purescript-lazy": "^1.0.0",
-    "purescript-arrays": "^1.0.0"
+    "purescript-arrays": "^4.0.0",
+    "purescript-canvas": "^3.0.0",
+    "purescript-colors": "^4.0.0",
+    "purescript-dom": "^4.0.0",
+    "purescript-elm-compat": "^2.0.0",
+    "purescript-exists": "^3.0.0",
+    "purescript-format": "^3.0.0",
+    "purescript-js-timers": "^3.0.0",
+    "purescript-lazy": "^3.0.0",
+    "purescript-list-zipper": "soupi/purescript-list-zipper#^1.0.0",
+    "purescript-now": "^3.0.0",
+    "purescript-nullable": "^3.0.0",
+    "purescript-prelude": "^3.0.0",
+    "purescript-refs": "^3.0.0",
+    "purescript-unsafe-coerce": "^3.0.0"
   },
   "devDependencies": {
-    "purescript-test-unit": "^7.0.0",
-    "purescript-psci-support": "^1.0.0",
-    "purescript-jsdom": "git://github.com/rgrempel/purescript-jsdom#3da4b91e5878ce8a8af8cade726c940bc4eb2615"
+    "purescript-test-unit": "^13.0.0",
+    "purescript-psci-support": "^3.0.0",
+    "purescript-jsdom": "rgrempel/purescript-jsdom#^1.0.0"
   },
   "repository": {
     "type": "git",
     "url": "git://github.com/rgrempel/purescript-elm.git"
   },
   "resolutions": {
-    "purescript-prelude": "^1.0.0",
-    "purescript-eff": "^1.0.0"
+    "purescript-js-date": "^4.0.0"
   }
 }

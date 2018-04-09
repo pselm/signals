@@ -1,11 +1,11 @@
 language: node_js
 dist: trusty
 sudo: required
-node_js: 5
+node_js: 6
 env:
   - PATH=./node_modules/.bin:$PATH
 install:
   - npm install
 script:
-  - pulp build --censor-lib
+  - pulp build -- --censor-lib
   - gulp test

@@ -14,16 +14,15 @@ module Elm.Mouse
 import Elm.Basics (Bool)
 import Elm.Signal (Signal, DELAY, GraphState, Graph, send, mailbox, map)
 
-import Prelude (Unit, pure, ($), bind, unit, const, (<<<), (>>=), (<$>))
-import Data.Nullable (toMaybe)
+import Prelude (Unit, pure, ($), bind, discard, unit, const, (<<<), (>>=), (<$>))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Partial.Unsafe (unsafeCrashWith)
 
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)
-import Control.Monad.Reader.Class (reader)
+import Control.Monad.Reader.Class (asks)
 import Control.Monad.State.Trans (StateT)
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
@@ -111,14 +110,14 @@ setupGlobalMouse cb = do
     node <- liftEff $
         window >>= document >>= body
 
-    case toMaybe node of
+    case node of
         Just n -> setupMouse (htmlElementToEventTarget n) cb
         Nothing -> unsafeCrashWith "No document.body to be found"
 
 
 -- | The current mouse position.
 position :: ∀ e m. (MonadEff (ref :: REF | e) m) => Mouse m (Signal (Tuple Int Int))
-position = reader _.position
+position = asks _.position
 
 
 -- | The current x-coordinate of the mouse.
@@ -138,7 +137,7 @@ isDown :: ∀ e m.
     Mouse m (Signal Bool)
 
 isDown = do
-    node <- reader _.node
+    node <- asks _.node
     mbox <- lift $ mailbox false
 
     let
@@ -165,7 +164,7 @@ clicks :: ∀ e m.
     Mouse m  (Signal Unit)
 
 clicks = do
-    node <- reader _.node
+    node <- asks _.node
     mbox <- lift $ mailbox unit
 
     let

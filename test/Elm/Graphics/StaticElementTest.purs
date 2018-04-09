@@ -16,18 +16,18 @@ import DOM.Node.Node (appendChild)
 import DOM.Node.Document (createElement)
 
 import Graphics.Canvas (CANVAS)
-import Data.List ((:), fromFoldable, filter)
+import Data.List (fromFoldable, filter)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Foldable (for_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 
-import Prelude (class Show, class Eq, flip, bind, (>>=), ($), (#), (<#>), (>>>))
+import Prelude (class Show, class Eq, flip, bind, discard, void, ($), (#))
 
 
 infixl 9 equals as ===
 
-equals :: forall a e. (Eq a, Show a) => a -> a -> Test e
+equals :: forall a e. Eq a => Show a => a -> a -> Test e
 equals = flip equal
 
 
@@ -39,7 +39,7 @@ makeDocument =
 tests :: ∀ e. TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
 tests = do
     suite "Elm.Graphics.StaticElement" $
-        for_ (filter hasExpected expectations) makeTest
+        for_ (filter hasExpected (fromFoldable expectations)) makeTest
 
     where
         hasExpected {expected} =
@@ -60,7 +60,7 @@ makeTest expectation =
             # render document
             # liftEff
 
-        liftEff $ appendChild child (elementToNode wrapper)
+        liftEff $ void $ appendChild child (elementToNode wrapper)
 
         result <-
             liftEff $ innerHtml wrapper
