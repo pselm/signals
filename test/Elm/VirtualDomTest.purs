@@ -18,19 +18,17 @@ import DOM.Node.Types (Element, ElementId(..), documentToNonElementParentNode, e
 
 import Elm.Json.Encode as Json
 import Graphics.Canvas (CANVAS)
-import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.List (List(..), (:), toUnfoldable)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (traverse_)
-import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty(..))
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Random (RANDOM)
 import Control.Monad.Rec.Class (Step(..), tailRecM3)
 import Partial.Unsafe (unsafePartial, unsafeCrashWith)
 
-import Prelude (class Show, class Eq, flip, bind, discard, void, ($), (<>), show, (<#>), (>>>), pure, unit, (<=), (==), (/=), (-))
+import Prelude (class Show, class Eq, flip, bind, discard, void, ($), (<>), show, pure, unit, (<=), (==), (/=), (-))
 
 
 infixl 9 equals as ===

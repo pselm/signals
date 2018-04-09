@@ -16,7 +16,6 @@ import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (ElementId(..), elementToEventTarget)
 import DOM (DOM)
 import Prelude (class Show, show, bind, discard, Unit, (<<<), (<>), ($), (>>=))
-import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafeCrashWith)
 

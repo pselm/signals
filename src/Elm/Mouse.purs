@@ -15,7 +15,6 @@ import Elm.Basics (Bool)
 import Elm.Signal (Signal, DELAY, GraphState, Graph, send, mailbox, map)
 
 import Prelude (Unit, pure, ($), bind, discard, unit, const, (<<<), (>>=), (<$>))
-import Data.Nullable (toMaybe)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Partial.Unsafe (unsafeCrashWith)

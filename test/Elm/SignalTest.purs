@@ -12,9 +12,9 @@ import Data.List ((:), List(..))
 import Data.Time.Duration (Milliseconds(..))
 
 import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (delay) as Aff
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Aff (delay)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Now (NOW)
@@ -30,7 +30,7 @@ equals = flip equal
 
 later :: ∀ e. Aff e Unit -> Aff e Unit
 later doThen = do
-    delay (Milliseconds 1.0)
+    Aff.delay (Milliseconds 1.0)
     doThen
 
 

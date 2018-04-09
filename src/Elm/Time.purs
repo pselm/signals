@@ -32,7 +32,7 @@ import Data.Int (round)
 import Data.DateTime.Instant (unInstant)
 import Data.Maybe (Maybe(..))
 
-import Control.Monad.Eff.Timer (TIMER, TimeoutId, IntervalId, setInterval, clearInterval, setTimeout)
+import Control.Monad.Eff.Timer (TIMER, IntervalId, setInterval, clearInterval, setTimeout)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Now (NOW, now)

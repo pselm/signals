@@ -32,7 +32,7 @@ import Data.List.Zipper (Zipper(..), down)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Foldable (for_)
-import Data.Traversable (traverse, traverse_)
+import Data.Traversable (traverse_)
 import Data.Nullable (toMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Bifunctor (bimap)
@@ -1197,15 +1197,15 @@ makeCanvas = do
 setCanvasProps :: ∀ e. DOM.Element -> UpdateEffects e DOM.Element
 setCanvasProps canvas = do
     env <-
-        asks \(UpdateEnv {devicePixelRatio, collage: Collage collage}) ->
-            {devicePixelRatio, collage}
+        asks \(UpdateEnv {devicePixelRatio: dpr, collage: Collage coll}) ->
+            {dpr, coll}
 
     liftEff do
-        setStyle "width" ((show env.collage.w) <> "px") canvas
-        setStyle "height" ((show env.collage.h) <> "px") canvas
+        setStyle "width" ((show env.coll.w) <> "px") canvas
+        setStyle "height" ((show env.coll.h) <> "px") canvas
 
-        setAttribute "width" (show $ (toNumber env.collage.w) * env.devicePixelRatio) canvas
-        setAttribute "height" (show $ (toNumber env.collage.h) * env.devicePixelRatio) canvas
+        setAttribute "width" (show $ (toNumber env.coll.w) * env.dpr) canvas
+        setAttribute "height" (show $ (toNumber env.coll.h) * env.dpr) canvas
 
     pure canvas
 
@@ -1343,8 +1343,8 @@ useContext ctx = do
             s { context = Just ctx }
 
     env <-
-        asks \(UpdateEnv {devicePixelRatio, collage: Collage {w, h}}) ->
-            {devicePixelRatio, w, h}
+        asks \(UpdateEnv {devicePixelRatio: dpr, collage: Collage {w, h}}) ->
+            {dpr, w, h}
 
     groupSettings <-
         gets \(UpdateState state) ->
@@ -1355,14 +1355,14 @@ useContext ctx = do
         void $ Canvas.setGlobalAlpha ctx 1.0
 
         void $ Canvas.translate
-            { translateX: (toNumber env.w) / 2.0 * env.devicePixelRatio
-            , translateY: (toNumber env.h) / 2.0 * env.devicePixelRatio
+            { translateX: (toNumber env.w) / 2.0 * env.dpr
+            , translateY: (toNumber env.h) / 2.0 * env.dpr
             }
             ctx
 
         void $ Canvas.scale
-            { scaleX: env.devicePixelRatio
-            , scaleY: -env.devicePixelRatio
+            { scaleX: env.dpr
+            , scaleY: -env.dpr
             }
             ctx
 

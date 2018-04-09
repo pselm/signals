@@ -16,13 +16,13 @@ import DOM.Node.Node (appendChild)
 import DOM.Node.Document (createElement)
 
 import Graphics.Canvas (CANVAS)
-import Data.List ((:), fromFoldable, filter)
+import Data.List (fromFoldable, filter)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Foldable (for_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 
-import Prelude (class Show, class Eq, flip, bind, discard, void, (>>=), ($), (#), (<#>), (>>>))
+import Prelude (class Show, class Eq, flip, bind, discard, void, ($), (#))
 
 
 infixl 9 equals as ===

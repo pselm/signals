@@ -32,7 +32,7 @@ import Control.Monad.Eff (Eff)
 import Graphics.Canvas (Context2D, CANVAS, CanvasGradient, createLinearGradient, createRadialGradient, addColorStop)
 import Color (Color, graytone, toHSLA, toRGBA, rgba, complementary, cssStringHSLA)
 import Color (hsla) as Color
-import Prelude (class Eq, eq, (==), (&&), ($), (*), (/), bind, discard, (>>=), pure)
+import Prelude (class Eq, eq, (==), (&&), ($), (*), (/), discard, (>>=), pure)
 import Data.Tuple (Tuple(..))
 import Data.Foldable (for_)
 import Elm.Basics (Float, degrees)

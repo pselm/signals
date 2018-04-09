@@ -39,7 +39,7 @@ import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, modifySTRef, runST)
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
 
-import Prelude (class Show, class Semigroup, ($), (<#>), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, discard, pure, negate, void)
+import Prelude (class Show, class Semigroup, ($), (<>), (==), (>>>), (/), mod, (>), show, map, (+), (-), (>>=), bind, discard, pure, negate, void)
 
 
 -- | Represents styled text. It can be rendered with collages or with elements.

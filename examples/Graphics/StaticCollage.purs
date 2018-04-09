@@ -11,7 +11,6 @@ import Examples.Graphics.CollageExamples (examples)
 
 import Control.Monad.Eff (Eff)
 import Graphics.Canvas (CANVAS)
-import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 
 import DOM (DOM)

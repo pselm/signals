@@ -34,7 +34,6 @@ import Data.List (List(..), null, (:), reverse, length, index)
 import Data.Int (ceil, toNumber)
 import Data.Ord (max)
 import Data.Foldable (maximum, sum, for_)
-import Data.Traversable (for)
 import Data.Nullable (Nullable, toMaybe)
 import Data.String (joinWith)
 import Data.Array (catMaybes)
@@ -1264,8 +1263,8 @@ update document outerNode (Element curr) (Element next) = do
 
                                         for_ kid \k ->
                                             for_ innerOld \old ->
-                                                for_ innerNext \next ->
-                                                    updateAndReplace document k old next >>= goDir
+                                                for_ innerNext \iNext ->
+                                                    updateAndReplace document k old iNext >>= goDir
 
                                     updateProps document innerNode (Element curr) (Element next)
                                     pure outerNode

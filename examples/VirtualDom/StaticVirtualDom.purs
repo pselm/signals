@@ -14,11 +14,10 @@ import DOM.Node.Types (elementToNode, ElementId(..))
 import DOM.Node.Node (appendChild)
 import Graphics.Canvas (CANVAS)
 
-import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
 
-import Prelude (bind, Unit, (>>=), ($), (<>), (<$>))
+import Prelude (bind, Unit, (>>=))
 
 
 main :: Eff (canvas :: CANVAS, dom :: DOM) Unit

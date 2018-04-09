@@ -6,7 +6,7 @@ import Test.Unit.Assert (assert)
 import Elm.Time as Time
 import Elm.Basics ((<|), (==), (*))
 import Data.Time.Duration (Milliseconds(..), Hours(..), Seconds(..), Minutes(..))
-import Prelude (bind, discard, class Eq)
+import Prelude (discard, class Eq)
 
 
 assertEqual :: forall a e. (Eq a) => String -> a -> a -> Test e

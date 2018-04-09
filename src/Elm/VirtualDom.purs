@@ -34,7 +34,7 @@ import Partial.Unsafe (unsafeCrashWith)
 
 import Data.Array (null) as Array
 import Data.Tuple (Tuple(..))
-import Data.List (List(..), length, reverse, singleton, snoc, drop, zip, (:))
+import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, singleton, null) as List
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Foldable (class Foldable, foldl, for_)
@@ -47,7 +47,6 @@ import Data.Foreign (readString)
 import Data.Ord (abs, max)
 import Data.Either (Either(..))
 import Data.Lazy (Lazy, defer)
-import Data.Nullable (toNullable, toMaybe)
 
 import DOM (DOM)
 import DOM.Node.NodeList (item)
@@ -64,8 +63,8 @@ import Prelude
     ( class Eq, (==), (/=), (<), (>), not, (||)
     , class Show, show, (<>)
     , Unit, unit, void
-    , flip, ($), (#), const, (>>>), (<<<)
-    , class Functor, (<$>), (<#>)
+    , flip, ($), (#), const, (<<<)
+    , class Functor, (<#>)
     , bind, discard, pure, (>>=)
     , (+), (-), (*)
     )

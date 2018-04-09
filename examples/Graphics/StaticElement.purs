@@ -20,14 +20,13 @@ import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..))
 import DOM.Node.Node (appendChild)
 
-import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:), fromFoldable)
 import Data.NonEmpty (NonEmpty(..))
 import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..))
 
-import Prelude (bind, discard, Unit, (>>=), ($), (<>), (<$>), map)
+import Prelude (bind, Unit, (>>=), ($), (<>), (<$>), map)
 import Prelude (show) as Prelude
 
 

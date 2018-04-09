@@ -23,7 +23,7 @@ import DOM.Node.Document (createElement)
 import DOM.Node.Types (Document, Element, Node, elementToNode)
 import DOM.Node.NodeType (NodeType(ElementNode))
 import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType, ownerDocument)
-import Data.Nullable (Nullable, toMaybe)
+import Data.Nullable (Nullable)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (either)
 import Data.Foreign (Foreign, toForeign)
@@ -32,7 +32,7 @@ import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Except.Trans (runExceptT)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude (bind, discard, (>>=), (>>>), pure, void, Unit, (<#>), (<$>), ($), const)
+import Prelude (bind, discard, pure, void, Unit, (<#>), (<$>), ($), const)
 
 
 -- Sets the style named in the first param to the value of the second param

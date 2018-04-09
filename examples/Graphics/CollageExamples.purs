@@ -15,7 +15,7 @@ import Control.Monad (when)
 import Test.QuickCheck.Arbitrary (class Arbitrary)
 import Test.QuickCheck.Gen (elements)
 import Math (sin, cos)
-import Data.List (List(..), (..), (:), toUnfoldable)
+import Data.List (List(..), (..), (:))
 import Data.Tuple (Tuple(..))
 import Data.Int (toNumber)
 import Data.NonEmpty (NonEmpty(..))
@@ -26,7 +26,7 @@ import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Element (setAttribute)
 import DOM.Node.Node (appendChild)
 
-import Prelude (bind, discard, pure, void, unit, (>>=), ($), (<$>), negate, (/=), (#), (*), map)
+import Prelude (bind, discard, pure, void, unit, ($), (<$>), negate, (/=), (#), (*), map)
 
 
 newtype Example = Example

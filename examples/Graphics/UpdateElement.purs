@@ -22,7 +22,6 @@ import DOM.Node.ParentNode (firstElementChild) as ParentNode
 import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
 import DOM.Event.EventTarget (eventListener, addEventListener)
 
-import Data.Nullable (toMaybe)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
 import Data.Either (Either(..))

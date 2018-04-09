@@ -36,12 +36,11 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Uncurried (EffFn3, mkEffFn1, runEffFn3)
 import Control.Monad.Except.Trans (ExceptT(..), runExceptT, withExceptT)
 import Control.Monad.Error.Class (throwError)
-import Prelude (Unit, unit, discard, bind, map, pure, (<<<), (>>=), const, ($), (<$>))
+import Prelude (Unit, discard, bind, map, pure, (<<<), (>>=), const, ($), (<$>))
 import Data.Either (Either(..), either)
 import Data.Time.Duration (Milliseconds(..), toDuration)
 import Elm.Result (Result(..))
 import Elm.Maybe (Maybe(..))
-import Data.Int (round)
 
 
 -- Duplicate from Elm.Time to avoid circular dependency

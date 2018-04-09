@@ -9,7 +9,6 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Elm.Result (Result(..))
 import Data.List (List(..), (:))
-import Control.Monad.Eff (Eff)
 import Control.Monad.Aff (nonCanceler)
 import Math (sqrt)
 
