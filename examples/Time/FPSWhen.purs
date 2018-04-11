@@ -3,7 +3,7 @@ module Examples.Time.FPSWhen where
 
 import Elm.Signal (DELAY, setup, current, send, runSignal, mailbox)
 import Elm.Signal (map) as Signal
-import Elm.Time (fpsWhen)
+import Elm.Time.Signal (fpsWhen)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF)

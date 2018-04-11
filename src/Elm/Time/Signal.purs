@@ -1,32 +1,24 @@
 
--- | Library for working with time
+-- | The Elm 0.16-specific parts of Elm's `Time` package.
+-- |
+-- | This supplements `Elm.Time` from `purescript-elm-compat` by adding
+-- | the `Signal`-oriented functions from Elm 0.16.
 
-module Elm.Time
+module Elm.Time.Signal
     ( module Virtual
-    , Time, toTime, fromTime
-    , millisecond, second, minute, hour
-    , inMilliseconds, inSeconds, inMinutes, inHours
     , fps, fpsWhen, every
     , delay, since
     ) where
 
-
--- For re-export
-
-import Data.Time.Duration (class Duration) as Virtual
 import Elm.Signal (timestamp) as Virtual
 
-
--- Internal
-
-import Data.Time.Duration
-    ( Hours(..), Minutes(..), Seconds(..), Milliseconds(..)
-    , class Duration, toDuration, fromDuration
-    )
+-- Should we re-export all of Elm.Time? I'll see what it feels like to not do
+-- that at first.
 
 import Elm.Basics (Float, Bool)
 import Elm.Signal (Signal, dropRepeats, send, mailbox, constant, current, output, foldp, merge, DELAY, GraphState)
 import Elm.Signal (map) as Signal
+import Elm.Time hiding (now) 
 
 import Data.Int (round)
 import Data.DateTime.Instant (unInstant)
@@ -38,71 +30,7 @@ import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.Eff.Console (CONSOLE)
 
-import Prelude ((/), flip, id, ($), (<$>), (<<<), bind, discard, pure, (-), unit, (>>=), void, const, negate, (+), (/=))
-
-
--- | Type alias to make it clearer when you are working with time values.
--- | Using the `Time` helpers like `second` and `inSeconds` instead of raw numbers
--- | is very highly recommended.
--- |
--- | Note that Purescript's `Data.Time` class does something similar, but has more detailed
--- | time values, with separate types for `Hours`, `Minutes`, `Seconds` and `Milliseconds`.
-type Time = Number 
-
-
--- | Convert any of Purescript's time values to `Time`.
-toTime :: forall a. (Duration a) => a -> Time
-toTime tv =
-    case fromDuration tv of
-         Milliseconds n -> n
-
-
--- | Convert from `Time` to any of Purescript's time values.
-fromTime :: forall a. (Duration a) => Time -> a
-fromTime =
-    toDuration <<< Milliseconds
-
-
--- | Units of time, making it easier to specify things like a half-second
--- | `(500 * millisecond)` without remembering Elm&rsquo;s underlying units of time.
-millisecond :: Time
-millisecond =
-    toTime $ Milliseconds 1.0
-
-
-second :: Time 
-second =
-    toTime $ Seconds 1.0
-
-
-minute :: Time
-minute =
-    toTime $ Minutes 1.0
-
-
-hour :: Time 
-hour =
-    toTime $ Hours 1.0
-
-
-divBy :: Number -> Number -> Number
-divBy = flip (/)
-
-
-inMilliseconds :: Time -> Float
-inMilliseconds = id
-
-
-inSeconds :: Time -> Float
-inSeconds = divBy second
-
-
-inMinutes :: Time -> Float
-inMinutes = divBy minute
-
-
-inHours :: Time -> Float
-inHours = divBy hour
+import Prelude ((/), ($), (<$>), (<<<), bind, discard, pure, (-), unit, (>>=), void, const, negate, (+), (/=))
 
 
 -- | Takes desired number of frames per second (FPS). The resulting signal

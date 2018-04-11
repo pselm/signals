@@ -3,7 +3,7 @@ module Examples.Time.FPS where
 
 import Elm.Signal (DELAY, setup, runSignal)
 import Elm.Signal (map) as Signal
-import Elm.Time (fps)
+import Elm.Time.Signal (fps)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE, log)
