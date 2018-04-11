@@ -3,7 +3,7 @@ module Examples.Time.Timestamp where
 
 import Elm.Signal (DELAY, setup, runSignal)
 import Elm.Signal (map) as Signal
-import Elm.Time (every, timestamp)
+import Elm.Time.Signal (every, timestamp)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE, log)

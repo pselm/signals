@@ -3,7 +3,7 @@ module Examples.Time.Every where
 
 import Elm.Signal (DELAY, setup, runSignal)
 import Elm.Signal (map) as Signal
-import Elm.Time (every)
+import Elm.Time.Signal (every)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Console (CONSOLE, log)
