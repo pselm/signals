@@ -17,9 +17,6 @@ import DOM.JSDOM (JSDOM)
 import Graphics.Canvas (CANVAS)
 
 import Test.Elm.TextTest as TextTest
-import Test.Elm.ColorTest as ColorTest
-import Test.Elm.TimeTest as TimeTest
-import Test.Elm.TaskTest as TaskTest
 import Test.Elm.SignalTest as SignalTest
 import Test.Elm.VirtualDomTest as VirtualDomTest
 import Test.Elm.Graphics.StaticElementTest as StaticElementTest
@@ -44,9 +41,6 @@ main :: Eff
 main =
     runTest do
         TextTest.tests
-        ColorTest.tests
-        TimeTest.tests
-        TaskTest.tests
         SignalTest.tests
         VirtualDomTest.tests
         StaticElementTest.tests
