@@ -20,7 +20,7 @@
     "purescript-canvas": "^3.0.0",
     "purescript-colors": "^4.0.0",
     "purescript-dom": "^4.0.0",
-    "purescript-elm-compat": "rgrempel/purescript-elm-compat#f3e169848dc2325adde763145583b21fedd032ea",
+    "purescript-elm-compat": "^3.0.0",
     "purescript-exists": "^3.0.0",
     "purescript-format": "^3.0.0",
     "purescript-js-timers": "^3.0.0",
