@@ -30,7 +30,7 @@ module Elm.Signal
     ) where
 
 
-import Elm.Task (TaskE)
+import Elm.Task (Task)
 import Elm.Debug (crash)
 
 import Data.Array (cons)
@@ -1203,7 +1203,7 @@ forwardTo (Address actuallySend) f =
 -- | A `Message` is like an envelope that you have not yet put in a mailbox.
 -- | The address is filled out and the envelope is filled, but it will be sent at
 -- | some point in the future.
-newtype Message e = Message (TaskE (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit Unit)
+newtype Message e = Message (Task Unit Unit)
 
 
 -- | Create a message that may be sent to a `Mailbox` at a later time.
