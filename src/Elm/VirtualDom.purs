@@ -3,13 +3,16 @@
 -- | that expose more helper functions for HTML or SVG.
 
 module Elm.VirtualDom
-    ( Node, text, node, keyedNode
-    , Property, property, attribute, attributeNS, style
-    , Options, on, onWithOptions, defaultOptions
-    , map
+    ( module Virtual
+    , Node
+    , text, node
+    , Property, property, attribute, attributeNS, mapProperty
+    , style
+    , on, onWithOptions, Options, defaultOptions
     , lazy, lazy2, lazy3
+    , keyedNode
     , fromRenderable
---  , programWithFlags
+--  , program, programWithFlags
     ) where
 
 
@@ -59,12 +62,13 @@ import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Graphics.Canvas (CANVAS)
 
+import Prelude (map) as Virtual
 import Prelude
     ( class Eq, (==), (/=), (<), (>), not, (||)
     , class Show, show, (<>)
     , Unit, unit, void
     , flip, ($), (#), const, (<<<)
-    , class Functor, (<#>)
+    , class Functor, (<#>), map
     , bind, discard, pure, (>>=)
     , (+), (-), (*)
     )
@@ -106,7 +110,8 @@ data Node msg
 
 
 instance functorNode :: Functor Node where
-    map = map
+    map tagger child =
+        Tagger (mkExists (TaggerRecord {tagger, child}))
 
 
 type NodeRecord msg =
@@ -255,31 +260,6 @@ text :: ∀ msg. String -> Node msg
 text = Text
 
 
--- | This function is useful when nesting components with [the Elm
--- | Architecture](https://github.com/evancz/elm-architecture-tutorial/). It lets
--- | you transform the messages produced by a subtree.
--- |
--- | Say you have a node named `button` that produces `()` values when it is
--- | clicked. To get your model updating properly, you will probably want to tag
--- | this `()` value like this:
--- |
--- |     type Msg = Click | ...
--- |
--- |     update msg model =
--- |       case msg of
--- |         Click ->
--- |           ...
--- |
--- |     view model =
--- |       map (\_ -> Click) button
--- |
--- | So now all the events produced by `button` will be transformed to be of type
--- | `Msg` so they can be handled by your update function!
-map :: ∀ sub msg. (sub -> msg) -> Node sub -> Node msg
-map tagger child =
-    Tagger (mkExists (TaggerRecord {tagger, child}))
-
-
 -- PROPERTIES
 
 -- | When using HTML and JS, there are two ways to specify parts of a DOM node.
@@ -303,6 +283,15 @@ data Property msg
     | AttributeNS Namespace Key String
     | Styles (List (Tuple String String))
     | OnEvent Key Options (Json.Decoder msg)
+
+
+derive instance functorProperty :: Functor Property
+
+
+-- | Transform the messages produced by a `Property`.
+mapProperty :: ∀ a b. (a -> b) -> Property a -> Property b
+mapProperty = map
+
 
 
 -- This represents the properties that should be applied to a node, organized for
