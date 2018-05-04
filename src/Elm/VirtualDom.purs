@@ -16,62 +16,46 @@ module Elm.VirtualDom
     ) where
 
 
-import Elm.Json.Decode (Decoder, Value) as Json
-import Elm.Basics (Bool)
-import Elm.Graphics.Internal
-    ( setStyle, removeStyle
-    , setProperty, setPropertyIfDifferent, removeProperty
-    , setAttributeNS, removeAttributeNS, nodeToElement
-    , documentForNode
-    )
-
-import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
+import Control.Comonad (extract)
+import Control.Monad (when, unless, (>=>))
 import Control.Monad.Eff (Eff, runPure, forE)
 import Control.Monad.Except.Trans (runExceptT)
-import Control.Comonad (extract)
-import Control.Monad.Rec.Class (Step(..), tailRecM2)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Control.Monad (when, unless, (>=>))
-import Unsafe.Coerce (unsafeCoerce)
-import Partial.Unsafe (unsafeCrashWith)
-
+import Control.Monad.Rec.Class (Step(..), tailRecM2)
+import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
+import DOM (DOM)
+import DOM.Node.Document (createTextNode, createElement, createElementNS)
+import DOM.Node.Element (setAttribute, removeAttribute)
+import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
+import DOM.Node.NodeList (item)
+import DOM.Node.Types (Document, Element, textToNode, elementToNode)
+import DOM.Node.Types (Node) as DOM
+import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
+import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
-import Data.Tuple (Tuple(..))
+import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
+import Data.Either (Either(..))
+import Data.Exists (Exists, mkExists)
+import Data.Foldable (class Foldable, foldl, for_)
+import Data.Foreign (readString)
+import Data.Lazy (Lazy, defer)
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, singleton, null) as List
-import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
-import Data.Foldable (class Foldable, foldl, for_)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Ord (abs, max)
 import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeFreeze)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Exists (Exists, mkExists)
-import Data.Foreign (readString)
-import Data.Ord (abs, max)
-import Data.Either (Either(..))
-import Data.Lazy (Lazy, defer)
-
-import DOM (DOM)
-import DOM.Node.NodeList (item)
-import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
-import DOM.Node.Types (Document, Element, textToNode, elementToNode)
-import DOM.Node.Types (Node) as DOM
-import DOM.Node.Document (createTextNode, createElement, createElementNS)
-import DOM.Node.Element (setAttribute, removeAttribute)
-import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
-import DOM.Renderable (render, updateDOM) as Renderable
+import Data.Tuple (Tuple(..))
+import Elm.Basics (Bool)
+import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfDifferent, removeProperty, setAttributeNS, removeAttributeNS, nodeToElement, documentForNode)
+import Elm.Json.Decode (Decoder, Value) as Json
 import Graphics.Canvas (CANVAS)
-
+import Partial.Unsafe (unsafeCrashWith)
+import Prelude (class Eq, (==), (/=), (<), (>), not, (||), class Show, show, (<>), Unit, unit, void, flip, ($), (#), const, (<<<), class Functor, (<#>), map, bind, discard, pure, (>>=), (+), (-), (*))
 import Prelude (map) as Virtual
-import Prelude
-    ( class Eq, (==), (/=), (<), (>), not, (||)
-    , class Show, show, (<>)
-    , Unit, unit, void
-    , flip, ($), (#), const, (<<<)
-    , class Functor, (<#>), map
-    , bind, discard, pure, (>>=)
-    , (+), (-), (*)
-    )
+import Unsafe.Coerce (unsafeCoerce)
+import Unsafe.Reference (unsafeRefEq)
 
 
 -- Will suggest these for Data.Exists if they work
@@ -91,10 +75,6 @@ mkExists3 = unsafeCoerce
 
 runExists3 :: ∀ f r. (∀ a b c. f a b c -> r) -> Exists3 f -> r
 runExists3 = unsafeCoerce
-
-
--- The original Javascript code uses reference equality on occasion ...
-foreign import refEq :: ∀ a b. a -> b -> Boolean
 
 
 -- | An immutable chunk of data representing a DOM node. This can be HTML or SVG.
@@ -1059,7 +1039,7 @@ diffHelp a b patches index =
     -- Can't use regular equality because of the possible thunks ... should consider
     -- a workaround, like perhaps forcing the thunks to have unique tags that cn be
     -- compared in some way.
-    if a `refEq` b
+    if unsafeRefEq a b
         then patches
         else
             case {a, b} of
@@ -1274,7 +1254,7 @@ diffFacts old new =
                 newProperty _ k newValue =
                     case lookup k old.properties of
                         Just oldValue ->
-                            when ((not (newValue `refEq` oldValue)) || (k == "value")) $ void $
+                            when ((not (unsafeRefEq newValue oldValue)) || (k == "value")) $ void $
                                 pushSTArray accum (AddProperty k newValue)
 
                         Nothing ->
