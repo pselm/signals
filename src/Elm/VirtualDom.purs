@@ -1,6 +1,6 @@
 
--- | API to the core diffing algorithm. Can serve as a foundation for libraries
--- | that expose more helper functions for HTML or SVG.
+-- | > API to the core diffing algorithm. Can serve as a foundation for libraries
+-- | > that expose more helper functions for HTML or SVG.
 
 module Elm.VirtualDom
     ( module Virtual
@@ -34,6 +34,7 @@ import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
+import Data.Coyoneda (Coyoneda, coyoneda)
 import Data.Either (Either(..))
 import Data.Exists (Exists, mkExists)
 import Data.Foldable (class Foldable, foldl, for_)
@@ -77,12 +78,12 @@ runExists3 :: ∀ f r. (∀ a b c. f a b c -> r) -> Exists3 f -> r
 runExists3 = unsafeCoerce
 
 
--- | An immutable chunk of data representing a DOM node. This can be HTML or SVG.
+-- | > An immutable chunk of data representing a DOM node. This can be HTML or SVG.
 data Node msg
     = Text String
     | PlainNode (NodeRecord msg) (List (Node msg))
     | KeyedNode (NodeRecord msg) (List (Tuple String (Node msg)))
-    | Tagger (Exists (TaggerRecord msg))
+    | Tagger (Coyoneda Node msg) 
     | Thunk (Exists (ThunkRecord1 msg))
     | Thunk2 (Exists2 (ThunkRecord2 msg))
     | Thunk3 (Exists3 (ThunkRecord3 msg))
@@ -90,20 +91,13 @@ data Node msg
 
 
 instance functorNode :: Functor Node where
-    map tagger child =
-        Tagger (mkExists (TaggerRecord {tagger, child}))
+    map func child = Tagger $ coyoneda func child
 
 
 type NodeRecord msg =
     { tag :: String
     , namespace :: Maybe String
     , facts :: OrganizedFacts msg
-    }
-
-
-newtype TaggerRecord msg sub = TaggerRecord
-    { tagger :: sub -> msg
-    , child :: Node sub
     }
 
 
@@ -229,6 +223,8 @@ fromRenderable =
     -- The original Elm allows a list of facts here as well, but that ends up being
     -- incoherent, since if we change what the renderable produces, then the
     -- renderable can be out of sync for updates.
+    --
+    -- TODO: Revisit this for Elm 0.18's version ...
     Custom <<< toAnyRenderable
 
 
