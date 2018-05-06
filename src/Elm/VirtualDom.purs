@@ -8,7 +8,7 @@ module Elm.VirtualDom
     , text, node
     , Property, property, attribute, attributeNS, mapProperty
     , style
-    , on, onWithOptions, Options, defaultOptions
+    , on, onWithOptions, Options, defaultOptions, equalOptions
     , lazy, lazy2, lazy3
     , keyedNode
     , fromRenderable
@@ -50,12 +50,13 @@ import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
 import Elm.Basics (Bool)
 import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfDifferent, removeProperty, setAttributeNS, removeAttributeNS, nodeToElement, documentForNode)
-import Elm.Json.Decode (Decoder, Value) as Json
+import Elm.Json.Decode (Decoder, Value, equalDecoders)
 import Graphics.Canvas (CANVAS)
 import Partial.Unsafe (unsafeCrashWith)
-import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, flip, id, map, not, pure, show, unit, void, (#), ($), (*), (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>), (>>=), (||))
+import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (unsafeRefEq)
@@ -256,11 +257,11 @@ text = Text
 -- | > underlying property. For example, as of this writing, the `webkit-playsinline`
 -- | > attribute can be used in HTML, but there is no corresponding property!
 data Property msg
-    = CustomProperty Key Json.Value
+    = CustomProperty Key Value
     | Attribute Key String
     | AttributeNS Namespace Key String
     | Styles (List (Tuple String String))
-    | OnEvent Key Options (Json.Decoder msg)
+    | OnEvent Key Options (Decoder msg)
 
 
 derive instance functorProperty :: Functor Property
@@ -279,9 +280,9 @@ mapProperty = map
 type OrganizedFacts msg =
     { attributes :: StrMap String
     , attributesNS :: StrMap (StrMap String)
-    , events :: StrMap (Tuple Options (Json.Decoder msg))
+    , events :: StrMap (Tuple Options (Decoder msg))
     , styles :: StrMap String
-    , properties :: StrMap Json.Value
+    , properties :: StrMap Value
     }
 
 
@@ -290,12 +291,12 @@ data FactChange msg
     | RemoveAttribute String
     | AddAttributeNS String String String
     | RemoveAttributeNS String String
-    | AddEvent String Options (Json.Decoder msg)
+    | AddEvent String Options (Decoder msg)
     | RemoveEvent String Options
     | AddStyle String String
     | RemoveStyle String
     | RemoveAllStyles
-    | AddProperty String Json.Value
+    | AddProperty String Value
     | RemoveProperty String
 
 
@@ -429,7 +430,7 @@ organizeFacts factList =
 -- | >
 -- | > Notice that you must give the *property* name, so we use `className` as it
 -- | > would be in JavaScript, not `class` as it would appear in HTML.
-property :: ∀ msg. String -> Json.Value -> Property msg
+property :: ∀ msg. String -> Value -> Property msg
 property = CustomProperty
 
 
@@ -490,13 +491,13 @@ style = Styles
 -- | > `addEventListener`. Next you give a JSON decoder, which lets you pull
 -- | > information out of the event object. If the decoder succeeds, it will produce
 -- | > a message and route it to your `update` function.
-on :: ∀ msg. String -> Json.Decoder msg -> Property msg
+on :: ∀ msg. String -> Decoder msg -> Property msg
 on =
     (flip onWithOptions) defaultOptions
 
 
 -- | > Same as `on` but you can set a few options.
-onWithOptions :: ∀ msg. String -> Options -> Json.Decoder msg -> Property msg
+onWithOptions :: ∀ msg. String -> Options -> Decoder msg -> Property msg
 onWithOptions = OnEvent
 
 
@@ -522,6 +523,15 @@ defaultOptions =
     { stopPropagation: false
     , preventDefault: false
     }
+
+
+-- | Elm doesn't need this function because its `==` can handle record types
+-- | magically. This isn't possible in Purescript without a newtype, which we'd
+-- | like to avoid here. So, we define a custom equality function.
+equalOptions :: Options -> Options -> Bool
+equalOptions a b =
+    a.stopPropagation == b.stopPropagation &&
+    a.preventDefault == b.preventDefault
 
 
 -- OPTIMIZATION
@@ -754,8 +764,10 @@ applyFacts eventNode operations elem = do
 
             AddProperty key value ->
                 if key == "value"
-                    -- I think this is trying to avoid setting the "value" property if it is not
-                    -- changing, probably to avoid some kind of browser issue.
+                    -- Changes to value are deferred to the real DOM, instead of the virtual
+                    -- DOM, since the browser will change "value" behind our backs.
+                    -- Note that we should probably treat "checked" like this as well:
+                    -- https://github.com/elm-lang/virtual-dom/issues/117
                     then setPropertyIfDifferent key value elem
                     else setProperty key value elem
 
@@ -1263,6 +1275,14 @@ diffFacts old new =
                 newProperty _ k newValue =
                     case lookup k old.properties of
                         Just oldValue ->
+                            -- Where the key is "value", we defer the check to
+                            -- the actual DOM, rather than the virtual DOM, because
+                            -- the browser will change "value" behind our backs.
+                            -- Possibly "checked" should be handled this way as well:
+                            -- https://github.com/elm-lang/virtual-dom/issues/117
+                            --
+                            -- The value is a Foreign, so the best we can do is
+                            -- an unsafeRefEq here, I suppose?
                             when ((not (unsafeRefEq newValue oldValue)) || (k == "value")) $ void $
                                 pushSTArray accum (AddProperty k newValue)
 
@@ -1272,8 +1292,8 @@ diffFacts old new =
 
                 oldProperty _ k oldValue =
                     case lookup k new.properties of
-                        Just newValue ->
-                            -- We've done this already
+                        Just _ ->
+                            -- We'll have done this one already ...
                             pure unit
 
                         Nothing ->
@@ -1292,7 +1312,7 @@ diffFacts old new =
 
                 oldAttribute _ k oldValue =
                     case lookup k new.attributes of
-                        Just newValue ->
+                        Just _ ->
                             -- We'll have done this one already ...
                             pure unit
 
@@ -1358,22 +1378,47 @@ diffFacts old new =
 
                 oldStyle _ k oldValue =
                     case lookup k new.styles of
-                        Just newValue ->
-                            -- We'll have done this one already ...
+                        Just _ ->
+                             -- We'll handle this when iterating the new stuff.
                             pure unit
 
                         Nothing ->
                             void $
                                 pushSTArray accum (RemoveStyle k)
 
-            -- Push removals first, then additions
+                newEvent _ k (newOptions /\ newDecoder) =
+                    case lookup k old.events of
+                        Just (oldOptions /\ oldDecoder ) ->
+                            unless (equalOptions oldOptions newOptions && equalDecoders oldDecoder newDecoder) do
+                                void $ pushSTArray accum (RemoveEvent k oldOptions)
+                                void $ pushSTArray accum (AddEvent k newOptions newDecoder)
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (AddEvent k newOptions newDecoder)
+
+                oldEvent _ k (oldOptions /\ oldDecoder) =
+                    case lookup k new.events of
+                        Just _ ->
+                            -- We'll handle this when iterating the new stuff.
+                            pure unit
+
+                        Nothing ->
+                            void $
+                                pushSTArray accum (RemoveEvent k oldOptions)
+
+
+            -- Push removals first, then additions. I've forgotten why each of
+            -- these has an unused initial parameter ...
             foldM oldAttribute unit old.attributes
             foldM oldAttributeNS unit old.attributesNS
             foldM oldProperty unit old.properties
+            foldM oldEvent unit old.events
 
             foldM newAttribute unit new.attributes
             foldM newAttributeNS unit new.attributesNS
             foldM newProperty unit new.properties
+            foldM newEvent unit new.events
 
             case Tuple (isEmpty old.styles) (isEmpty new.styles) of
                 Tuple false true ->
@@ -1393,10 +1438,6 @@ diffFacts old new =
                 Tuple true false ->
                     -- It was empty, and now isn't. So, just add.
                     foldM newStyle unit new.styles
-
-            -- TODO
-            -- foldM newEvent unit new.events -- uses equalEvents
-            -- foldM oldEvent unit old.events
 
             pure accum
 
