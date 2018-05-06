@@ -560,23 +560,6 @@ lazy3 func arg1 arg2 arg3 =
     Thunk3 (mkExists3 (ThunkRecord3 {func, arg1, arg2, arg3, lazy: defer \_ -> func arg1 arg2 arg3}))
 
 
-{-
-
-function equalEvents(a, b)
-{
-	if (!a.options === b.options)
-	{
-		if (a.stopPropagation !== b.stopPropagation || a.preventDefault !== b.preventDefault)
-		{
-			return false;
-		}
-	}
-	return _elm_lang$core$Native_Json.equality(a.decoder, b.decoder);
-}
-
--}
-
-
 -- RENDERER
 
 {-
