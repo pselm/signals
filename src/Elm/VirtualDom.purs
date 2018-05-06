@@ -38,10 +38,10 @@ import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Coyoneda (Coyoneda, coyoneda)
 import Data.Either (Either(..), either)
-import Data.Exists (Exists, mkExists)
+import Data.Exists (Exists, mkExists, runExists)
 import Data.Foldable (class Foldable, foldl, for_)
 import Data.Foreign (ForeignError(..), readString, toForeign)
-import Data.Lazy (Lazy, defer)
+import Data.Lazy (Lazy, defer, force)
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, null) as List
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
@@ -625,24 +625,19 @@ var rAF =
 -- RENDER
 
 render :: ∀ e msg. Document -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
-render doc vNode eventNode = do
+render doc vNode eventNode =
     case vNode of
         Thunk t ->
-            unsafeCrashWith "TODO"
-
-{-
-			if (!vNode.node)
-			{
-				vNode.node = vNode.thunk();
-			}
-			return render(vNode.node, eventNode);
--}
+            t # runExists \(ThunkRecord1 thunk) ->
+                render doc (force thunk.lazy) eventNode
 
         Thunk2 t ->
-            unsafeCrashWith "TODO"
+            t # runExists2 \(ThunkRecord2 thunk) ->
+                render doc (force thunk.lazy) eventNode
 
         Thunk3 t ->
-            unsafeCrashWith "TODO"
+            t # runExists3 \(ThunkRecord3 thunk) ->
+                render doc (force thunk.lazy) eventNode
 
         Text string ->
             createTextNode string doc
@@ -708,7 +703,7 @@ render doc vNode eventNode = do
 			return domNode;
 -}
 
-        Custom renderable -> do
+        Custom renderable ->
             Renderable.render doc renderable
 
 
