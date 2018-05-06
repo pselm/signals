@@ -16,10 +16,12 @@ module Elm.VirtualDom
     ) where
 
 
+import Control.Apply (lift2)
 import Control.Comonad (extract)
 import Control.Monad (when, unless, (>=>))
 import Control.Monad.Eff (Eff, runPure, forE)
-import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.Except (runExcept)
+import Control.Monad.Except.Trans (runExceptT, throwError)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Rec.Class (Step(..), tailRecM2)
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
@@ -35,14 +37,14 @@ import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Coyoneda (Coyoneda, coyoneda)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Exists (Exists, mkExists)
 import Data.Foldable (class Foldable, foldl, for_)
-import Data.Foreign (readString)
+import Data.Foreign (ForeignError(..), readString, toForeign)
 import Data.Lazy (Lazy, defer)
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
-import Data.List (foldM, singleton, null) as List
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.List (foldM, null) as List
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Ord (abs, max)
 import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
@@ -53,7 +55,7 @@ import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfD
 import Elm.Json.Decode (Decoder, Value) as Json
 import Graphics.Canvas (CANVAS)
 import Partial.Unsafe (unsafeCrashWith)
-import Prelude (class Eq, (==), (/=), (<), (>), not, (||), class Show, show, (<>), Unit, unit, void, flip, ($), (#), const, (<<<), class Functor, (<#>), map, bind, discard, pure, (>>=), (+), (-), (*))
+import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, flip, id, map, not, pure, show, unit, void, (#), ($), (*), (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (unsafeRefEq)
@@ -83,7 +85,7 @@ data Node msg
     = Text String
     | PlainNode (NodeRecord msg) (List (Node msg))
     | KeyedNode (NodeRecord msg) (List (Tuple String (Node msg)))
-    | Tagger (Coyoneda Node msg) 
+    | Tagger (Coyoneda Node msg)
     | Thunk (Exists (ThunkRecord1 msg))
     | Thunk2 (Exists2 (ThunkRecord2 msg))
     | Thunk3 (Exists3 (ThunkRecord3 msg))
@@ -358,19 +360,33 @@ organizeFacts factList =
                     -- a special "namespace" property, to specify the namespace of the node
                     -- itself. This seems a bit odd ... would probably be better to have an
                     -- explicit API for namespaced nodes.
-                    if key == "namespace"
-                        then
-                            case extract $ runExceptT $ readString value of
-                                Left _ ->
-                                    -- It wasn't a string, so don't handle specially
-                                    void $ poke mutableProperties key value
+                    if key == "namespace" then
+                        case extract $ runExceptT $ readString value of
+                            Left _ ->
+                                -- It wasn't a string, so don't handle specially
+                                void $ poke mutableProperties key value
 
-                                Right s ->
-                                    -- It was a string, so store as the namespace
-                                    void $ writeSTRef mutableNamespace (Just s)
+                            Right s ->
+                                -- It was a string, so store as the namespace
+                                void $ writeSTRef mutableNamespace (Just s)
 
-                        else
-                            void $ poke mutableProperties key value
+                    else if key == "className" then do
+                        -- The Elm code also special-cases `className` so that
+                        -- if you supply it multiple times, it will be
+                        -- additive, rather than clobbering the previous one.
+                        oldString <-
+                            peek mutableProperties key
+                            <#> maybe (throwError $ pure $ ErrorAtProperty "className" $ JSONError "missing") readString
+
+                        let newString = readString value
+                        let combined = lift2 (\a b -> toForeign $ a <> " " <> b) oldString newString
+
+                        -- If we've had any kind of error above, we just use the raw value
+                        void $ poke mutableProperties key $ either (const value) id $ runExcept combined
+
+                    else
+                        -- This is the general case.
+                        void $ poke mutableProperties key value
 
         -- These are unsafe in the sense that further modifications to the mutable
         -- versions would also modify the pure. So, we won't do that ...
@@ -979,7 +995,7 @@ performTraversal =
                         if abs distance > 3
                             then
                                 performTraversal (TParent 1) >=>
-                                performTraversal (TChild (List.singleton s.to))
+                                performTraversal (TChild (singleton s.to))
 
                             else
                                 goSibling distance
