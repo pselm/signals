@@ -284,6 +284,7 @@ data FactChange msg
     | AddAttributeNS String String String
     | RemoveAttributeNS String String
     | AddEvent String Options (Decoder msg)
+    | MutateEvent String Options (Decoder msg)
     | RemoveEvent String Options
     | AddStyle String String
     | RemoveStyle String
@@ -713,6 +714,11 @@ render doc vNode eventNode =
 
         Custom renderable ->
             Renderable.render doc renderable
+            {-
+			var domNode = vNode.impl.render(vNode.model);
+			applyFacts(domNode, eventNode, vNode.facts);
+			return domNode;
+            -}
 
 
 -- APPLY FACTS
@@ -734,6 +740,9 @@ applyFacts eventNode operations elem = do
                 removeAttributeNS ns key elem
 
             AddEvent key options decoder ->
+                unsafeCrashWith "TODO"
+
+            MutateEvent key options decoder ->
                 unsafeCrashWith "TODO"
 
             RemoveEvent key options ->
@@ -760,6 +769,16 @@ applyFacts eventNode operations elem = do
             RemoveProperty key ->
                 removeProperty key elem
 
+
+-- When Elm knows that there previously was a listener for an event, it does a
+-- kind of "mutate event" instead of removing the listener and adding a new
+-- one. This might happen frequently, because testing the equality of decoders
+-- is not fully decidable. So, you may end up with a lot of spurious listener
+-- mutations. Removing and adding listeners is probably a little expensive, and
+-- could even affect behaviour in some cases. So, instead, Elm mutates the
+-- listener, by having the listener refer to some data "deposited" as a
+-- property on the DOM node. Thus, we can mutate the listener by changing that
+-- data.
 
 {-
 function applyEvents(domNode, eventNode, events)
@@ -1376,8 +1395,7 @@ diffFacts old new =
                     case lookup k old.events of
                         Just (oldOptions /\ oldDecoder ) ->
                             unless (equalOptions oldOptions newOptions && equalDecoders oldDecoder newDecoder) do
-                                void $ pushSTArray accum (RemoveEvent k oldOptions)
-                                void $ pushSTArray accum (AddEvent k newOptions newDecoder)
+                                void $ pushSTArray accum (MutateEvent k newOptions newDecoder)
 
                         Nothing ->
                             void $
