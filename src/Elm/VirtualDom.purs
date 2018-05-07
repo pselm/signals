@@ -87,9 +87,9 @@ data Node msg
     | PlainNode (NodeRecord msg) (List (Node msg))
     | KeyedNode (NodeRecord msg) (List (Tuple String (Node msg)))
     | Tagger (Coyoneda Node msg)
-    | Thunk (Thunk msg)
-    | Thunk2 (Thunk2 msg)
-    | Thunk3 (Thunk3 msg)
+    | Thunk (Lazy (Node msg)) (Thunk msg)
+    | Thunk2 (Lazy (Node msg)) (Thunk2 msg)
+    | Thunk3 (Lazy (Node msg)) (Thunk3 msg)
     | Custom AnyRenderable
 
 
@@ -138,7 +138,6 @@ type Thunk3 msg = Exists3 (ThunkRecord3 msg)
 newtype ThunkRecord1 msg a = ThunkRecord1
     { func :: a -> Node msg
     , arg :: a /\ Maybe (a -> a -> Bool)
-    , lazy :: Lazy (Node msg)
     }
 
 
@@ -146,7 +145,6 @@ newtype ThunkRecord2 msg a b = ThunkRecord2
     { func :: a -> b -> Node msg
     , arg1 :: a /\ Maybe (a -> a -> Bool)
     , arg2 :: b /\ Maybe (b -> b -> Bool)
-    , lazy :: Lazy (Node msg)
     }
 
 
@@ -155,14 +153,13 @@ newtype ThunkRecord3 msg a b c = ThunkRecord3
     , arg1 :: a /\ Maybe (a -> a -> Bool)
     , arg2 :: b /\ Maybe (b -> b -> Bool)
     , arg3 :: c /\ Maybe (c -> c -> Bool)
-    , lazy :: Lazy (Node msg)
     }
 
 
 -- | Not an `Eq` instance, because it's not deciable ... will be some false
 -- | negatives.
-equalsThunk :: ∀ msg. Thunk msg -> Thunk msg -> Bool
-equalsThunk left right =
+equalThunks :: ∀ msg. Thunk msg -> Thunk msg -> Bool
+equalThunks left right =
     left # runExists (\(ThunkRecord1 a) ->
     right # runExists (\(ThunkRecord1 b) ->
         -- The two functions need to be the same, and the best we can do
@@ -175,8 +172,8 @@ equalsThunk left right =
 
 -- | Not an `Eq` instance, because it's not deciable ... will be some false
 -- | negatives.
-equalsThunk2 :: ∀ msg. Thunk2 msg -> Thunk2 msg -> Bool
-equalsThunk2 left right =
+equalThunks2 :: ∀ msg. Thunk2 msg -> Thunk2 msg -> Bool
+equalThunks2 left right =
     left # runExists2 (\(ThunkRecord2 a) ->
     right # runExists2 (\(ThunkRecord2 b) ->
         -- The two functions need to be the same, and the best we can do
@@ -190,8 +187,8 @@ equalsThunk2 left right =
 
 -- | Not an `Eq` instance, because it's not deciable ... will be some false
 -- | negatives.
-equalsThunk3 :: ∀ msg. Thunk3 msg -> Thunk3 msg -> Bool
-equalsThunk3 left right =
+equalThunks3 :: ∀ msg. Thunk3 msg -> Thunk3 msg -> Bool
+equalThunks3 left right =
     left # runExists3 (\(ThunkRecord3 a) ->
     right # runExists3 (\(ThunkRecord3 b) ->
         -- The two functions need to be the same, and the best we can do
@@ -598,10 +595,9 @@ equalOptions a b =
 -- | `lazy_`. This one will do a better job of detecting equality.
 lazy :: ∀ a msg. Eq a => (a -> Node msg) -> a -> Node msg
 lazy func arg =
-    Thunk $ mkExists $ ThunkRecord1
+    Thunk (defer \_ -> func arg) $ mkExists $ ThunkRecord1
         { func
         , arg : arg /\ Just eq
-        , lazy : defer \_ -> func arg
         }
 
 -- | Like `lazy`, but does not require an `Eq` instance. Using `lazy` will do
@@ -612,10 +608,9 @@ lazy func arg =
 -- do it now with overlapping instances, but may as well wait).
 lazy_ :: ∀ a msg. (a -> Node msg) -> a -> Node msg
 lazy_ func arg =
-    Thunk $ mkExists $ ThunkRecord1
+    Thunk (defer \_ -> func arg) $ mkExists $ ThunkRecord1
         { func
         , arg : arg /\ Nothing
-        , lazy : defer \_ -> func arg
         }
 
 
@@ -626,11 +621,10 @@ lazy_ func arg =
 -- | next time we see it).
 lazy2 :: ∀ a b msg. Eq a => Eq b => (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2 func arg1 arg2 =
-    Thunk2 $ mkExists2 $ ThunkRecord2
+    Thunk2 (defer \_ -> func arg1 arg2) $ mkExists2 $ ThunkRecord2
         { func
         , arg1 : arg1 /\ Just eq
         , arg2 : arg2 /\ Just eq
-        , lazy : defer \_ -> func arg1 arg2
         }
 
 
@@ -638,11 +632,10 @@ lazy2 func arg1 arg2 =
 -- | a better job of detecting equality.
 lazy2_ :: ∀ a b msg. (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2_ func arg1 arg2 =
-    Thunk2 $ mkExists2 $ ThunkRecord2
+    Thunk2 (defer \_ -> func arg1 arg2) $ mkExists2 $ ThunkRecord2
         { func
         , arg1 : arg1 /\ Nothing
         , arg2 : arg2 /\ Nothing
-        , lazy : defer \_ -> func arg1 arg2
         }
 
 
@@ -653,12 +646,11 @@ lazy2_ func arg1 arg2 =
 -- | next time we see it).
 lazy3 :: ∀ a b c msg. Eq a => Eq b => Eq c => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3 func arg1 arg2 arg3 =
-    Thunk3 $ mkExists3 $ ThunkRecord3
+    Thunk3 (defer \_ -> func arg1 arg2 arg3) $ mkExists3 $ ThunkRecord3
         { func
         , arg1 : arg1 /\ Just eq
         , arg2 : arg2 /\ Just eq
         , arg3 : arg3 /\ Just eq
-        , lazy : defer \_ -> func arg1 arg2 arg3
         }
 
 
@@ -666,12 +658,11 @@ lazy3 func arg1 arg2 arg3 =
 -- | a better job of detecting equality.
 lazy3_ :: ∀ a b c msg. (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3_ func arg1 arg2 arg3 =
-    Thunk3 $ mkExists3 $ ThunkRecord3
+    Thunk3 (defer \_ -> func arg1 arg2 arg3) $ mkExists3 $ ThunkRecord3
         { func
         , arg1 : arg1 /\ Nothing
         , arg2 : arg2 /\ Nothing
         , arg3 : arg3 /\ Nothing
-        , lazy : defer \_ -> func arg1 arg2 arg3
         }
 
 
@@ -762,17 +753,14 @@ elmEventNodeRef = "elm_event_node_ref"
 render :: ∀ e msg. Document -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 render doc vNode eventNode =
     case vNode of
-        Thunk t ->
-            t # runExists \(ThunkRecord1 thunk) ->
-                render doc (force thunk.lazy) eventNode
+        Thunk l _ ->
+            render doc (force l) eventNode
 
-        Thunk2 t ->
-            t # runExists2 \(ThunkRecord2 thunk) ->
-                render doc (force thunk.lazy) eventNode
+        Thunk2 l _ ->
+            render doc (force l) eventNode
 
-        Thunk3 t ->
-            t # runExists3 \(ThunkRecord3 thunk) ->
-                render doc (force thunk.lazy) eventNode
+        Thunk3 l _ ->
+            render doc (force l) eventNode
 
         Text string ->
             createTextNode string doc
@@ -1214,39 +1202,50 @@ diffHelp a b index accum =
         then accum
         else
             case a, b of
-                Thunk aThunk, Thunk bThunk ->
-                    unsafeCrashWith "TODO"
+                Thunk aLazy aThunk, Thunk bLazy bThunk ->
+                    if equalThunks aThunk bThunk then
+                        -- The Elm code has an extra optimization here ... it
+                        -- mutates the bLazy in-place so that it has the same
+                        -- answer as the aLazy. That way, when we get it next
+                        -- time, and might need to force it to do a diff, we
+                        -- already have the answer. It's a sensible
+                        -- optimization, but a little difficult to do safely in
+                        -- Purescript. It can probably be done unsafely,
+                        -- though, so it would be a nice TODO. It would
+                        -- probably have to depend a little unsafely on the
+                        -- internals of the `Lazy` type, or I suppose we could
+                        -- build our own variant. It would be a kind of
+                        -- `forceWith` where you supply the value that will be
+                        -- forced, rather than running the calculation.
+                        accum
+                    else
+                        -- The Elm code kind of restarts the diffing process
+                        -- with the thunked node as the root, and then groups
+                        -- the resulting patches together in a `PThunk` case.
+                        -- I'm not sure whether that has a point ... it doesn't
+                        -- seem to ... so I'll just calculate the actual nodes
+                        -- and continue diffing in the usual manner ... it feels
+                        -- as though that ought to just work. I guess we'll see!
+                        --
+                        -- The Elm code has pre-forced the `aLazy` side with the
+                        -- optimization mentioned above ... would be nice to do
+                        -- that here as well, but we'll start this way ... we'll
+                        -- only pay when the thunks aren't equal.
+                        diffHelp (force aLazy) (force bLazy) index accum
 
-                    {-
-                    case 'thunk':
-                        var aArgs = a.args;
-                        var bArgs = b.args;
-                        var i = aArgs.length;
-                        var same = a.func === b.func && i === bArgs.length;
-                        while (same && i--)
-                        {
-                            same = aArgs[i] === bArgs[i];
-                        }
-                        if (same)
-                        {
-                            b.node = a.node;
-                            return;
-                        }
-                        b.node = b.thunk();
-                        var subPatches = [];
-                        diffHelp(a.node, b.node, subPatches, 0);
-                        if (subPatches.length > 0)
-                        {
-                            patches.push(makePatch('p-thunk', index, subPatches));
-                        }
-                        return;
-                    -}
+                Thunk2 aLazy aThunk, Thunk2 bLazy bThunk ->
+                    -- See comments on the `Thunk` case
+                    if equalThunks2 aThunk bThunk then
+                        accum
+                    else
+                        diffHelp (force aLazy) (force bLazy) index accum
 
-                Thunk2 aThunk, Thunk2 bThunk ->
-                    unsafeCrashWith "TODO"
-
-                Thunk3 aThunk, Thunk3 bThunk ->
-                    unsafeCrashWith "TODO"
+                Thunk3 aLazy aThunk, Thunk3 bLazy bThunk ->
+                    -- See comments on the `Thunk` case
+                    if equalThunks3 aThunk bThunk then
+                        accum
+                    else
+                        diffHelp (force aLazy) (force bLazy) index accum
 
                 Tagger aTagger, Tagger bTagger ->
                     unsafeCrashWith "TODO"
