@@ -50,7 +50,7 @@ import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Tuple (Tuple(..))
-import Data.Tuple.Nested ((/\))
+import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
 import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfDifferent, removeProperty, setAttributeNS, removeAttributeNS, nodeToElement, documentForNode)
 import Elm.Json.Decode (Decoder, Value, equalDecoders)
@@ -59,7 +59,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
-import Unsafe.Reference (unsafeRefEq)
+import Unsafe.Reference (reallyUnsafeRefEq, unsafeRefEq)
 
 
 -- Will suggest these for Data.Exists if they work
@@ -87,9 +87,9 @@ data Node msg
     | PlainNode (NodeRecord msg) (List (Node msg))
     | KeyedNode (NodeRecord msg) (List (Tuple String (Node msg)))
     | Tagger (Coyoneda Node msg)
-    | Thunk (Exists (ThunkRecord1 msg))
-    | Thunk2 (Exists2 (ThunkRecord2 msg))
-    | Thunk3 (Exists3 (ThunkRecord3 msg))
+    | Thunk (Thunk msg)
+    | Thunk2 (Thunk2 msg)
+    | Thunk3 (Thunk3 msg)
     | Custom AnyRenderable
 
 
@@ -130,47 +130,94 @@ instance renderableNode :: Renderable (Node msg) where
             RootEventNode
 
 
--- This should really be generalized and broken out. It has something
--- in common with laziness, and something in common with memoization,
--- but isn't quite the same as either. I suppose it is fundamentally
--- a lazy calculation which is able to decide whether it is equal
--- to another lazy calculation. So, if you have already forced one,
--- you don't need to force another one that is equal.
---
--- Like the Elm version of this, we're relying on reference equality.
--- Doing anything else would be a bit puzzling, unless we complicated
--- the type of `Node` a great deal. The existential types help to a point,
--- but prevent us (of course) from knowing that two things have the same
--- type. I suppose this may be another case where typeable might help?
--- There would also be the question of function equality to deal with.
+type Thunk msg = Exists (ThunkRecord1 msg)
+type Thunk2 msg = Exists2 (ThunkRecord2 msg)
+type Thunk3 msg = Exists3 (ThunkRecord3 msg)
+
+
 newtype ThunkRecord1 msg a = ThunkRecord1
     { func :: a -> Node msg
-    , arg :: a
-    , eqArg :: Maybe (a -> a -> Bool)
+    , arg :: a /\ Maybe (a -> a -> Bool)
     , lazy :: Lazy (Node msg)
     }
 
 
 newtype ThunkRecord2 msg a b = ThunkRecord2
     { func :: a -> b -> Node msg
-    , arg1 :: a
-    , arg2 :: b
-    , eqArg1 :: Maybe (a -> a -> Bool)
-    , eqArg2 :: Maybe (b -> b -> Bool)
+    , arg1 :: a /\ Maybe (a -> a -> Bool)
+    , arg2 :: b /\ Maybe (b -> b -> Bool)
     , lazy :: Lazy (Node msg)
     }
 
 
 newtype ThunkRecord3 msg a b c = ThunkRecord3
     { func :: a -> b -> c -> Node msg
-    , arg1 :: a
-    , arg2 :: b
-    , arg3 :: c
-    , eqArg1 :: Maybe (a -> a -> Bool)
-    , eqArg2 :: Maybe (b -> b -> Bool)
-    , eqArg3 :: Maybe (c -> c -> Bool)
+    , arg1 :: a /\ Maybe (a -> a -> Bool)
+    , arg2 :: b /\ Maybe (b -> b -> Bool)
+    , arg3 :: c /\ Maybe (c -> c -> Bool)
     , lazy :: Lazy (Node msg)
     }
+
+
+-- | Not an `Eq` instance, because it's not deciable ... will be some false
+-- | negatives.
+equalsThunk :: ∀ msg. Thunk msg -> Thunk msg -> Bool
+equalsThunk left right =
+    left # runExists (\(ThunkRecord1 a) ->
+    right # runExists (\(ThunkRecord1 b) ->
+        -- The two functions need to be the same, and the best we can do
+        -- is reference equality. That also gives us our warrant for
+        -- believing that the arguments have matching types.
+        reallyUnsafeRefEq a.func b.func &&
+        equalArgs a.arg (unsafeCoerce b.arg)
+    ))
+
+
+-- | Not an `Eq` instance, because it's not deciable ... will be some false
+-- | negatives.
+equalsThunk2 :: ∀ msg. Thunk2 msg -> Thunk2 msg -> Bool
+equalsThunk2 left right =
+    left # runExists2 (\(ThunkRecord2 a) ->
+    right # runExists2 (\(ThunkRecord2 b) ->
+        -- The two functions need to be the same, and the best we can do
+        -- is reference equality. That also gives us our warrant for
+        -- believing that the arguments have matching types.
+        reallyUnsafeRefEq a.func b.func &&
+        equalArgs a.arg1 (unsafeCoerce b.arg1) &&
+        equalArgs a.arg2 (unsafeCoerce b.arg2)
+    ))
+
+
+-- | Not an `Eq` instance, because it's not deciable ... will be some false
+-- | negatives.
+equalsThunk3 :: ∀ msg. Thunk3 msg -> Thunk3 msg -> Bool
+equalsThunk3 left right =
+    left # runExists3 (\(ThunkRecord3 a) ->
+    right # runExists3 (\(ThunkRecord3 b) ->
+        -- The two functions need to be the same, and the best we can do
+        -- is reference equality. That also gives us our warrant for
+        -- believing that the arguments have matching types.
+        reallyUnsafeRefEq a.func b.func &&
+        equalArgs a.arg1 (unsafeCoerce b.arg1) &&
+        equalArgs a.arg2 (unsafeCoerce b.arg2) &&
+        equalArgs a.arg3 (unsafeCoerce b.arg3)
+    ))
+
+
+-- | Checks possibly equality where we may have captured an `Eq` instance or
+-- | may not. Assumes that we've already coerced the types if we have
+-- | sufficient evidence to have done that.
+equalArgs :: ∀ a. Tuple a (Maybe (a -> a -> Bool)) -> Tuple a (Maybe (a -> a -> Bool)) -> Bool
+equalArgs (Tuple left leftEq) (Tuple right rightEq) =
+    case left, leftEq, right, rightEq of
+        a, Just equals, b, _ ->
+            unsafeRefEq a b || equals a b
+
+        a, _, b, Just equals ->
+            unsafeRefEq a b || equals a b
+
+        a, _, b, _ ->
+            unsafeRefEq a b
 
 
 -- | > Create a DOM node with a tag name, a list of HTML properties that can
@@ -553,8 +600,7 @@ lazy :: ∀ a msg. Eq a => (a -> Node msg) -> a -> Node msg
 lazy func arg =
     Thunk $ mkExists $ ThunkRecord1
         { func
-        , arg
-        , eqArg : Just eq
+        , arg : arg /\ Just eq
         , lazy : defer \_ -> func arg
         }
 
@@ -568,8 +614,7 @@ lazy_ :: ∀ a msg. (a -> Node msg) -> a -> Node msg
 lazy_ func arg =
     Thunk $ mkExists $ ThunkRecord1
         { func
-        , arg
-        , eqArg : Nothing
+        , arg : arg /\ Nothing
         , lazy : defer \_ -> func arg
         }
 
@@ -583,24 +628,20 @@ lazy2 :: ∀ a b msg. Eq a => Eq b => (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2 func arg1 arg2 =
     Thunk2 $ mkExists2 $ ThunkRecord2
         { func
-        , arg1
-        , arg2
-        , eqArg1 : Just eq
-        , eqArg2 : Just eq
+        , arg1 : arg1 /\ Just eq
+        , arg2 : arg2 /\ Just eq
         , lazy : defer \_ -> func arg1 arg2
         }
 
 
 -- | Like `lazy2`, but does not require an `Eq` instance. Using `lazy2` will do
 -- | a better job of detecting equality.
-lazy2_ :: ∀ a b msg. Eq a => Eq b => (a -> b -> Node msg) -> a -> b -> Node msg
+lazy2_ :: ∀ a b msg. (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2_ func arg1 arg2 =
     Thunk2 $ mkExists2 $ ThunkRecord2
         { func
-        , arg1
-        , arg2
-        , eqArg1 : Nothing
-        , eqArg2 : Nothing
+        , arg1 : arg1 /\ Nothing
+        , arg2 : arg2 /\ Nothing
         , lazy : defer \_ -> func arg1 arg2
         }
 
@@ -614,28 +655,22 @@ lazy3 :: ∀ a b c msg. Eq a => Eq b => Eq c => (a -> b -> c -> Node msg) -> a -
 lazy3 func arg1 arg2 arg3 =
     Thunk3 $ mkExists3 $ ThunkRecord3
         { func
-        , arg1
-        , arg2
-        , arg3
-        , eqArg1 : Just eq
-        , eqArg2 : Just eq
-        , eqArg3 : Just eq
+        , arg1 : arg1 /\ Just eq
+        , arg2 : arg2 /\ Just eq
+        , arg3 : arg3 /\ Just eq
         , lazy : defer \_ -> func arg1 arg2 arg3
         }
 
 
 -- | Like `lazy3`, but does not require an `Eq` instance. Using `lazy3` will do
 -- | a better job of detecting equality.
-lazy3_ :: ∀ a b c msg. Eq a => Eq b => Eq c => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
+lazy3_ :: ∀ a b c msg. (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3_ func arg1 arg2 arg3 =
     Thunk3 $ mkExists3 $ ThunkRecord3
         { func
-        , arg1
-        , arg2
-        , arg3
-        , eqArg1 : Nothing
-        , eqArg2 : Nothing
-        , eqArg3 : Nothing
+        , arg1 : arg1 /\ Nothing
+        , arg2 : arg2 /\ Nothing
+        , arg3 : arg3 /\ Nothing
         , lazy : defer \_ -> func arg1 arg2 arg3
         }
 
