@@ -911,6 +911,8 @@ type Patch msg =
     }
 
 
+-- The Elm version also includes a domNode and eventNode ... we add those a bit
+-- later in the process.
 makePatch :: ∀ msg. PatchOp msg -> List Int -> Patch msg
 makePatch type_ index =
     { index
@@ -940,6 +942,9 @@ instance showTraversal :: Show Traversal where
     show (TSibling s) = "(TSibling {up: " <> show s.up <> ", from: " <> show s.from <> ", to: " <> show s.to <> ", down: " <> show s.down <> "})"
 
 
+-- We use this to calculate the most efficient traversal method ... that is, the one which
+-- requires the fewest function calls.
+--
 -- My theory is that a child traversal costs 2, since you'll need to get the list of child nodes
 -- and then index into them. But, I haven't really tested ... in theory, one could get actual
 -- data for this.
@@ -1060,16 +1065,23 @@ diff :: ∀ msg. Node msg -> Node msg -> List (Patch msg)
 diff a b = diffHelp a b Nil Nil
 
 
-diffHelp :: ∀ msg. Node msg -> Node msg -> List (Patch msg) -> List Int -> List (Patch msg)
-diffHelp a b patches index =
-    -- Can't use regular equality because of the possible thunks ... should consider
-    -- a workaround, like perhaps forcing the thunks to have unique tags that cn be
-    -- compared in some way.
+-- We accumulate the needed patches, by calling ourself recursively.  The `List
+-- Int` tracks where we are relative to the root node.  An empty list meeans
+-- we're at the root node, and then each list item represent an offset into
+-- descendants.
+--
+-- TODO: Should probably not use a `List` for the offsets or the patches, since
+-- we're appending.  Or, I should prepend and then document that you should
+-- reverse once at the end.
+diffHelp :: ∀ msg. Node msg -> Node msg -> List Int -> List (Patch msg) -> List (Patch msg)
+diffHelp a b index accum =
+    -- We could have a distinct `equalNodes` function but it doesn't seem
+    -- necessary ... we just return the patches unchanged if we're equal.
     if unsafeRefEq a b
-        then patches
+        then accum
         else
-            case {a, b} of
-                {a: Thunk aThunk, b: Thunk bThunk} ->
+            case a, b of
+                Thunk aThunk, Thunk bThunk ->
                     unsafeCrashWith "TODO"
 
                     {-
@@ -1097,13 +1109,13 @@ diffHelp a b patches index =
                         return;
                     -}
 
-                {a: Thunk2 aThunk, b: Thunk2 bThunk} ->
+                Thunk2 aThunk, Thunk2 bThunk ->
                     unsafeCrashWith "TODO"
 
-                {a: Thunk3 aThunk, b: Thunk3 bThunk} ->
+                Thunk3 aThunk, Thunk3 bThunk ->
                     unsafeCrashWith "TODO"
 
-                {a: Tagger aTagger, b: Tagger bTagger} ->
+                Tagger aTagger, Tagger bTagger ->
                     unsafeCrashWith "TODO"
 
                     {-
@@ -1155,14 +1167,14 @@ diffHelp a b patches index =
                     return;
                     -}
 
-                {a: Text aText, b: Text bText} ->
+                Text aText, Text bText ->
                     if aText == bText
-                        then patches
-                        else snoc patches (makePatch (PText bText) index)
+                        then accum
+                        else snoc accum (makePatch (PText bText) index)
 
-                {a: PlainNode aNode aChildren, b: PlainNode bNode bChildren} ->
+                PlainNode aNode aChildren, PlainNode bNode bChildren ->
                     if aNode.tag /= bNode.tag || aNode.namespace /= bNode.namespace
-                        then snoc patches (makePatch (PRedraw b) index)
+                        then snoc accum (makePatch (PRedraw b) index)
                         else
                             let
                                 factsDiff =
@@ -1170,13 +1182,17 @@ diffHelp a b patches index =
 
                                 patchesWithFacts =
                                     if Array.null factsDiff
-                                        then patches
-                                        else snoc patches (makePatch (PFacts factsDiff) index)
+                                        then accum
+                                        else snoc accum (makePatch (PFacts factsDiff) index)
 
                             in
+                                -- diffChildren calls diffHelp, and I'm guessing that it
+                                -- possibly won't be tail-recursive, because it's not calling
+                                -- itself? So, may need to do something about that? Or
+                                -- possibly it's not a problem.
                                 diffChildren aChildren bChildren patchesWithFacts index
 
-                {a: KeyedNode aNode aChildren, b: KeyedNode bNode bChildren} ->
+                KeyedNode aNode aChildren, KeyedNode bNode bChildren ->
                     unsafeCrashWith "TODO"
 
 {-
@@ -1200,13 +1216,35 @@ diffHelp a b patches index =
 			return;
 -}
 
-                {a: Custom oldRenderable, b: Custom newRenderable} ->
-                    snoc patches (makePatch (PCustom oldRenderable newRenderable) index)
+                Custom oldRenderable, Custom newRenderable ->
+                    snoc accum (makePatch (PCustom oldRenderable newRenderable) index)
+{-
+		case 'custom':
+			if (a.impl !== b.impl)
+			{
+				patches.push(makePatch('p-redraw', index, b));
+				return;
+			}
 
-                _ ->
+			var factsDiff = diffFacts(a.facts, b.facts);
+			if (typeof factsDiff !== 'undefined')
+			{
+				patches.push(makePatch('p-facts', index, factsDiff));
+			}
+
+			var patch = b.impl.diff(a,b);
+			if (patch)
+			{
+				patches.push(makePatch('p-custom', index, patch));
+				return;
+			}
+
+			return;
+-}
+
+                _, _ ->
                     -- This covers the case where they are different types
-                    -- TODO: Probably shouldn't use `List`, since we're appending
-                    snoc patches (makePatch (PRedraw b) index)
+                    snoc accum (makePatch (PRedraw b) index)
 
 
 {-
@@ -1468,7 +1506,7 @@ diffChildren aChildren bChildren patches rootIndex =
 
         diffChild memo (Tuple aChild bChild) =
             { subIndex: memo.subIndex + 1
-            , patches: diffHelp aChild bChild memo.patches (snoc rootIndex memo.subIndex)
+            , patches: diffHelp aChild bChild (snoc rootIndex memo.subIndex) memo.patches
             }
 
     in
@@ -1950,7 +1988,14 @@ applyPatch patch domNode = do
             pure domNode
 
         {-
-			domNode.elm_event_node_ref.tagger = patch.data;
+			if (typeof domNode.elm_event_node_ref !== 'undefined')
+			{
+				domNode.elm_event_node_ref.tagger = patch.data;
+			}
+			else
+			{
+				domNode.elm_event_node_ref = { tagger: patch.data, parent: patch.eventNode };
+			}
 			return domNode;
         -}
 
@@ -1993,55 +2038,51 @@ applyPatch patch domNode = do
 		case 'p-reorder':
 			var data = patch.data;
 
-			// end inserts
-			var endInserts = data.endInserts;
-			var end;
-			if (typeof endInserts !== 'undefined')
-			{
-				if (endInserts.length === 1)
-				{
-					var insert = endInserts[0];
-					var entry = insert.entry;
-					var end = entry.tag === 'move'
-						? entry.data
-						: render(entry.vnode, patch.eventNode);
-				}
-				else
-				{
-					end = document.createDocumentFragment();
-					for (var i = 0; i < endInserts.length; i++)
-					{
-						var insert = endInserts[i];
-						var entry = insert.entry;
-						var node = entry.tag === 'move'
-							? entry.data
-							: render(entry.vnode, patch.eventNode);
-						end.appendChild(node);
-					}
-				}
-			}
+            // remove end inserts
+            var frag = applyPatchReorderEndInsertsHelp(data.endInserts, patch);
 
-			// removals
-			domNode = applyPatchesHelp(domNode, data.patches);
+            // removals
+            domNode = applyPatchesHelp(domNode, data.patches);
 
-			// inserts
-			var inserts = data.inserts;
-			for (var i = 0; i < inserts.length; i++)
-			{
-				var insert = inserts[i];
-				var entry = insert.entry;
-				var node = entry.tag === 'move'
-					? entry.data
-					: render(entry.vnode, patch.eventNode);
-				domNode.insertBefore(node, domNode.childNodes[insert.index]);
-			}
+            // inserts
+            var inserts = data.inserts;
+            for (var i = 0; i < inserts.length; i++)
+            {
+                var insert = inserts[i];
+                var entry = insert.entry;
+                var node = entry.tag === 'move'
+                    ? entry.data
+                    : render(entry.vnode, patch.eventNode);
+                domNode.insertBefore(node, domNode.childNodes[insert.index]);
+            }
 
-			if (typeof end !== 'undefined')
-			{
-				domNode.appendChild(end);
-			}
+            // add end inserts
+            if (typeof frag !== 'undefined')
+            {
+                domNode.appendChild(frag);
+            }
 
-			return domNode;
+            return domNode;
+
+function applyPatchReorderEndInsertsHelp(endInserts, patch)
+{
+	if (typeof endInserts === 'undefined')
+	{
+		return;
+	}
+
+	var frag = localDoc.createDocumentFragment();
+	for (var i = 0; i < endInserts.length; i++)
+	{
+		var insert = endInserts[i];
+		var entry = insert.entry;
+		frag.appendChild(entry.tag === 'move'
+			? entry.data
+			: render(entry.vnode, patch.eventNode)
+		);
+	}
+	return frag;
+}
 -}
 
         PCustom old new ->
@@ -2052,6 +2093,11 @@ applyPatch patch domNode = do
                 }
                 new
             <#> \x -> x.result
+
+            {-
+            var impl = patch.data;
+			return impl.applyPatch(domNode, impl.data);
+            -}
 
 
 redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
