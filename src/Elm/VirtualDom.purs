@@ -1071,10 +1071,21 @@ instance showTraversal :: Show Traversal where
 -- and then index into them. But, I haven't really tested ... in theory, one could get actual
 -- data for this.
 costOfTraversal :: Traversal -> Int
-costOfTraversal TRoot = 0
-costOfTraversal (TParent x)  = x
-costOfTraversal (TChild x) = (length x) * 2
-costOfTraversal (TSibling s) = s.up + (max 3 (abs (s.from - s.to))) + ((length s.down) * 2)
+costOfTraversal =
+    case _ of
+        TRoot ->
+            0
+
+        TParent x ->
+            x
+
+        TChild x ->
+            length x * 2
+
+        TSibling s ->
+            s.up +
+            (max 3 (abs (s.from - s.to))) +
+            ((length s.down) * 2)
 
 
 -- The first param is a sibling offset ... i.e. +1 for next sibling, -1 for
