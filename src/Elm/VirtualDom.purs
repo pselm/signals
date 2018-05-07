@@ -36,7 +36,7 @@ import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
-import Data.Coyoneda (Coyoneda, coyoneda)
+import Data.Coyoneda (Coyoneda, coyoneda, unCoyoneda)
 import Data.Either (Either(..), either)
 import Data.Exists (Exists, mkExists, runExists)
 import Data.Foldable (class Foldable, foldl, for_)
@@ -56,7 +56,7 @@ import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfD
 import Elm.Json.Decode (Decoder, Value, equalDecoders)
 import Graphics.Canvas (CANVAS)
 import Partial.Unsafe (unsafeCrashWith)
-import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<<<), (<>), (==), (>), (>>=), (||))
+import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (unsafeRefEq)
@@ -104,23 +104,15 @@ type NodeRecord msg =
     }
 
 
--- This is here for initial testing only ... doesn't ultimately make sense.
-rootEventNode :: ∀ msg. EventNode msg
-rootEventNode =
-    mkExists $
-        EventNodeRecord
-            { tagger: const
-            , parent: Nothing
-            }
-
-
 newtype EventNodeRecord msg parentMsg = EventNodeRecord
     { tagger :: msg -> parentMsg
-    , parent :: Maybe (EventNode parentMsg)
+    , parent :: EventNode parentMsg
     }
 
 
-type EventNode msg = Exists (EventNodeRecord msg)
+data EventNode msg
+    = RootEventNode
+    | SubEventNode (Exists (EventNodeRecord msg))
 
 
 -- The references to rootEventNode here don't ultimately make sense.
@@ -128,14 +120,14 @@ type EventNode msg = Exists (EventNodeRecord msg)
 -- include the concept of an `EventNode`, in one way or another.
 instance renderableNode :: Renderable (Node msg) where
     render document n =
-        render document n rootEventNode
+        render document n RootEventNode
 
     update old current = do
         applyPatches
             old.result
             old.value
             (diff old.value current)
-            rootEventNode
+            RootEventNode
 
 
 -- This should really be generalized and broken out. It has something
@@ -624,6 +616,26 @@ var rAF =
 
 -- RENDER
 
+
+-- | If we have consecutive taggers, compose them together. We don't do this up
+-- | front, because we want to be able to use `unsafeRefEq` on the functions,
+-- | which won't work after we compose them. But it's handy sometimes, because
+-- | we don't write out a distinct DOM node for each consecutive tagger.
+composeTaggers :: ∀ msg. Coyoneda Node msg -> Coyoneda Node msg
+composeTaggers coyo =
+    coyo # unCoyoneda \func subNode ->
+        case subNode of
+            Tagger subcoyo ->
+                composeTaggers (func <$> subcoyo)
+
+            _ ->
+                coyo
+
+
+elmEventNodeRef :: String
+elmEventNodeRef = "elm_event_node_ref"
+
+
 render :: ∀ e msg. Document -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 render doc vNode eventNode =
     case vNode of
@@ -677,31 +689,27 @@ render doc vNode eventNode =
 
             pure (elementToNode domNode)
 
-        Tagger rec ->
-            unsafeCrashWith "TODO"
-
-{-
-			var subNode = vNode.node;
-			var tagger = vNode.tagger;
-
-			while (subNode.type === 'tagger')
-			{
-				typeof tagger !== 'object'
-					? tagger = [tagger, subNode.tagger]
-					: tagger.push(subNode.tagger);
-
-				subNode = subNode.node;
-			}
-
-			var subEventRoot = {
-				tagger: tagger,
-				parent: eventNode
-			};
-
-			var domNode = render(subNode, subEventRoot);
-			domNode.elm_event_node_ref = subEventRoot;
-			return domNode;
--}
+        Tagger coyo ->
+            -- We compose consecutive taggers now, rather than up-front,
+            -- because we want to compare the funcs for reference equality
+            -- when diffing. But it's better to compose here, because we're
+            -- only writing out one DOM node. Remember to check how this
+            -- affects traversals and indexes!
+            composeTaggers coyo # unCoyoneda \func subNode ->
+                let
+                    subEventRoot =
+                        SubEventNode $ mkExists $ EventNodeRecord
+                            { tagger : func
+                            , parent : eventNode
+                            }
+                in do
+                    domNode <- render doc subNode subEventRoot
+                    -- Will need to see where this gets used ... it's a bit
+                    -- hacksih, possibly? Could probably make it a **bit**
+                    -- more type-safe.
+                    for_ (nodeToElement domNode) \element ->
+                        setProperty elmEventNodeRef (toForeign subEventRoot) element
+                    pure domNode
 
         Custom renderable ->
             Renderable.render doc renderable
