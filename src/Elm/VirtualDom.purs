@@ -9,7 +9,7 @@ module Elm.VirtualDom
     , Property, property, attribute, attributeNS, mapProperty
     , style
     , on, onWithOptions, Options, defaultOptions, equalOptions
-    , lazy, lazy2, lazy3
+    , lazy, lazy_, lazy2, lazy2_, lazy3, lazy3_
     , keyedNode
     , fromRenderable
 --  , program, programWithFlags
@@ -56,7 +56,7 @@ import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfD
 import Elm.Json.Decode (Decoder, Value, equalDecoders)
 import Graphics.Canvas (CANVAS)
 import Partial.Unsafe (unsafeCrashWith)
-import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
+import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (unsafeRefEq)
@@ -146,6 +146,7 @@ instance renderableNode :: Renderable (Node msg) where
 newtype ThunkRecord1 msg a = ThunkRecord1
     { func :: a -> Node msg
     , arg :: a
+    , eqArg :: Maybe (a -> a -> Bool)
     , lazy :: Lazy (Node msg)
     }
 
@@ -154,6 +155,8 @@ newtype ThunkRecord2 msg a b = ThunkRecord2
     { func :: a -> b -> Node msg
     , arg1 :: a
     , arg2 :: b
+    , eqArg1 :: Maybe (a -> a -> Bool)
+    , eqArg2 :: Maybe (b -> b -> Bool)
     , lazy :: Lazy (Node msg)
     }
 
@@ -163,6 +166,9 @@ newtype ThunkRecord3 msg a b c = ThunkRecord3
     , arg1 :: a
     , arg2 :: b
     , arg3 :: c
+    , eqArg1 :: Maybe (a -> a -> Bool)
+    , eqArg2 :: Maybe (b -> b -> Bool)
+    , eqArg3 :: Maybe (c -> c -> Bool)
     , lazy :: Lazy (Node msg)
     }
 
@@ -536,21 +542,102 @@ equalOptions a b =
 -- | > can check to see if `model` is referentially equal to the previous value used,
 -- | > and if so, we just stop. No need to build up the tree structure and diff it,
 -- | > we know if the input to `view` is the same, the output must be the same!
-lazy :: ∀ a msg. (Eq a) => (a -> Node msg) -> a -> Node msg
+-- |
+-- | The diffing process will operate somewhat more efficiently if the function you
+-- | provide has a stable reference (that we can check for reference equality the
+-- | next time we see it).
+-- |
+-- | For a version of this function that doesn't require an `Eq` instance, see
+-- | `lazy_`. This one will do a better job of detecting equality.
+lazy :: ∀ a msg. Eq a => (a -> Node msg) -> a -> Node msg
 lazy func arg =
-    Thunk (mkExists (ThunkRecord1 {func, arg, lazy: defer \_ -> func arg}))
+    Thunk $ mkExists $ ThunkRecord1
+        { func
+        , arg
+        , eqArg : Just eq
+        , lazy : defer \_ -> func arg
+        }
+
+-- | Like `lazy`, but does not require an `Eq` instance. Using `lazy` will do
+-- | a better job of detecting equality.
+--
+-- In Purescript 0.12, I should be able to pick up a possibly-existing `Eq`
+-- instance with instance chains, without needing a separate function. (I could
+-- do it now with overlapping instances, but may as well wait).
+lazy_ :: ∀ a msg. (a -> Node msg) -> a -> Node msg
+lazy_ func arg =
+    Thunk $ mkExists $ ThunkRecord1
+        { func
+        , arg
+        , eqArg : Nothing
+        , lazy : defer \_ -> func arg
+        }
 
 
 -- | > Same as `lazy` but checks on two arguments.
+-- |
+-- | The diffing process will operate somewhat more efficiently if the function you
+-- | provide has a stable reference (that we can check for reference equality the
+-- | next time we see it).
 lazy2 :: ∀ a b msg. Eq a => Eq b => (a -> b -> Node msg) -> a -> b -> Node msg
 lazy2 func arg1 arg2 =
-    Thunk2 (mkExists2 (ThunkRecord2 {func, arg1, arg2, lazy: defer \_ -> func arg1 arg2}))
+    Thunk2 $ mkExists2 $ ThunkRecord2
+        { func
+        , arg1
+        , arg2
+        , eqArg1 : Just eq
+        , eqArg2 : Just eq
+        , lazy : defer \_ -> func arg1 arg2
+        }
+
+
+-- | Like `lazy2`, but does not require an `Eq` instance. Using `lazy2` will do
+-- | a better job of detecting equality.
+lazy2_ :: ∀ a b msg. Eq a => Eq b => (a -> b -> Node msg) -> a -> b -> Node msg
+lazy2_ func arg1 arg2 =
+    Thunk2 $ mkExists2 $ ThunkRecord2
+        { func
+        , arg1
+        , arg2
+        , eqArg1 : Nothing
+        , eqArg2 : Nothing
+        , lazy : defer \_ -> func arg1 arg2
+        }
 
 
 -- | > Same as `lazy` but checks on three arguments.
+-- |
+-- | The diffing process will operate somewhat more efficiently if the function you
+-- | provide has a stable reference (that we can check for reference equality the
+-- | next time we see it).
 lazy3 :: ∀ a b c msg. Eq a => Eq b => Eq c => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
 lazy3 func arg1 arg2 arg3 =
-    Thunk3 (mkExists3 (ThunkRecord3 {func, arg1, arg2, arg3, lazy: defer \_ -> func arg1 arg2 arg3}))
+    Thunk3 $ mkExists3 $ ThunkRecord3
+        { func
+        , arg1
+        , arg2
+        , arg3
+        , eqArg1 : Just eq
+        , eqArg2 : Just eq
+        , eqArg3 : Just eq
+        , lazy : defer \_ -> func arg1 arg2 arg3
+        }
+
+
+-- | Like `lazy3`, but does not require an `Eq` instance. Using `lazy3` will do
+-- | a better job of detecting equality.
+lazy3_ :: ∀ a b c msg. Eq a => Eq b => Eq c => (a -> b -> c -> Node msg) -> a -> b -> c -> Node msg
+lazy3_ func arg1 arg2 arg3 =
+    Thunk3 $ mkExists3 $ ThunkRecord3
+        { func
+        , arg1
+        , arg2
+        , arg3
+        , eqArg1 : Nothing
+        , eqArg2 : Nothing
+        , eqArg3 : Nothing
+        , lazy : defer \_ -> func arg1 arg2 arg3
+        }
 
 
 -- RENDERER
