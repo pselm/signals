@@ -593,6 +593,11 @@ equalOptions a b =
 -- |
 -- | For a version of this function that doesn't require an `Eq` instance, see
 -- | `lazy_`. This one will do a better job of detecting equality.
+--
+-- TODO: One idea I coul explore is an `Eq`-like instance that represents
+-- something better than `unsafeRefEq` but not as reliable as `Eq` ... that is,
+-- no false positives, but some false negatives. Perhaps `PartialEq`? Though
+-- `Partial` doesn't quite have the right connotation.
 lazy :: ∀ a msg. Eq a => (a -> Node msg) -> a -> Node msg
 lazy func arg =
     Thunk (defer \_ -> func arg) $ mkExists $ ThunkRecord1
