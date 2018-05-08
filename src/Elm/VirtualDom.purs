@@ -520,8 +520,7 @@ style = Styles
 -- | > information out of the event object. If the decoder succeeds, it will produce
 -- | > a message and route it to your `update` function.
 on :: ∀ msg. String -> Decoder msg -> Property msg
-on =
-    (flip onWithOptions) defaultOptions
+on = (flip onWithOptions) defaultOptions
 
 
 -- | > Same as `on` but you can set a few options.
@@ -589,6 +588,7 @@ lazy func arg =
         { func
         , arg : arg /\ Just eq
         }
+
 
 -- | Like `lazy`, but does not require an `Eq` instance. Using `lazy` will do
 -- | a better job of detecting equality.
