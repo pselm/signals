@@ -19,7 +19,7 @@ module Elm.VirtualDom
 import Control.Apply (lift2)
 import Control.Comonad (extract)
 import Control.Monad (when, unless, (>=>))
-import Control.Monad.Eff (Eff, runPure, forE)
+import Control.Monad.Eff (Eff, forE, runPure, kind Effect)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Except.Trans (runExceptT, throwError)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
@@ -815,9 +815,8 @@ render doc vNode eventNode =
                             }
                 in do
                     domNode <- render doc subNode subEventRoot
-                    -- Will need to see where this gets used ... it's a bit
-                    -- hacksih, possibly? Could probably make it a **bit**
-                    -- more type-safe.
+                    -- Will need to see where this gets used ... it's not absolutely
+                    -- clear why we're putting this in the DOM.
                     for_ (nodeToElement domNode) \element ->
                         setProperty elmEventNodeRef (toForeign subEventRoot) element
                     pure domNode
@@ -889,6 +888,13 @@ applyFacts eventNode operations elem = do
 -- listener, by having the listener refer to some data "deposited" as a
 -- property on the DOM node. Thus, we can mutate the listener by changing that
 -- data.
+
+-- | The information that a handler needs (in addition to the event!)
+type HandlerInfo msg =
+    { decoder :: Decoder msg
+    , options :: Options
+    }
+
 
 {-
 function applyEvents(domNode, eventNode, events)

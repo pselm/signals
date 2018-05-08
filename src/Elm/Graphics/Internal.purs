@@ -13,26 +13,28 @@ module Elm.Graphics.Internal
     , defaultView
     , nodeToElement, documentToHtmlDocument
     , documentForNode
+    , EventHandler, eventHandler, addEventHandler, setHandlerInfo, removeEventHandler
     ) where
 
 
+import Control.Comonad (extract)
+import Control.Monad.Eff (Eff, foreachE, kind Effect)
+import Control.Monad.Except.Trans (runExceptT)
 import DOM (DOM)
-import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode, readHTMLDocument)
+import DOM.Event.Types (Event, EventTarget, EventType)
 import DOM.HTML.Document (body)
+import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode, readHTMLDocument)
 import DOM.Node.Document (createElement)
-import DOM.Node.Types (Document, Element, Node, elementToNode)
-import DOM.Node.NodeType (NodeType(ElementNode))
 import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType, ownerDocument)
-import Data.Nullable (Nullable)
-import Data.Maybe (Maybe(..), fromMaybe)
+import DOM.Node.NodeType (NodeType(ElementNode))
+import DOM.Node.Types (Document, Element, Node, elementToNode)
 import Data.Either (either)
 import Data.Foreign (Foreign, toForeign)
-import Control.Comonad (extract)
-import Control.Monad.Eff (Eff, foreachE)
-import Control.Monad.Except.Trans (runExceptT)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Nullable (Nullable)
 import Partial.Unsafe (unsafePartial)
-import Unsafe.Coerce (unsafeCoerce)
 import Prelude (bind, discard, pure, void, Unit, (<#>), (<$>), ($), const)
+import Unsafe.Coerce (unsafeCoerce)
 
 
 -- Sets the style named in the first param to the value of the second param
@@ -194,3 +196,45 @@ documentToHtmlDocument :: Document -> Maybe HTMLDocument
 documentToHtmlDocument doc =
     extract $ either (const Nothing) Just <$>
         runExceptT (readHTMLDocument (toForeign doc))
+
+
+-- | Like `DOM.Event.EventTarget.EventListener`, but parameterized by the `msg`
+-- | type, and you can mutate the "info" that it uses without removing and
+-- | adding the listener.
+foreign import data EventHandler :: # Effect -> Type -> Type
+
+
+-- | Like `DOM.Event.EventTarget.eventListener`, but your function also gets
+-- | some info of type `i`, and you can change that info without removing and
+-- | re-applying the handler. And, since you can mutate the result, producing
+-- | it needs to be an `Eff` itself.
+-- |
+-- | You have to supply some initial info (which you can change using
+-- | `setHandlerInfo`).
+foreign import eventHandler :: ∀ e i a.
+    i -> (i -> Event -> Eff e a) -> Eff e (EventHandler e i)
+
+
+-- | Like `addEventListener`, but for handlers. The `Boolean` arg indicates
+-- | whether to use the "capture" phase.
+foreign import addEventHandler :: ∀ e i.
+    EventType ->
+    EventHandler (dom :: DOM | e) i ->
+    Boolean ->
+    EventTarget ->
+    Eff (dom :: DOM | e) Unit
+
+
+-- | Supply a different value for the handler, for use with the callback
+-- | function, without removing and re-applying the handler.
+foreign import setHandlerInfo :: ∀ e i.
+    i -> EventHandler e i -> Eff (dom :: DOM | e) Unit
+
+
+-- | Like `removeEventListener`
+foreign import removeEventHandler :: ∀ e i.
+    EventType ->
+    EventHandler (dom :: DOM | e) i ->
+    Boolean ->
+    EventTarget ->
+    Eff (dom :: DOM | e) Unit

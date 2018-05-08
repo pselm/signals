@@ -125,3 +125,52 @@ exports.removeAttributeNS = function (ns) {
 exports.defaultView = function (htmlDoc) {
     return htmlDoc.defaultView;
 };
+
+exports.eventHandler = function (i) {
+    return function (fn) {
+        return function () {
+            function handler (event) {
+                fn(handler.info)(event)();
+            };
+
+            handler.info = i;
+
+            return handler;
+        };
+    };
+};
+
+exports.setHandlerInfo = function (i) {
+    return function (handler) {
+        return function () {
+            handler.info = i;
+            return {};
+        };
+    };
+};
+
+exports.addEventHandler = function (type) {
+    return function (handler) {
+        return function (useCapture) {
+            return function (target) {
+                return function () {
+                    target.addEventListener(type, handler, useCapture);
+                    return {};
+                };
+            };
+        };
+    };
+};
+
+exports.removeEventHandler = function (type) {
+    return function (handler) {
+        return function (useCapture) {
+            return function (target) {
+                return function () {
+                    target.removeEventListener(type, handler, useCapture);
+                    return {};
+                };
+            };
+        };
+    };
+};
