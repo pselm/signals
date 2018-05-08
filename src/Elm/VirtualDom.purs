@@ -966,7 +966,6 @@ data PatchOp msg
     = PRedraw (Node msg)
     | PFacts (Array (FactChange msg))
     | PText String
-    | PThunk
     | PTagger
     | PRemoveLast Int
     | PAppend (List (Node msg))
@@ -2100,9 +2099,6 @@ applyPatch patch domNode = do
 
         PText string -> do
             setTextContent string domNode
-            pure domNode
-
-        PThunk ->
             pure domNode
 
         {-
