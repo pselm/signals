@@ -1930,6 +1930,16 @@ addDomNodes rootNode vNode patches eventNode = do
             case maybeDest of
                 Just domNode ->
                     let
+                        -- Ah, it's possible that the elm_event_node_ref needs
+                        -- to be tracked as I traverse, so that the `eventNode`
+                        -- here is accurate for the patch. So, instead of
+                        -- traversing over just the domNode, we'd traverse over
+                        -- a Tuple of domNode and eventNode.
+                        --
+                        -- It feels as though it would be better to keep the
+                        -- eventNodes in some kind of state here, rather than
+                        -- in the DOM, but I may as well start the way Elm does
+                        -- it.
                         patchWithNodes =
                             { patch
                             , domNode
@@ -2017,6 +2027,10 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 				subNode = subNode.node;
 			}
 
+            // TODO: Figure out the significance of using the domNode.elm_event_node_ref here ...
+            // it's possible that it's doing something which I'll need to factor into the
+            // traversal of the DOM ... it's tracking the current `eventNode` according to
+            // what it finds in the DOM?
 			return addDomNodesHelp(domNode, subNode, patches, i, low + 1, high, domNode.elm_event_node_ref);
 
 		case 'node':
@@ -2124,6 +2138,46 @@ applyPatch patch domNode = do
 
         PTagger ->
             pure domNode
+
+        -- I suppose the significance of elm_event_node_ref is partly so that
+        -- we can modify it in-place? Here, we're changing the tagger and not
+        -- the parent. Which, I suppose, means that creating an `EventNode`
+        -- will need to be effectful ... otherwise, we can't mutate one!
+        -- I suppose the way Elm sets things up, the mutation is necessary, because
+        -- the subEventNodes retain a reference to their parent, and their parent
+        -- may be changed.
+        --
+        -- So, my working theory is that we're storing the event nodes in the
+        -- DOM so that, as we traverse the DOM with patches, we can keep track
+        -- of which eventNode we ought to be using. And, we modify the event
+        -- node in place, because the children retain a reference to it. It's
+        -- curious that we don't just walk up the DOM to find event nodes
+        -- (rather than internally retain a reference), but there may well be a
+        -- good reason for that.
+        --
+        -- Well, I suppose that retaining a reference to your eventNode parent
+        -- is faster than walking up the DOM. But, you know, there is a
+        -- conceptually clearer scheme that occurs to me.
+        --
+        -- 1. The initial listener would apply its decoder and, if succesful,
+        --    dispatch a custom event with the result, to itself. This would
+        --    bubble up in the normal way until something handles it. (In fact,
+        --    you could imagine bubbling a different custom event for a decoder
+        --    failure, which Elm currently silently drops, but which something
+        --    could conceivably listen for).
+        --
+        -- 2. A "tagger" would simply install a listener for this custom event,
+        --    which runs a function on it an then dispatches the result, using
+        --    the same custom event, to its parent. (Or in some way continues
+        --    bubbling the event with the transformed content).
+        --
+        -- 3. Once you reach the top, there would be a listener for these events
+        --    that would send them into the app's event loop.
+        --
+        -- You know, I think that's much nicer -- it should accomplish the same
+        -- thing and be conceptually clearer. There may be performance
+        -- implications, but event bubbling is something that ought to be quite
+        -- optimized ... it may not amount to anything.
 
         {-
 			if (typeof domNode.elm_event_node_ref !== 'undefined')
@@ -2244,6 +2298,7 @@ redraw domNode vNode eventNode = do
     parentNode <- parentNode domNode
     newNode <- render document vNode eventNode
 
+    -- TODO: Figure out the significance of this ...
     {-
     if (typeof newNode.elm_event_node_ref === 'undefined')
  	{
