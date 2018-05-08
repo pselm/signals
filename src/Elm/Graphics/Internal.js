@@ -126,8 +126,8 @@ exports.defaultView = function (htmlDoc) {
     return htmlDoc.defaultView;
 };
 
-exports.eventHandler = function (i) {
-    return function (fn) {
+exports.eventHandler = function (fn) {
+    return function (i) {
         return function () {
             function handler (event) {
                 fn(handler.info)(event)();
@@ -171,6 +171,23 @@ exports.removeEventHandler = function (type) {
                     return {};
                 };
             };
+        };
+    };
+};
+
+exports.makeCustomEvent = function (eventName) {
+    return function (detail) {
+        return function () {
+            if (typeof(CustomEvent) === 'function') {
+                return new CustomEvent(eventName, {
+                    detail: detail,
+                    bubbles: true
+                });
+            } else {
+                var event = document.createEvent('CustomEvent');
+                event.initCustomEvent(eventName, true, false, detail);
+                return event;
+            }
         };
     };
 };

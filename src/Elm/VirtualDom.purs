@@ -20,12 +20,16 @@ import Control.Apply (lift2)
 import Control.Comonad (extract)
 import Control.Monad (when, unless, (>=>))
 import Control.Monad.Eff (Eff, forE, runPure, kind Effect)
+import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Except.Trans (runExceptT, throwError)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Rec.Class (Step(..), tailRecM2)
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import DOM (DOM)
+import DOM.Event.Event (currentTarget, preventDefault, stopPropagation)
+import DOM.Event.EventTarget (dispatchEvent)
+import DOM.Event.Types (Event, EventTarget, customEventToEvent)
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
 import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
@@ -52,8 +56,9 @@ import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
-import Elm.Graphics.Internal (setStyle, removeStyle, setProperty, setPropertyIfDifferent, removeProperty, setAttributeNS, removeAttributeNS, nodeToElement, documentForNode)
-import Elm.Json.Decode (Decoder, Value, equalDecoders)
+import Elm.Graphics.Internal (EventHandler, documentForNode, eventHandler, makeCustomEvent, nodeToElement, removeAttributeNS, removeProperty, removeStyle, setAttributeNS, setProperty, setPropertyIfDifferent, setStyle)
+import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecoders)
+import Elm.Result (Result(..))
 import Graphics.Canvas (CANVAS)
 import Partial.Unsafe (unsafeCrashWith)
 import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
@@ -736,11 +741,6 @@ composeTaggers coyo =
                 coyo
 
 
--- | The name for the custom event we use to dispatch Elm messages up the tree.
-elmMsgEvent :: String
-elmMsgEvent = "elm_msg_event"
-
-
 render :: ∀ e msg. Document -> Node msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
 render doc vNode =
     case vNode of
@@ -799,11 +799,11 @@ render doc vNode =
             -- affects traversals and indexes!
             composeTaggers coyo # unCoyoneda \func subNode -> do
                     domNode <- render doc subNode
-                    
+
                     -- TODO: Add a listener for our custom Elm `msg` event, so
                     -- we can tag it and re-dispatch it. We can use the handler
                     -- mechanism to change the tagger on the fly!
-                    
+
                     pure domNode
 
         Custom renderable ->
@@ -881,6 +881,60 @@ type HandlerInfo msg =
     }
 
 
+-- | The name for the custom event we use to dispatch Elm messages up the tree.
+elmMsgEvent :: String
+elmMsgEvent = "elm_msg_event"
+
+
+
+-- | Attaches the initial info to a newly produced handler. The info is
+-- | mutable, so this is an `Eff`
+makeEventHandler :: ∀ e msg. HandlerInfo msg -> Eff (dom :: DOM, err :: EXCEPTION | e) (EventHandler (dom :: DOM, err :: EXCEPTION | e) (HandlerInfo msg))
+makeEventHandler = eventHandler handleEvent
+
+
+-- | The generic handler for any Elm event. We're doing something different
+-- | here than Elm does. Instead of interally tracking "event nodes" and
+-- | passing things up that chain, we apply our decoder and then re-dispatch a
+-- | custom event with the results. So, whatever is above us in the DOM can do
+-- | what it likes with that -- less book-keeping is needed.
+handleEvent :: ∀ e msg. HandlerInfo msg -> Event -> Eff (dom :: DOM, err :: EXCEPTION | e) Unit
+handleEvent info event =
+    case decodeValue info.decoder (toForeign event) of
+        Err _ ->
+            -- Should we dispatch a distinct message that someone could listen
+            -- to in order to catch the error? Might not be a bad idea.
+            -- However, failing the decoder at this stage is a genuine strategy
+            -- ... that way, you don't have to go through an `update` round.
+            -- So, it's not as though this *necessarily* represents a bug.
+            pure unit
+
+        Ok msg -> do
+            -- Perhaps curiously, the Elm code doesn't stopPropagation or
+            -- preventDefault unless the decoder succeeds ... so, we'll do that
+            -- as well.
+            when info.options.preventDefault $
+                preventDefault event
+
+            when info.options.stopPropagation $
+                stopPropagation event
+
+            -- We re-dispatch the transformed message from the point in the
+            -- DOM where the listener was attached, not necessarily where the
+            -- event originated, since that will match the taggers up.
+            msgEvent <-
+                makeCustomEvent elmMsgEvent (toForeign msg)
+
+            -- dispatchEvent adds the `EXCEPTION` effect
+            void $ dispatchEvent (customEventToEvent msgEvent) (currentEventTarget event)
+
+
+-- | Oddly, currentTarget returns a `Node` rather than an `EventTarget`, so
+-- | we'll coerce.
+currentEventTarget :: Event -> EventTarget
+currentEventTarget = unsafeCoerce currentTarget
+
+
 {-
 function applyEvents(domNode, eventNode, events)
 {
@@ -909,53 +963,6 @@ function applyEvents(domNode, eventNode, events)
 	}
 
 	domNode.elm_handlers = allHandlers;
-}
-
-function makeEventHandler(eventNode, info)
-{
-	function eventHandler(event)
-	{
-		var info = eventHandler.info;
-
-		var value = A2(_elm_lang$core$Native_Json.run, info.decoder, event);
-
-		if (value.ctor === 'Ok')
-		{
-			var options = info.options;
-			if (options.stopPropagation)
-			{
-				event.stopPropagation();
-			}
-			if (options.preventDefault)
-			{
-				event.preventDefault();
-			}
-
-			var message = value._0;
-
-			var currentEventNode = eventNode;
-			while (currentEventNode)
-			{
-				var tagger = currentEventNode.tagger;
-				if (typeof tagger === 'function')
-				{
-					message = tagger(message);
-				}
-				else
-				{
-					for (var i = tagger.length; i--; )
-					{
-						message = tagger[i](message);
-					}
-				}
-				currentEventNode = currentEventNode.parent;
-			}
-		}
-	};
-
-	eventHandler.info = info;
-
-	return eventHandler;
 }
 -}
 
@@ -2100,10 +2107,6 @@ applyPatch patch domNode = do
         PText string -> do
             setTextContent string domNode
             pure domNode
-
-        {-
-			return applyPatchesHelp(domNode, patch.data);
-        -}
 
         PTagger ->
             pure domNode

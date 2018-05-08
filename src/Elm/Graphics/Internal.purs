@@ -14,6 +14,7 @@ module Elm.Graphics.Internal
     , nodeToElement, documentToHtmlDocument
     , documentForNode
     , EventHandler, eventHandler, addEventHandler, setHandlerInfo, removeEventHandler
+    , makeCustomEvent
     ) where
 
 
@@ -21,7 +22,7 @@ import Control.Comonad (extract)
 import Control.Monad.Eff (Eff, foreachE, kind Effect)
 import Control.Monad.Except.Trans (runExceptT)
 import DOM (DOM)
-import DOM.Event.Types (Event, EventTarget, EventType)
+import DOM.Event.Types (CustomEvent, Event, EventTarget, EventType)
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode, readHTMLDocument)
 import DOM.Node.Document (createElement)
@@ -212,7 +213,7 @@ foreign import data EventHandler :: # Effect -> Type -> Type
 -- | You have to supply some initial info (which you can change using
 -- | `setHandlerInfo`).
 foreign import eventHandler :: ∀ e i a.
-    i -> (i -> Event -> Eff e a) -> Eff e (EventHandler e i)
+    (i -> Event -> Eff e a) -> i -> Eff e (EventHandler e i)
 
 
 -- | Like `addEventListener`, but for handlers. The `Boolean` arg indicates
@@ -238,3 +239,8 @@ foreign import removeEventHandler :: ∀ e i.
     Boolean ->
     EventTarget ->
     Eff (dom :: DOM | e) Unit
+
+
+-- | It feels as though purescript-dom ought to have a way to do this, but
+-- | I can't find it.
+foreign import makeCustomEvent :: ∀ e. String -> Foreign -> Eff e CustomEvent
