@@ -104,30 +104,15 @@ type NodeRecord msg =
     }
 
 
-newtype EventNodeRecord msg parentMsg = EventNodeRecord
-    { tagger :: msg -> parentMsg
-    , parent :: EventNode parentMsg
-    }
-
-
-data EventNode msg
-    = RootEventNode
-    | SubEventNode (Exists (EventNodeRecord msg))
-
-
--- The references to rootEventNode here don't ultimately make sense.
--- Eventually, the thing that is `Renderable` is going to have to
--- include the concept of an `EventNode`, in one way or another.
+-- Note that something will need to be listening for the Elm `msg` custom
+-- events and send them back into an event loop for this to be fully
+-- functional.
 instance renderableNode :: Renderable (Node msg) where
-    render document n =
-        render document n RootEventNode
+    render = render
 
-    update old current = do
-        applyPatches
-            old.result
-            old.value
-            (diff old.value current)
-            RootEventNode
+    update old current =
+        applyPatches old.result old.value $
+            diff old.value current
 
 
 type Thunk msg = Exists (ThunkRecord1 msg)
@@ -751,21 +736,22 @@ composeTaggers coyo =
                 coyo
 
 
-elmEventNodeRef :: String
-elmEventNodeRef = "elm_event_node_ref"
+-- | The name for the custom event we use to dispatch Elm messages up the tree.
+elmMsgEvent :: String
+elmMsgEvent = "elm_msg_event"
 
 
-render :: ∀ e msg. Document -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
-render doc vNode eventNode =
+render :: ∀ e msg. Document -> Node msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+render doc vNode =
     case vNode of
         Thunk l _ ->
-            render doc (force l) eventNode
+            render doc (force l)
 
         Thunk2 l _ ->
-            render doc (force l) eventNode
+            render doc (force l)
 
         Thunk3 l _ ->
-            render doc (force l) eventNode
+            render doc (force l)
 
         Text string ->
             createTextNode string doc
@@ -780,10 +766,10 @@ render doc vNode eventNode =
                     Nothing ->
                         createElement rec.tag doc
 
-            applyFacts eventNode (initialFactChanges rec.facts) domNode
+            applyFacts (initialFactChanges rec.facts) domNode
 
             for_ children \child -> do
-                renderedChild <- render doc child eventNode
+                renderedChild <- render doc child
                 appendChild renderedChild (elementToNode domNode)
 
             pure (elementToNode domNode)
@@ -797,10 +783,10 @@ render doc vNode eventNode =
                     Nothing ->
                         createElement rec.tag doc
 
-            applyFacts eventNode (initialFactChanges rec.facts) domNode
+            applyFacts (initialFactChanges rec.facts) domNode
 
             for_ children \(Tuple key child) -> do
-                renderedChild <- render doc child eventNode
+                renderedChild <- render doc child
                 appendChild renderedChild (elementToNode domNode)
 
             pure (elementToNode domNode)
@@ -811,19 +797,13 @@ render doc vNode eventNode =
             -- when diffing. But it's better to compose here, because we're
             -- only writing out one DOM node. Remember to check how this
             -- affects traversals and indexes!
-            composeTaggers coyo # unCoyoneda \func subNode ->
-                let
-                    subEventRoot =
-                        SubEventNode $ mkExists $ EventNodeRecord
-                            { tagger : func
-                            , parent : eventNode
-                            }
-                in do
-                    domNode <- render doc subNode subEventRoot
-                    -- Will need to see where this gets used ... it's not absolutely
-                    -- clear why we're putting this in the DOM.
-                    for_ (nodeToElement domNode) \element ->
-                        setProperty elmEventNodeRef (toForeign subEventRoot) element
+            composeTaggers coyo # unCoyoneda \func subNode -> do
+                    domNode <- render doc subNode
+                    
+                    -- TODO: Add a listener for our custom Elm `msg` event, so
+                    -- we can tag it and re-dispatch it. We can use the handler
+                    -- mechanism to change the tagger on the fly!
+                    
                     pure domNode
 
         Custom renderable ->
@@ -837,8 +817,8 @@ render doc vNode eventNode =
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e f msg. (Foldable f) => EventNode msg -> f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
-applyFacts eventNode operations elem = do
+applyFacts :: ∀ e f msg. (Foldable f) => f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts operations elem = do
     for_ operations \operation ->
         case operation of
             AddAttribute key value ->
@@ -1032,8 +1012,8 @@ type Patch msg =
     }
 
 
--- The Elm version also includes a domNode and eventNode ... we add those a bit
--- later in the process.
+-- The Elm version also includes a domNode and eventNode ... we add the domNode
+-- later, and we've changed the implementation so that we don't use an eventNode
 makePatch :: ∀ msg. PatchOp msg -> List Int -> Patch msg
 makePatch type_ index =
     { index
@@ -1184,12 +1164,11 @@ traversal (Cons c cs) (Cons d ds) =         -- Something left on both sides, so 
                 }
 
 
--- This represents a patch with a domNode and event node filled in ... that is,
+-- This represents a patch with a domNode filled in ... that is,
 -- a patch where we've now determined exactly what it is going to patch.
 type PatchWithNodes msg =
     { patch :: Patch msg
     , domNode :: DOM.Node
-    , eventNode :: EventNode msg
     }
 
 
@@ -1904,8 +1883,8 @@ function removeNode(changes, localPatches, key, vnode, index)
 -}
 
 
-addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode msg -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
-addDomNodes rootNode vNode patches eventNode = do
+addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
+addDomNodes rootNode vNode patches = do
     patches
         # List.foldM step
             { currentNode: rootNode
@@ -1935,20 +1914,9 @@ addDomNodes rootNode vNode patches eventNode = do
             case maybeDest of
                 Just domNode ->
                     let
-                        -- Ah, it's possible that the elm_event_node_ref needs
-                        -- to be tracked as I traverse, so that the `eventNode`
-                        -- here is accurate for the patch. So, instead of
-                        -- traversing over just the domNode, we'd traverse over
-                        -- a Tuple of domNode and eventNode.
-                        --
-                        -- It feels as though it would be better to keep the
-                        -- eventNodes in some kind of state here, rather than
-                        -- in the DOM, but I may as well start the way Elm does
-                        -- it.
                         patchWithNodes =
                             { patch
                             , domNode
-                            , eventNode
                             }
 
                     in
@@ -2088,14 +2056,14 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
-applyPatches rootDomNode oldVirtualNode patches eventNode =
+applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+applyPatches rootDomNode oldVirtualNode patches =
     if List.null patches
         then
             pure rootDomNode
 
         else
-            addDomNodes rootDomNode oldVirtualNode patches eventNode
+            addDomNodes rootDomNode oldVirtualNode patches
             >>= applyPatchesHelp rootDomNode
 
 
@@ -2121,11 +2089,11 @@ applyPatch patch domNode = do
 
     case patch.patch.type_ of
         PRedraw vNode ->
-            redraw domNode vNode patch.eventNode
+            redraw domNode vNode
 
         PFacts changes -> do
             nodeToElement domNode
-                <#> applyFacts patch.eventNode changes
+                <#> applyFacts changes
                 # fromMaybe (pure unit)
 
             pure domNode
@@ -2210,9 +2178,8 @@ applyPatch patch domNode = do
             pure domNode
 
         PAppend newNodes -> do
-            for_ newNodes \n ->
-                render document n patch.eventNode
-                >>= (flip appendChild) domNode
+            for_ newNodes $
+                render document >=> (flip appendChild) domNode
 
             pure domNode
 
@@ -2297,18 +2264,16 @@ function applyPatchReorderEndInsertsHelp(endInserts, patch)
             -}
 
 
-redraw :: ∀ e msg. DOM.Node -> Node msg -> EventNode msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
-redraw domNode vNode eventNode = do
+redraw :: ∀ e msg. DOM.Node -> Node msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+redraw domNode vNode = do
     document <- documentForNode domNode
     parentNode <- parentNode domNode
-    newNode <- render document vNode eventNode
+    newNode <- render document vNode
 
-    -- TODO: Figure out the significance of this ...
-    {-
-    if (typeof newNode.elm_event_node_ref === 'undefined')
- 	{
-+		newNode.elm_event_node_ref = domNode.elm_event_node_ref;
-    -}
+    -- TODO: Consider how to handle a tagger that was listening here ...  we'll
+    -- need to re-attach it ... but it comes from one-level up, not down.
+    -- Perhaps we'll need to pass in a `Maybe ...` with a tagger to apply?
+    -- Since the caller ought to know, I think. Yes, that ought to work.
 
     case parentNode of
         Just p -> do
