@@ -90,21 +90,28 @@ module DOM.Renderable
     , Rendered, updateDOM
     , AnyRenderable, toAnyRenderable, makeAnyRenderable
     , renderOrUpdate
+    , EffDOM
     ) where
 
 
 import Control.Monad (when)
 import Control.Monad.Eff (Eff, untilE)
+import Control.Monad.Eff.Exception (EXCEPTION)
 import DOM (DOM)
-import DOM.Node.Types (Document, Element, Node, elementToNode, textToNode)
-import DOM.Node.Node (parentNode, firstChild, appendChild, replaceChild, removeChild, insertBefore, ownerDocument, setTextContent)
 import DOM.Node.Document (createTextNode)
-import Data.Nullable (Nullable, toMaybe)
-import Data.Maybe (Maybe(..), fromMaybe)
+import DOM.Node.Node (parentNode, firstChild, appendChild, replaceChild, removeChild, insertBefore, ownerDocument, setTextContent)
+import DOM.Node.Types (Document, Element, Node, elementToNode, textToNode)
 import Data.Exists (Exists, runExists, mkExists)
-import Unsafe.Coerce (unsafeCoerce)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Nullable (Nullable, toMaybe)
 import Graphics.Canvas (CANVAS)
 import Prelude (Unit, bind, discard, pure, unit, not, void, ($), (#), (<$>), (<#>), (/=))
+import Unsafe.Coerce (unsafeCoerce)
+
+
+-- | A convenience so we don't have to repeat so much in type signatures.
+type EffDOM e a =
+    Eff (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e) a
 
 
 -- | A `Renderable` is somethng that knows how to render some data type as a DOM
@@ -141,8 +148,8 @@ import Prelude (Unit, bind, discard, pure, unit, not, void, ($), (#), (<$>), (<#
 -- |   `Renderable` explicitly permits (and is able to detect or compensate for in its
 -- |   `update` method).
 class Renderable a where
-    render :: ∀ e. Document -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
-    update :: ∀ e. Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+    render :: ∀ e. Document -> a -> EffDOM e Node
+    update :: ∀ e. Rendered a -> a -> EffDOM e Node
 
 -- Originally, I didn't have `Canvas` in the row of effects, but it looks as though
 -- you need to list anything that an instance might want to use. In a way,
@@ -162,7 +169,7 @@ class Renderable a where
 -- | as follows:
 -- |
 -- |       update rendered = render rendered.document
-defaultUpdate :: ∀ a e. (Renderable a) => Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+defaultUpdate :: ∀ a e. (Renderable a) => Rendered a -> a -> EffDOM e Node
 defaultUpdate rendered =
     render rendered.document
 
@@ -186,8 +193,8 @@ type Rendered a =
 -- Packages up a value with the render and update methods that can act on it
 newtype RenderableValue a = RenderableValue
     { value :: a
-    , render :: ∀ e. Document -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
-    , update :: ∀ e. Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+    , render :: ∀ e. Document -> a -> EffDOM e Node
+    , update :: ∀ e. Rendered a -> a -> EffDOM e Node
     }
 
 
@@ -265,8 +272,8 @@ toAnyRenderable = makeAnyRenderable render update
 -- | An alternative to `toAnyRenderable`, in cases where you don't have a
 -- | `Renderable` instance, but you do have the necessary functions.
 makeAnyRenderable :: ∀ a.
-    (∀ e. Document -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node) ->
-    (∀ e. Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Node) ->
+    (∀ e. Document -> a -> EffDOM e Node) ->
+    (∀ e. Rendered a -> a -> EffDOM e Node) ->
     a ->
     AnyRenderable
 
@@ -304,7 +311,7 @@ documentForNode node =
 -- |
 -- | Or, for even more convenience, you could consider `renderOrUpdate`, which
 -- | keeps track of the previous data for you.
-renderIntoDOM :: ∀ e a. (Renderable a) => Position -> Node -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) (Rendered a)
+renderIntoDOM :: ∀ e a. (Renderable a) => Position -> Node -> a -> EffDOM e (Rendered a)
 renderIntoDOM position node value = do
     document <- documentForNode node
     result <- render document value
@@ -335,7 +342,7 @@ renderIntoDOM position node value = do
     pure { value, result, document }
 
 
-removeChildren :: ∀ e. Node -> Eff (canvas :: CANVAS, dom :: DOM | e) Unit
+removeChildren :: ∀ e. Node -> EffDOM e Unit
 removeChildren parent =
     untilE do
         child <- firstChild parent
@@ -349,7 +356,7 @@ removeChildren parent =
                 pure true
 
 
-replaceNode :: ∀ e. Node -> Node -> Eff (canvas :: CANVAS, dom :: DOM | e) Unit
+replaceNode :: ∀ e. Node -> Node -> EffDOM e Unit
 replaceNode old new = do
     parent <- parentNode old
 
@@ -366,7 +373,7 @@ replaceNode old new = do
 -- | Updates previously data previously rendered via `renderToDOM`, replacing
 -- | the originally rendered node in the DOM. Returns a structure that can be
 -- | provided to `updateDOM` for future changes in the value.
-updateDOM :: ∀ e a. (Renderable a) => Rendered a -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) (Rendered a)
+updateDOM :: ∀ e a. (Renderable a) => Rendered a -> a -> EffDOM e (Rendered a)
 updateDOM rendered value = do
     result <- update rendered value
 
@@ -388,7 +395,7 @@ foreign import getRenderable :: ∀ e. Element -> Eff (dom :: DOM | e) (Nullable
 -- | This stores the provided `Renderable` on the `Element`. So, when you call this again
 -- | with the same `Element`, we may be able to use the renderable's `update`
 -- | method, to efficiently update the DOM.
-renderOrUpdate :: ∀ e a. (Renderable a) => Element -> a -> Eff (canvas :: CANVAS, dom :: DOM | e) Unit
+renderOrUpdate :: ∀ e a. (Renderable a) => Element -> a -> EffDOM e Unit
 renderOrUpdate element renderable = do
     let
         new =

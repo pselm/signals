@@ -29,14 +29,14 @@ import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import DOM (DOM)
 import DOM.Event.Event (currentTarget, preventDefault, stopPropagation)
 import DOM.Event.EventTarget (dispatchEvent)
-import DOM.Event.Types (Event, EventTarget, customEventToEvent)
+import DOM.Event.Types (Event, EventTarget, EventType, customEventToEvent)
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
 import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
 import DOM.Node.NodeList (item)
-import DOM.Node.Types (Document, Element, textToNode, elementToNode)
+import DOM.Node.Types (Document, Element, elementToEventTarget, elementToNode, textToNode)
 import DOM.Node.Types (Node) as DOM
-import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
+import DOM.Renderable (class Renderable, AnyRenderable, EffDOM, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
@@ -49,6 +49,7 @@ import Data.Lazy (Lazy, defer, force)
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, null) as List
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
+import Data.Newtype (wrap)
 import Data.Ord (abs, max)
 import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap.ST (new, poke, peek)
@@ -56,10 +57,9 @@ import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
-import Elm.Graphics.Internal (EventHandler, documentForNode, eventHandler, makeCustomEvent, nodeToElement, removeAttributeNS, removeProperty, removeStyle, setAttributeNS, setProperty, setPropertyIfDifferent, setStyle)
+import Elm.Graphics.Internal (EventHandler, addEventHandler, detail, documentForNode, eventHandler, eventToCustomEvent, makeCustomEvent, nextEventTarget, nodeToElement, removeAttributeNS, removeProperty, removeStyle, setAttributeNS, setProperty, setPropertyIfDifferent, setStyle)
 import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecoders)
 import Elm.Result (Result(..))
-import Graphics.Canvas (CANVAS)
 import Partial.Unsafe (unsafeCrashWith)
 import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
@@ -741,7 +741,7 @@ composeTaggers coyo =
                 coyo
 
 
-render :: ∀ e msg. Document -> Node msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+render :: ∀ e msg. Document -> Node msg -> EffDOM e DOM.Node
 render doc vNode =
     case vNode of
         Thunk l _ ->
@@ -798,13 +798,34 @@ render doc vNode =
             -- only writing out one DOM node. Remember to check how this
             -- affects traversals and indexes!
             composeTaggers coyo # unCoyoneda \func subNode -> do
-                    domNode <- render doc subNode
+                domNode <-
+                    render doc subNode
 
-                    -- TODO: Add a listener for our custom Elm `msg` event, so
-                    -- we can tag it and re-dispatch it. We can use the handler
-                    -- mechanism to change the tagger on the fly!
+                -- Now, this may be a flaw in my scheme. I can't add a listener
+                -- to something unless it's an Element, not a Node. Now, in
+                -- theory you can add a tagger in Elm to a Node that isn't an
+                -- Element ...  e.g. a text node. However, I'm pretty sure that
+                -- it doesn't matter, because you can't attach Elm listeners to
+                -- plain text ...  you'd need to put it in a `span` or
+                -- something. (Since plain text has no Elm attributes). So, I
+                -- think this will work out OK, but we'll need to see.
+                for_ (nodeToElement domNode) \element -> do
+                    tagger <-
+                        makeTagger func
 
-                    pure domNode
+                    addEventHandler elmMsgEvent tagger false (elementToEventTarget element)
+
+                    -- We also store it as a property on the node, so that we can
+                    -- mutate the handler in future instead of removing it and
+                    -- re-adding it.
+                    --
+                    -- I suppose at some point I should reconsider this strategy of
+                    -- leaving things in the DOM ... it's a handy way to keep state
+                    -- around, I suppose, but we could probably do better if we
+                    -- tried.
+                    setProperty elmTaggerKey (toForeign tagger) element
+
+                pure domNode
 
         Custom renderable ->
             Renderable.render doc renderable
@@ -882,9 +903,8 @@ type HandlerInfo msg =
 
 
 -- | The name for the custom event we use to dispatch Elm messages up the tree.
-elmMsgEvent :: String
-elmMsgEvent = "elm_msg_event"
-
+elmMsgEvent :: EventType
+elmMsgEvent = wrap "elm_msg_event"
 
 
 -- | Attaches the initial info to a newly produced handler. The info is
@@ -933,6 +953,32 @@ handleEvent info event =
 -- | we'll coerce.
 currentEventTarget :: Event -> EventTarget
 currentEventTarget = unsafeCoerce currentTarget
+
+
+elmTaggerKey :: String
+elmTaggerKey = "elm_tagger"
+
+
+makeTagger :: ∀ e a b. (a -> b) -> Eff (dom :: DOM, err :: EXCEPTION | e) (EventHandler (dom :: DOM, err :: EXCEPTION | e) (a -> b))
+makeTagger = eventHandler handleTagger
+
+
+handleTagger :: ∀ e a b. (a -> b) -> Event -> Eff (dom :: DOM, err :: EXCEPTION | e) Unit
+handleTagger tagger event =
+    for_ (eventToCustomEvent event >>= detail) \msg -> do
+        -- So, we're not giving ourselves very much type-safety here ... we're
+        -- relying on the DOM to have been setup correctly so that our input is
+        -- an `a` and we should be relaying a `b` upwards. There may be ways to
+        -- improve on this.
+        taggedMsg <-
+            makeCustomEvent elmMsgEvent $ toForeign $ tagger $ unsafeCoerce msg
+
+        maybeNext <-
+            nextEventTarget $ currentTarget event
+
+        for_ maybeNext \next -> do
+            stopPropagation event
+            dispatchEvent (customEventToEvent taggedMsg) next
 
 
 {-
@@ -2062,7 +2108,7 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EffDOM e DOM.Node
 applyPatches rootDomNode oldVirtualNode patches =
     if List.null patches
         then
@@ -2073,7 +2119,7 @@ applyPatches rootDomNode oldVirtualNode patches =
             >>= applyPatchesHelp rootDomNode
 
 
-applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> EffDOM e DOM.Node
 applyPatchesHelp =
     List.foldM \rootNode patch -> do
         newNode <- applyPatch patch patch.domNode
@@ -2088,7 +2134,7 @@ applyPatchesHelp =
             else pure rootNode
 
 
-applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> EffDOM e DOM.Node
 applyPatch patch domNode = do
     document <-
         documentForNode domNode
@@ -2263,7 +2309,7 @@ function applyPatchReorderEndInsertsHelp(endInserts, patch)
             -}
 
 
-redraw :: ∀ e msg. DOM.Node -> Node msg -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Node
+redraw :: ∀ e msg. DOM.Node -> Node msg -> EffDOM e DOM.Node
 redraw domNode vNode = do
     document <- documentForNode domNode
     parentNode <- parentNode domNode

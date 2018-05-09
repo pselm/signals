@@ -50,6 +50,14 @@ exports.setProperty = function (key) {
     };
 };
 
+exports.getProperty = function (key) {
+    return function (element) {
+        return function () {
+            return element[key];
+        };
+    };
+};
+
 exports.removeProperty = function (key) {
     return function (element) {
         return function () {
@@ -190,4 +198,8 @@ exports.makeCustomEvent = function (eventName) {
             }
         };
     };
+};
+
+exports._detail = function (customEvent) {
+    return customEvent.detail;
 };
