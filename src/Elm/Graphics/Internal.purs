@@ -234,8 +234,8 @@ foreign import addEventHandler :: ∀ e i.
 
 -- | Supply a different value for the handler, for use with the callback
 -- | function, without removing and re-applying the handler.
-foreign import setHandlerInfo :: ∀ e i.
-    i -> EventHandler e i -> Eff (dom :: DOM | e) Unit
+foreign import setHandlerInfo :: ∀ e1 e2 i.
+    i -> EventHandler e1 i -> Eff (dom :: DOM | e2) Unit
 
 
 -- | Like `removeEventListener`

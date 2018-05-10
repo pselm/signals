@@ -49,15 +49,17 @@ import Data.Lazy (Lazy, defer, force)
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, null) as List
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
-import Data.Newtype (wrap)
+import Data.Newtype (unwrap, wrap)
+import Data.Nullable (Nullable, toMaybe)
 import Data.Ord (abs, max)
 import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
+import Data.StrMap (delete, empty, insert, lookup) as StrMap
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
-import Elm.Graphics.Internal (EventHandler, addEventHandler, detail, documentForNode, eventHandler, eventToCustomEvent, makeCustomEvent, nextEventTarget, nodeToElement, removeAttributeNS, removeProperty, removeStyle, setAttributeNS, setProperty, setPropertyIfDifferent, setStyle)
+import Elm.Graphics.Internal (EventHandler, addEventHandler, detail, documentForNode, eventHandler, eventToCustomEvent, makeCustomEvent, nextEventTarget, nodeToElement, removeAttributeNS, removeEventHandler, removeProperty, removeStyle, setAttributeNS, setHandlerInfo, setProperty, setPropertyIfDifferent, setStyle)
 import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecoders)
 import Elm.Result (Result(..))
 import Partial.Unsafe (unsafeCrashWith)
@@ -323,9 +325,9 @@ data FactChange msg
     | RemoveAttribute String
     | AddAttributeNS String String String
     | RemoveAttributeNS String String
-    | AddEvent String Options (Decoder msg)
-    | MutateEvent String Options (Decoder msg)
-    | RemoveEvent String Options
+    | AddEvent EventType Options (Decoder msg)
+    | MutateEvent EventType Options (Decoder msg)
+    | RemoveEvent EventType Options
     | AddStyle String String
     | RemoveStyle String
     | RemoveAllStyles
@@ -823,7 +825,7 @@ render doc vNode =
                     -- leaving things in the DOM ... it's a handy way to keep state
                     -- around, I suppose, but we could probably do better if we
                     -- tried.
-                    setProperty elmTaggerKey (toForeign tagger) element
+                    setTagger tagger element
 
                 pure domNode
 
@@ -838,7 +840,7 @@ render doc vNode =
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e f msg. (Foldable f) => f (FactChange msg) -> Element -> Eff (dom :: DOM | e) Unit
+applyFacts :: ∀ e f msg. (Foldable f) => f (FactChange msg) -> Element -> EffDOM e Unit
 applyFacts operations elem = do
     for_ operations \operation ->
         case operation of
@@ -854,14 +856,51 @@ applyFacts operations elem = do
             RemoveAttributeNS ns key ->
                 removeAttributeNS ns key elem
 
-            AddEvent key options decoder ->
-                unsafeCrashWith "TODO"
+            AddEvent key options decoder -> do
+                handlers  <-
+                    (fromMaybe StrMap.empty <<< toMaybe) <$>
+                        getHandlers elem
 
-            MutateEvent key options decoder ->
-                unsafeCrashWith "TODO"
+                handler <-
+                    makeEventHandler {options, decoder}
 
-            RemoveEvent key options ->
-                unsafeCrashWith "TODO"
+                let newHandlers = StrMap.insert (unwrap key) handler handlers
+
+                addEventHandler key handler false (elementToEventTarget elem)
+                setHandlers newHandlers elem
+
+            MutateEvent key options decoder -> do
+                handlers <-
+                    (fromMaybe StrMap.empty <<< toMaybe) <$>
+                        getHandlers elem
+
+                let handler =
+                        case StrMap.lookup (unwrap key) handlers of
+                            Just h ->
+                                h
+
+                            Nothing ->
+                                unsafeCrashWith "Could not find expected handler in DOM"
+
+                setHandlerInfo {options, decoder} handler
+
+            RemoveEvent key options -> do
+                handlers <-
+                    (fromMaybe StrMap.empty <<< toMaybe) <$>
+                        getHandlers elem
+
+                let handler =
+                        case StrMap.lookup (unwrap key) handlers of
+                            Just h ->
+                                h
+
+                            Nothing ->
+                                unsafeCrashWith "Could not find expected handler in DOM"
+
+                removeEventHandler key handler false (elementToEventTarget elem)
+
+                let newHandlers = StrMap.delete (unwrap key) handlers
+                setHandlers newHandlers elem
 
             AddStyle key value ->
                 setStyle key value elem
@@ -885,6 +924,15 @@ applyFacts operations elem = do
                 removeProperty key elem
 
 
+foreign import getHandlers :: ∀ e1 e2 msg. Element -> Eff e1 (Nullable (StrMap (MsgHandler e2 msg)))
+foreign import setHandlers :: ∀ e1 e2 msg. StrMap (MsgHandler e1 msg) -> Element -> Eff e2 Unit
+foreign import removeHandlers :: ∀ e. Element -> Eff e Unit
+
+foreign import getTagger :: ∀ e a b. Element -> Eff e (Nullable (TaggerHandler e a b))
+foreign import setTagger :: ∀ e1 e2 a b. TaggerHandler e1 a b -> Element -> Eff e2 Unit
+foreign import removeTagger :: ∀ e. Element -> Eff e Unit
+
+
 -- When Elm knows that there previously was a listener for an event, it does a
 -- kind of "mutate event" instead of removing the listener and adding a new
 -- one. This might happen frequently, because testing the equality of decoders
@@ -902,6 +950,10 @@ type HandlerInfo msg =
     }
 
 
+type MsgHandler e msg =
+    EventHandler (dom :: DOM, err :: EXCEPTION | e) (HandlerInfo msg)
+
+
 -- | The name for the custom event we use to dispatch Elm messages up the tree.
 elmMsgEvent :: EventType
 elmMsgEvent = wrap "elm_msg_event"
@@ -909,7 +961,7 @@ elmMsgEvent = wrap "elm_msg_event"
 
 -- | Attaches the initial info to a newly produced handler. The info is
 -- | mutable, so this is an `Eff`
-makeEventHandler :: ∀ e msg. HandlerInfo msg -> Eff (dom :: DOM, err :: EXCEPTION | e) (EventHandler (dom :: DOM, err :: EXCEPTION | e) (HandlerInfo msg))
+makeEventHandler :: ∀ e msg. HandlerInfo msg -> Eff (dom :: DOM, err :: EXCEPTION | e) (MsgHandler e msg)
 makeEventHandler = eventHandler handleEvent
 
 
@@ -955,11 +1007,11 @@ currentEventTarget :: Event -> EventTarget
 currentEventTarget = unsafeCoerce currentTarget
 
 
-elmTaggerKey :: String
-elmTaggerKey = "elm_tagger"
+type TaggerHandler e a b =
+    EventHandler (dom :: DOM, err :: EXCEPTION | e) (a -> b)
 
 
-makeTagger :: ∀ e a b. (a -> b) -> Eff (dom :: DOM, err :: EXCEPTION | e) (EventHandler (dom :: DOM, err :: EXCEPTION | e) (a -> b))
+makeTagger :: ∀ e a b. (a -> b) -> Eff (dom :: DOM, err :: EXCEPTION | e) (TaggerHandler e a b)
 makeTagger = eventHandler handleTagger
 
 
@@ -979,38 +1031,6 @@ handleTagger tagger event =
         for_ maybeNext \next -> do
             stopPropagation event
             dispatchEvent (customEventToEvent taggedMsg) next
-
-
-{-
-function applyEvents(domNode, eventNode, events)
-{
-	var allHandlers = domNode.elm_handlers || {};
-
-	for (var key in events)
-	{
-		var handler = allHandlers[key];
-		var value = events[key];
-
-		if (typeof value === 'undefined')
-		{
-			domNode.removeEventListener(key, handler);
-            allHandlers[key] = undefined;
-		}
-		else if (typeof handler === 'undefined')
-		{
-			var handler = makeEventHandler(eventNode, value);
-			domNode.addEventListener(key, handler);
-			allHandlers[key] = handler;
-		}
-		else
-		{
-			handler.info = value;
-		}
-	}
-
-	domNode.elm_handlers = allHandlers;
-}
--}
 
 
 --  DIFF
@@ -1467,7 +1487,7 @@ initialFactChanges facts =
         eventChanges =
             facts.events #
                 foldMap \k (Tuple options decoder) ->
-                    singleton (AddEvent k options decoder)
+                    singleton (AddEvent (wrap k) options decoder)
 
         styleChanges =
             facts.styles #
@@ -1607,11 +1627,11 @@ diffFacts old new =
                     case lookup k old.events of
                         Just (oldOptions /\ oldDecoder ) ->
                             unless (equalOptions oldOptions newOptions && equalDecoders oldDecoder newDecoder) do
-                                void $ pushSTArray accum (MutateEvent k newOptions newDecoder)
+                                void $ pushSTArray accum (MutateEvent (wrap k) newOptions newDecoder)
 
                         Nothing ->
                             void $
-                                pushSTArray accum (AddEvent k newOptions newDecoder)
+                                pushSTArray accum (AddEvent (wrap k) newOptions newDecoder)
 
                 oldEvent _ k (oldOptions /\ oldDecoder) =
                     case lookup k new.events of
@@ -1621,7 +1641,7 @@ diffFacts old new =
 
                         Nothing ->
                             void $
-                                pushSTArray accum (RemoveEvent k oldOptions)
+                                pushSTArray accum (RemoveEvent (wrap k) oldOptions)
 
 
             -- Push removals first, then additions. I've forgotten why each of
