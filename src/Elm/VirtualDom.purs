@@ -663,68 +663,6 @@ lazy3_ func arg1 arg2 arg3 =
         }
 
 
--- RENDERER
-
-{-
-function renderer(parent, tagger, initialVirtualNode)
-{
-	var eventNode = { tagger: tagger, parent: null };
-
-	var domNode = render(initialVirtualNode, eventNode);
-	parent.appendChild(domNode);
-
-	var state = 'NO_REQUEST';
-	var currentVirtualNode = initialVirtualNode;
-	var nextVirtualNode = initialVirtualNode;
-
-	function registerVirtualNode(vNode)
-	{
-		if (state === 'NO_REQUEST')
-		{
-			rAF(updateIfNeeded);
-		}
-		state = 'PENDING_REQUEST';
-		nextVirtualNode = vNode;
-	}
-
-	function updateIfNeeded()
-	{
-		switch (state)
-		{
-			case 'NO_REQUEST':
-				throw new Error(
-					'Unexpected draw callback.\n' +
-					'Please report this to <https://github.com/elm-lang/core/issues>.'
-				);
-
-			case 'PENDING_REQUEST':
-				rAF(updateIfNeeded);
-				state = 'EXTRA_REQUEST';
-
-				var patches = diff(currentVirtualNode, nextVirtualNode);
-				domNode = applyPatches(domNode, currentVirtualNode, patches, eventNode);
-				currentVirtualNode = nextVirtualNode;
-
-				return;
-
-			case 'EXTRA_REQUEST':
-				state = 'NO_REQUEST';
-				return;
-		}
-	}
-
-	return { update: registerVirtualNode };
-}
-
-
-var rAF =
-	typeof requestAnimationFrame !== 'undefined'
-		? requestAnimationFrame
-		: function(cb) { setTimeout(cb, 1000 / 60); };
-
--}
-
-
 -- RENDER
 
 
@@ -1439,25 +1377,6 @@ diffHelp a b index accum =
                 _, _ ->
                     -- This covers the case where they are different types
                     snoc accum (makePatch (PRedraw b) index)
-
-
-{-
-
-// assumes the incoming arrays are the same length
-function pairwiseRefEqual(as, bs)
-{
-	for (var i = 0; i < as.length; i++)
-	{
-		if (as[i] !== bs[i])
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
--}
 
 
 -- Could optimize this stage out by writing a function that went straight
@@ -2351,17 +2270,201 @@ redraw domNode vNode = do
 
 {-
 
-////////////  PROGRAMS  ////////////
+// PROGRAMS
 
+var program = makeProgram(checkNoFlags);
+var programWithFlags = makeProgram(checkYesFlags);
 
-function programWithFlags(details)
+function makeProgram(flagChecker)
 {
-	return {
-		init: details.init,
-		update: details.update,
-		subscriptions: details.subscriptions,
-		view: details.view,
-		renderer: renderer
+	return F2(function(debugWrap, impl)
+	{
+		return function(flagDecoder)
+		{
+			return function(object, moduleName, debugMetadata)
+			{
+				var checker = flagChecker(flagDecoder, moduleName);
+				if (typeof debugMetadata === 'undefined')
+				{
+					normalSetup(impl, object, moduleName, checker);
+				}
+				else
+				{
+					debugSetup(A2(debugWrap, debugMetadata, impl), object, moduleName, checker);
+				}
+			};
+		};
+	});
+}
+
+function staticProgram(vNode)
+{
+	var nothing = _elm_lang$core$Native_Utils.Tuple2(
+		_elm_lang$core$Native_Utils.Tuple0,
+		_elm_lang$core$Platform_Cmd$none
+	);
+	return A2(program, _elm_lang$virtual_dom$VirtualDom_Debug$wrap, {
+		init: nothing,
+		view: function() { return vNode; },
+		update: F2(function() { return nothing; }),
+		subscriptions: function() { return _elm_lang$core$Platform_Sub$none; }
+	})();
+}
+
+
+// FLAG CHECKERS
+
+function checkNoFlags(flagDecoder, moduleName)
+{
+	return function(init, flags, domNode)
+	{
+		if (typeof flags === 'undefined')
+		{
+			return init;
+		}
+
+		var errorMessage =
+			'The `' + moduleName + '` module does not need flags.\n'
+			+ 'Initialize it with no arguments and you should be all set!';
+
+		crash(errorMessage, domNode);
+	};
+}
+
+function checkYesFlags(flagDecoder, moduleName)
+{
+	return function(init, flags, domNode)
+	{
+		if (typeof flagDecoder === 'undefined')
+		{
+			var errorMessage =
+				'Are you trying to sneak a Never value into Elm? Trickster!\n'
+				+ 'It looks like ' + moduleName + '.main is defined with `programWithFlags` but has type `Program Never`.\n'
+				+ 'Use `program` instead if you do not want flags.'
+
+			crash(errorMessage, domNode);
+		}
+
+		var result = A2(_elm_lang$core$Native_Json.run, flagDecoder, flags);
+		if (result.ctor === 'Ok')
+		{
+			return init(result._0);
+		}
+
+		var errorMessage =
+			'Trying to initialize the `' + moduleName + '` module with an unexpected flag.\n'
+			+ 'I tried to convert it to an Elm value, but ran into this problem:\n\n'
+			+ result._0;
+
+		crash(errorMessage, domNode);
+	};
+}
+
+function crash(errorMessage, domNode)
+{
+	if (domNode)
+	{
+		domNode.innerHTML =
+			'<div style="padding-left:1em;">'
+			+ '<h2 style="font-weight:normal;"><b>Oops!</b> Something went wrong when starting your Elm program.</h2>'
+			+ '<pre style="padding-left:1em;">' + errorMessage + '</pre>'
+			+ '</div>';
+	}
+
+	throw new Error(errorMessage);
+}
+
+
+//  NORMAL SETUP
+
+function normalSetup(impl, object, moduleName, flagChecker)
+{
+	object['embed'] = function embed(node, flags)
+	{
+		while (node.lastChild)
+		{
+			node.removeChild(node.lastChild);
+		}
+
+		return _elm_lang$core$Native_Platform.initialize(
+			flagChecker(impl.init, flags, node),
+			impl.update,
+			impl.subscriptions,
+			normalRenderer(node, impl.view)
+		);
+	};
+
+	object['fullscreen'] = function fullscreen(flags)
+	{
+		return _elm_lang$core$Native_Platform.initialize(
+			flagChecker(impl.init, flags, document.body),
+			impl.update,
+			impl.subscriptions,
+			normalRenderer(document.body, impl.view)
+		);
+	};
+}
+
+function normalRenderer(parentNode, view)
+{
+	return function(tagger, initialModel)
+	{
+		var eventNode = { tagger: tagger, parent: undefined };
+		var initialVirtualNode = view(initialModel);
+		var domNode = render(initialVirtualNode, eventNode);
+		parentNode.appendChild(domNode);
+		return makeStepper(domNode, view, initialVirtualNode, eventNode);
+	};
+}
+
+
+// STEPPER
+
+var rAF =
+	typeof requestAnimationFrame !== 'undefined'
+		? requestAnimationFrame
+		: function(callback) { setTimeout(callback, 1000 / 60); };
+
+function makeStepper(domNode, view, initialVirtualNode, eventNode)
+{
+	var state = 'NO_REQUEST';
+	var currNode = initialVirtualNode;
+	var nextModel;
+
+	function updateIfNeeded()
+	{
+		switch (state)
+		{
+			case 'NO_REQUEST':
+				throw new Error(
+					'Unexpected draw callback.\n' +
+					'Please report this to <https://github.com/elm-lang/virtual-dom/issues>.'
+				);
+
+			case 'PENDING_REQUEST':
+				rAF(updateIfNeeded);
+				state = 'EXTRA_REQUEST';
+
+				var nextNode = view(nextModel);
+				var patches = diff(currNode, nextNode);
+				domNode = applyPatches(domNode, currNode, patches, eventNode);
+				currNode = nextNode;
+				return;
+
+			case 'EXTRA_REQUEST':
+				state = 'NO_REQUEST';
+				return;
+		}
+	}
+
+	return function stepper(model)
+	{
+		if (state === 'NO_REQUEST')
+		{
+			rAF(updateIfNeeded);
+		}
+		state = 'PENDING_REQUEST';
+		nextModel = model;
 	};
 }
 
