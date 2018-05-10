@@ -122,6 +122,43 @@ instance renderableNode :: Renderable (Node msg) where
             diff old.value current
 
 
+-- Try to determine whether two taggers are equal ... as best we can.  There
+-- will be some false negatives. Note that we only check the (possibly nested)
+-- tagging functions ... we don't check the final subnode.
+equalTaggers :: ∀ msg. Coyoneda Node msg -> Coyoneda Node msg -> Bool
+equalTaggers coyo1 coyo2 =
+    coyo1 # unCoyoneda (\func1 subNode1 ->
+    coyo2 # unCoyoneda (\func2 subNode2 ->
+        -- As far as the funcs go, the best we can do is reference equality.
+        if reallyUnsafeRefEq func1 func2 then
+            -- Since the funcs were equal, we have a warrant for believing
+            -- that the subNodes are of the same type.
+            case subNode1, subNode2 of
+                Tagger subcoyo1, Tagger subcoyo2 ->
+                    -- They both have another layer of tagger, so recurse.  I
+                    -- should see if there is some way to carry a witness to
+                    -- the type equality along with the Coyoneda.
+                    equalTaggers subcoyo1 (unsafeCoerce subcoyo2)
+
+                Tagger subcoyo1, _ ->
+                    -- There's an extra tagger on the left, so we're not equal
+                    false
+
+                _, Tagger subcoyo2 ->
+                    -- There's an extra tagger on the right, so we're not equal
+                    false
+
+                _, _ ->
+                    -- We've reached the end of the taggers on both sides, so
+                    -- we're equal as far as taggers go ... we don't consider
+                    -- the final subNode. But, we do know they have the same
+                    -- type.
+                    true
+        else
+            false
+    ))
+
+
 type Thunk msg = Exists (ThunkRecord1 msg)
 type Thunk2 msg = Exists2 (ThunkRecord2 msg)
 type Thunk3 msg = Exists3 (ThunkRecord3 msg)
@@ -769,11 +806,10 @@ render doc vNode =
 
         Custom renderable ->
             Renderable.render doc renderable
-            {-
-			var domNode = vNode.impl.render(vNode.model);
-			applyFacts(domNode, eventNode, vNode.facts);
-			return domNode;
-            -}
+            -- The original Elm code also tracks Facts and applies them here
+            -- ...  in my structure, it seems best not to do that, since it's
+            -- really the job of the renderable, but this may need to be
+            -- revisited at some point.
 
 
 -- APPLY FACTS
@@ -862,6 +898,8 @@ applyFacts operations elem = do
                 removeProperty key elem
 
 
+-- These store & retrieve some data as properties in the DOM ... should
+-- re-assess that strategy at some point!
 foreign import getHandlers :: ∀ e1 e2 msg. Element -> Eff e1 (Nullable (StrMap (MsgHandler e2 msg)))
 foreign import setHandlers :: ∀ e1 e2 msg. StrMap (MsgHandler e1 msg) -> Element -> Eff e2 Unit
 foreign import removeHandlers :: ∀ e. Element -> Eff e Unit
@@ -872,7 +910,7 @@ foreign import removeTagger :: ∀ e. Element -> Eff e Unit
 
 
 -- When Elm knows that there previously was a listener for an event, it does a
--- kind of "mutate event" instead of removing the listener and adding a new
+-- kind of "mutate listener" instead of removing the listener and adding a new
 -- one. This might happen frequently, because testing the equality of decoders
 -- is not fully decidable. So, you may end up with a lot of spurious listener
 -- mutations. Removing and adding listeners is probably a little expensive, and
@@ -880,6 +918,7 @@ foreign import removeTagger :: ∀ e. Element -> Eff e Unit
 -- listener, by having the listener refer to some data "deposited" as a
 -- property on the DOM node. Thus, we can mutate the listener by changing that
 -- data.
+
 
 -- | The information that a handler needs (in addition to the event!)
 type HandlerInfo msg =
@@ -940,7 +979,8 @@ handleEvent info event =
 
 
 -- | Oddly, currentTarget returns a `Node` rather than an `EventTarget`, so
--- | we'll coerce.
+-- | we'll coerce. (Presumably the result of `currentTarget` must be an
+-- | `EventTarget` seeing as, by definition, it has a listener attached).
 currentEventTarget :: Event -> EventTarget
 currentEventTarget = unsafeCoerce currentTarget
 
@@ -977,7 +1017,7 @@ data PatchOp msg
     = PRedraw (Node msg)
     | PFacts (Array (FactChange msg))
     | PText String
-    | PTagger
+    | PTagger -- TODO: Fill this out!
     | PRemoveLast Int
     | PAppend (List (Node msg))
     | PCustom AnyRenderable AnyRenderable
