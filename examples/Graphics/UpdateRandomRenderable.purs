@@ -9,30 +9,24 @@
 module Examples.Graphics.UpdateRandomRenderable where
 
 
-import Examples.Graphics.CollageExamples (collages) as Examples
-import Examples.Graphics.StaticElement (elements) as Examples
-
-import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Random (RANDOM)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
-import Graphics.Canvas (CANVAS)
-import Data.NonEmpty (NonEmpty(..))
-import Data.Foldable (for_)
-import Data.Tuple (fst, snd)
-import Test.QuickCheck.LCG (randomSeed)
-import Test.QuickCheck.Gen (Gen, runGen, elements)
-
-import DOM (DOM)
-import DOM.Renderable (AnyRenderable, toAnyRenderable, renderOrUpdate)
+import DOM.Event.EventTarget (eventListener, addEventListener)
 import DOM.HTML (window)
+import DOM.HTML.Event.EventTypes (keydown)
 import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.HTML.Window (document)
-import DOM.HTML.Event.EventTypes (keydown)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (ElementId(..), documentToNonElementParentNode, documentToEventTarget)
-import DOM.Event.EventTarget (eventListener, addEventListener)
-
+import DOM.Renderable (AnyRenderable, EffDOM, renderOrUpdate, toAnyRenderable)
+import Data.Foldable (for_)
+import Data.NonEmpty (NonEmpty(..))
+import Data.Tuple (fst, snd)
+import Examples.Graphics.CollageExamples (collages) as Examples
+import Examples.Graphics.StaticElement (elements) as Examples
 import Prelude (Unit, bind, discard, (<$>), (>>=), const, (<>), ($), void)
+import Test.QuickCheck.Gen (Gen, runGen, elements)
+import Test.QuickCheck.LCG (randomSeed)
 
 
 -- This could be made more general with some classes ... in fact, I would be
@@ -55,7 +49,7 @@ genAnyRenderable =
     elements collagesAndElements
 
 
-main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, random :: RANDOM | e) Unit
+main :: ∀ e. EffDOM (random :: RANDOM | e) Unit
 main = do
     doc <-
         htmlDocumentToDocument <$>

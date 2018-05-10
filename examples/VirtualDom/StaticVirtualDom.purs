@@ -3,24 +3,22 @@ module Examples.VirtualDom.StaticVirtualDom where
 import Elm.VirtualDom
 
 import Control.Monad.Eff (Eff)
-
+import Control.Monad.Eff.Exception (EXCEPTION)
 import DOM (DOM)
-import DOM.Renderable (render)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToDocument)
 import DOM.HTML.Window (document)
+import DOM.Node.Node (appendChild)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..))
-import DOM.Node.Node (appendChild)
-import Graphics.Canvas (CANVAS)
-
+import DOM.Renderable (render)
 import Data.Foldable (for_)
 import Data.List (List(..), (:))
-
+import Graphics.Canvas (CANVAS)
 import Prelude (bind, Unit, (>>=))
 
 
-main :: Eff (canvas :: CANVAS, dom :: DOM) Unit
+main :: Eff (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION) Unit
 main = do
     doc <-
         window >>= document

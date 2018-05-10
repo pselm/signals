@@ -29,6 +29,7 @@ main :: Eff
     , avar :: AVAR
     , random :: RANDOM
     , exception :: EXCEPTION
+    , err :: EXCEPTION
     , console :: CONSOLE
     , ref :: REF
     , delay :: DELAY

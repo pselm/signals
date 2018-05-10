@@ -2,38 +2,32 @@ module Examples.Graphics.UpdateElement where
 
 
 import Elm.Graphics.Element
-import Elm.Text (fromString)
-import Elm.Color (red, blue, yellow)
 
-import Control.Monad.Eff (Eff)
+import Control.Comonad (extract)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Except.Trans (runExceptT)
-import Control.Comonad (extract)
-import Graphics.Canvas (CANVAS)
-
-import DOM (DOM)
-import DOM.Renderable (Position(..), renderIntoDOM, updateDOM)
+import DOM.Event.EventTarget (eventListener, addEventListener)
 import DOM.HTML (window)
+import DOM.HTML.Event.EventTypes (keydown)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToEventTarget, htmlDocumentToDocument)
 import DOM.HTML.Window (document)
-import DOM.HTML.Event.EventTypes (keydown)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.ParentNode (firstElementChild) as ParentNode
 import DOM.Node.Types (elementToNode, elementToParentNode, ElementId(..))
-import DOM.Event.EventTarget (eventListener, addEventListener)
-
-import Data.Foldable (for_)
-import Data.List (List(..), (:))
+import DOM.Renderable (Position(..), EffDOM, renderIntoDOM, updateDOM)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Foreign (toForeign, readInt)
 import Data.Foreign.Index (readProp)
+import Data.List (List(..), (:))
 import Data.List.Zipper (Zipper(..), up, down, beginning) as Zipper
 import Data.Tuple (Tuple(..))
-
+import Elm.Color (red, blue, yellow)
+import Elm.Text (fromString)
 import Prelude (bind, discard, Unit, unit, void, (>>=), ($), (>>>), pure)
 
 
-main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, ref :: REF | e) Unit
+main :: ∀ e. EffDOM (ref :: REF | e) Unit
 main = do
     doc <-
         window >>= document

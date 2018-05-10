@@ -5,32 +5,26 @@ module Examples.Graphics.StaticElement
     ) where
 
 import Elm.Graphics.Element
-import Elm.Text (bold, fromString)
-import Elm.Color (blue, red, yellow, lightBlue)
 
-import Control.Monad.Eff (Eff)
-import Graphics.Canvas (CANVAS)
-
-import DOM (DOM)
-import DOM.Renderable (render)
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToNonElementParentNode, htmlDocumentToDocument)
 import DOM.HTML.Window (document)
+import DOM.Node.Node (appendChild)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (elementToNode, ElementId(..))
-import DOM.Node.Node (appendChild)
-
+import DOM.Renderable (EffDOM, render)
 import Data.Foldable (for_)
 import Data.List (List(..), (:), fromFoldable)
+import Data.Maybe (Maybe(..))
 import Data.NonEmpty (NonEmpty(..))
 import Data.Tuple (Tuple(..))
-import Data.Maybe (Maybe(..))
-
+import Elm.Color (blue, red, yellow, lightBlue)
+import Elm.Text (bold, fromString)
 import Prelude (bind, Unit, (>>=), ($), (<>), (<$>), map)
 import Prelude (show) as Prelude
 
 
-main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM | e) Unit
+main :: ∀ e. EffDOM e Unit
 main = do
     doc <-
         window >>= document
