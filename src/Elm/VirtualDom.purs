@@ -2133,60 +2133,22 @@ applyPatch (Patch index patchOp) domNode = do
             setTextContent string domNode
             pure domNode
 
-        PTagger taggerFunc ->
+        PTagger taggerFunc -> do
+            -- See comment in `render` ... I believe we can only apply a tagger
+            -- to an element, but it might be good to verify that.
+            for_ (nodeToElement domNode) \element ->
+                taggerFunc # runExists \(TaggerFunc func) -> do
+                    tagger <-
+                        toMaybe <$> getTagger element
+
+                    case tagger of
+                        Just t ->
+                            setHandlerInfo func t
+
+                        Nothing ->
+                            unsafeCrashWith "Could not find expected tagger in DOM"
+
             pure domNode
-
-        -- I suppose the significance of elm_event_node_ref is partly so that
-        -- we can modify it in-place? Here, we're changing the tagger and not
-        -- the parent. Which, I suppose, means that creating an `EventNode`
-        -- will need to be effectful ... otherwise, we can't mutate one!
-        -- I suppose the way Elm sets things up, the mutation is necessary, because
-        -- the subEventNodes retain a reference to their parent, and their parent
-        -- may be changed.
-        --
-        -- So, my working theory is that we're storing the event nodes in the
-        -- DOM so that, as we traverse the DOM with patches, we can keep track
-        -- of which eventNode we ought to be using. And, we modify the event
-        -- node in place, because the children retain a reference to it. It's
-        -- curious that we don't just walk up the DOM to find event nodes
-        -- (rather than internally retain a reference), but there may well be a
-        -- good reason for that.
-        --
-        -- Well, I suppose that retaining a reference to your eventNode parent
-        -- is faster than walking up the DOM. But, you know, there is a
-        -- conceptually clearer scheme that occurs to me.
-        --
-        -- 1. The initial listener would apply its decoder and, if succesful,
-        --    dispatch a custom event with the result, to itself. This would
-        --    bubble up in the normal way until something handles it. (In fact,
-        --    you could imagine bubbling a different custom event for a decoder
-        --    failure, which Elm currently silently drops, but which something
-        --    could conceivably listen for).
-        --
-        -- 2. A "tagger" would simply install a listener for this custom event,
-        --    which runs a function on it an then dispatches the result, using
-        --    the same custom event, to its parent. (Or in some way continues
-        --    bubbling the event with the transformed content).
-        --
-        -- 3. Once you reach the top, there would be a listener for these events
-        --    that would send them into the app's event loop.
-        --
-        -- You know, I think that's much nicer -- it should accomplish the same
-        -- thing and be conceptually clearer. There may be performance
-        -- implications, but event bubbling is something that ought to be quite
-        -- optimized ... it may not amount to anything.
-
-        {-
-			if (typeof domNode.elm_event_node_ref !== 'undefined')
-			{
-				domNode.elm_event_node_ref.tagger = patch.data;
-			}
-			else
-			{
-				domNode.elm_event_node_ref = { tagger: patch.data, parent: patch.eventNode };
-			}
-			return domNode;
-        -}
 
         PRemoveLast howMany -> do
             -- There must be a replicateM somewhere I'm forgetting ...
