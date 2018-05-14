@@ -46,7 +46,7 @@ import Data.Exists (Exists, mkExists, runExists)
 import Data.Foldable (class Foldable, foldl, for_)
 import Data.Foreign (ForeignError(..), readString, toForeign)
 import Data.Lazy (Lazy, defer, force)
-import Data.Leibniz (type (~))
+import Data.Leibniz (type (~), Leibniz(..))
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, null) as List
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
@@ -123,10 +123,11 @@ instance renderableNode :: Renderable (Node msg) where
             diff old.value current
 
 
--- Try to determine whether two taggers are equal ... as best we can.  There
--- will be some false negatives. Note that we only check the (possibly nested)
--- tagging functions ... we don't check the final subnode.
-equalTaggers :: ∀ msg. Coyoneda Node msg -> Coyoneda Node msg -> Bool
+-- Try to determine whether two taggers are equal ... as best we can. We return
+-- `Nothing` in cases where we can't be sure whether they are equal or not, given
+-- the limits of reference equality for functions. Note that we don't check the
+-- final subnode ... this just checks the taggers.
+equalTaggers :: ∀ msg1 msg2. Coyoneda Node msg1 -> Coyoneda Node msg2 -> Maybe Bool
 equalTaggers coyo1 coyo2 =
     coyo1 # unCoyoneda (\func1 subNode1 ->
     coyo2 # unCoyoneda (\func2 subNode2 ->
@@ -142,21 +143,25 @@ equalTaggers coyo1 coyo2 =
                     equalTaggers subcoyo1 (unsafeCoerce subcoyo2)
 
                 Tagger subcoyo1, _ ->
-                    -- There's an extra tagger on the left, so we're not equal
-                    false
+                    -- There's an extra tagger on the left, so we're definitely
+                    -- not equal
+                    Just false
 
                 _, Tagger subcoyo2 ->
-                    -- There's an extra tagger on the right, so we're not equal
-                    false
+                    -- There's an extra tagger on the left, so we're definitely
+                    -- not equal
+                    Just false
 
                 _, _ ->
                     -- We've reached the end of the taggers on both sides, so
                     -- we're equal as far as taggers go ... we don't consider
                     -- the final subNode. But, we do know they have the same
                     -- type.
-                    true
+                    Just true
         else
-            false
+            -- We couldn't match the functions with reference equality, but
+            -- they could still be equal, of course. So, we return `Nothing`.
+            Nothing
     ))
 
 
@@ -1018,10 +1023,14 @@ data PatchOp msg
     = PRedraw (Node msg)
     | PFacts (Array (FactChange msg))
     | PText String
-    | PTagger -- TODO: Fill this out!
+    | PTagger (Exists (TaggerFunc msg))
     | PRemoveLast Int
     | PAppend (List (Node msg))
     | PCustom AnyRenderable AnyRenderable
+
+
+newtype TaggerFunc msg a
+    = TaggerFunc (a -> msg)
 
 
 -- The index is a list of offsets to a root Node.
@@ -1292,56 +1301,45 @@ diffHelp proof a b index accum =
                         diffHelp proof (force aLazy) (force bLazy) index accum
 
                 Tagger aTagger, Tagger bTagger ->
-                    unsafeCrashWith "TODO"
+                    -- Elm will diff the children whether or not the taggers
+                    -- are equal, so long as there are the same number of
+                    -- nested taggers.  So, it diffs children even we can't
+                    -- know that they use the same `msg` type. The reason,
+                    -- essentially, is that we can't always know that two
+                    -- taggers are equal, even if they really are, so we want
+                    -- to minimize the cost of those false negatives.  It
+                    -- wouldn't be great to always have to redraw them, for
+                    -- instance.
+                    --
+                    -- We check equality on the non-composed version, since
+                    -- composition destroys the reference equality.
+                    -- (equalTaggers will follow nested taggers).
+                    case equalTaggers aTagger bTagger of
+                        Just true ->
+                            -- If the taggers were equal, then we don't need a
+                            -- patch for the taggers, and we have warrant to
+                            -- believe that the subnodes are of the same type.
+                            --
+                            -- We continue diffing at the same index, since the
+                            -- tagger doesn't get a separate DOM node.
+                            composeTaggers aTagger # unCoyoneda \_ node1 ->
+                            composeTaggers bTagger # unCoyoneda \_ node2 ->
+                                diffHelp (Just $ Leibniz unsafeCoerce) node1 node2 index accum
 
-                    {-
-                    // gather nested taggers
-                    var aTaggers = a.tagger;
-                    var bTaggers = b.tagger;
-                    var nesting = false;
+                        Just false ->
+                            -- If the taggers are definitely unequal, then
+                            -- we just redraw.
+                            snoc accum (makePatch (PRedraw b) index)
 
-                    var aSubNode = a.node;
-                    while (aSubNode.type === 'tagger')
-                    {
-                        nesting = true;
-
-                        typeof aTaggers !== 'object'
-                            ? aTaggers = [aTaggers, aSubNode.tagger]
-                            : aTaggers.push(aSubNode.tagger);
-
-                        aSubNode = aSubNode.node;
-                    }
-
-                    var bSubNode = b.node;
-                    while (bSubNode.type === 'tagger')
-                    {
-                        nesting = true;
-
-                        typeof bTaggers !== 'object'
-                            ? bTaggers = [bTaggers, bSubNode.tagger]
-                            : bTaggers.push(bSubNode.tagger);
-
-                        bSubNode = bSubNode.node;
-                    }
-
-                    // Just bail if different numbers of taggers. This implies the
-                    // structure of the virtual DOM has changed.
-                    if (nesting && aTaggers.length !== bTaggers.length)
-                    {
-                        patches.push(makePatch('p-redraw', index, b));
-                        return;
-                    }
-
-                    // check if taggers are "the same"
-                    if (nesting ? !pairwiseRefEqual(aTaggers, bTaggers) : aTaggers !== bTaggers)
-                    {
-                        patches.push(makePatch('p-tagger', index, bTaggers));
-                    }
-
-                    // diff everything below the taggers
-                    diffHelp(aSubNode, bSubNode, patches, index + 1);
-                    return;
-                    -}
+                        Nothing ->
+                            -- If we're not sure, then we need a patch for
+                            -- the tagger itself, and also continue on.
+                            -- But, without proof that the subnodes are the
+                            -- same type.
+                            composeTaggers aTagger # unCoyoneda \_ node1 ->
+                            composeTaggers bTagger # unCoyoneda \func node2 ->
+                                diffHelp Nothing node1 node2 index $
+                                    snoc accum (makePatch (PTagger $ mkExists $ TaggerFunc func) index)
 
                 Text aText, Text bText ->
                     if aText == bText
@@ -2135,7 +2133,7 @@ applyPatch (Patch index patchOp) domNode = do
             setTextContent string domNode
             pure domNode
 
-        PTagger ->
+        PTagger taggerFunc ->
             pure domNode
 
         -- I suppose the significance of elm_event_node_ref is partly so that
