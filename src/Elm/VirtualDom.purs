@@ -1958,125 +1958,6 @@ addDomNodes rootNode vNode patches = do
                     unsafeCrashWith "Problem traversing DOM -- has it been modified from the outside?"
 
 
-{-
-function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
-{
-	var patch = patches[i];
-	var index = patch.index;
-
-	while (index === low)
-	{
-		var patchType = patch.type;
-
-		if (patchType === 'p-thunk')
-		{
-			addDomNodes(domNode, vNode.node, patch.data, eventNode);
-		}
-		else if (patchType === 'p-reorder')
-		{
-			patch.domNode = domNode;
-			patch.eventNode = eventNode;
-
-			var subPatches = patch.data.patches;
-			if (subPatches.length > 0)
-			{
-				addDomNodesHelp(domNode, vNode, subPatches, 0, low, high, eventNode);
-			}
-		}
-		else if (patchType === 'p-remove')
-		{
-			patch.domNode = domNode;
-			patch.eventNode = eventNode;
-
-			var data = patch.data;
-			if (typeof data !== 'undefined')
-			{
-				data.entry.data = domNode;
-				var subPatches = data.patches;
-				if (subPatches.length > 0)
-				{
-					addDomNodesHelp(domNode, vNode, subPatches, 0, low, high, eventNode);
-				}
-			}
-		}
-		else
-		{
-			patch.domNode = domNode;
-			patch.eventNode = eventNode;
-		}
-
-		i++;
-
-		if (!(patch = patches[i]) || (index = patch.index) > high)
-		{
-			return i;
-		}
-	}
-
-	switch (vNode.type)
-	{
-		case 'tagger':
-			var subNode = vNode.node;
-
-			while (subNode.type === "tagger")
-			{
-				subNode = subNode.node;
-			}
-
-            // TODO: Figure out the significance of using the domNode.elm_event_node_ref here ...
-            // it's possible that it's doing something which I'll need to factor into the
-            // traversal of the DOM ... it's tracking the current `eventNode` according to
-            // what it finds in the DOM?
-			return addDomNodesHelp(domNode, subNode, patches, i, low + 1, high, domNode.elm_event_node_ref);
-
-		case 'node':
-			var vChildren = vNode.children;
-			var childNodes = domNode.childNodes;
-			for (var j = 0; j < vChildren.length; j++)
-			{
-				low++;
-				var vChild = vChildren[j];
-				var nextLow = low + (vChild.descendantsCount || 0);
-				if (low <= index && index <= nextLow)
-				{
-					i = addDomNodesHelp(childNodes[j], vChild, patches, i, low, nextLow, eventNode);
-					if (!(patch = patches[i]) || (index = patch.index) > high)
-					{
-						return i;
-					}
-				}
-				low = nextLow;
-			}
-			return i;
-
-		case 'keyed-node':
-			var vChildren = vNode.children;
-			var childNodes = domNode.childNodes;
-			for (var j = 0; j < vChildren.length; j++)
-			{
-				low++;
-				var vChild = vChildren[j]._1;
-				var nextLow = low + (vChild.descendantsCount || 0);
-				if (low <= index && index <= nextLow)
-				{
-					i = addDomNodesHelp(childNodes[j], vChild, patches, i, low, nextLow, eventNode);
-					if (!(patch = patches[i]) || (index = patch.index) > high)
-					{
-						return i;
-					}
-				}
-				low = nextLow;
-			}
-			return i;
-
-		case 'text':
-		case 'thunk':
-			throw new Error('should never traverse `text` or `thunk` nodes like this');
-	}
-}
--}
-
-
 -- APPLY PATCHES
 
 applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Exists Patch) -> EffDOM e DOM.Node
@@ -2249,10 +2130,15 @@ redraw domNode vNode = do
     parentNode <- parentNode domNode
     newNode <- render document vNode
 
-    -- TODO: Consider how to handle a tagger that was listening here ...  we'll
-    -- need to re-attach it ... but it comes from one-level up, not down.
-    -- Perhaps we'll need to pass in a `Maybe ...` with a tagger to apply?
-    -- Since the caller ought to know, I think. Yes, that ought to work.
+    -- We transfer a tagger from the old node to the new node, if there was
+    -- one, because taggers don't get their own node ... so we neeed to
+    -- preserve them when redrawing.
+    for_ (nodeToElement domNode) \oldElement ->
+        for_ (nodeToElement newNode) \newElement -> do
+            tagger <-
+                toMaybe <$> getTagger oldElement
+
+            for_ tagger (flip setTagger newElement)
 
     case parentNode of
         Just p -> do
