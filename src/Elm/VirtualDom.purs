@@ -46,6 +46,7 @@ import Data.Exists (Exists, mkExists, runExists)
 import Data.Foldable (class Foldable, foldl, for_)
 import Data.Foreign (ForeignError(..), readString, toForeign)
 import Data.Lazy (Lazy, defer, force)
+import Data.Leibniz (type (~))
 import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
 import Data.List (foldM, null) as List
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
@@ -56,11 +57,11 @@ import Data.StrMap (StrMap, foldM, foldMap, lookup, isEmpty)
 import Data.StrMap (delete, empty, insert, lookup) as StrMap
 import Data.StrMap.ST (new, poke, peek)
 import Data.StrMap.ST.Unsafe (unsafeFreeze)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
 import Elm.Graphics.Internal (EventHandler, addEventHandler, detail, documentForNode, eventHandler, eventToCustomEvent, makeCustomEvent, nextEventTarget, nodeToElement, removeAttributeNS, removeEventHandler, removeProperty, removeStyle, setAttributeNS, setHandlerInfo, setProperty, setPropertyIfDifferent, setStyle)
-import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecoders)
+import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecodersL)
 import Elm.Result (Result(..))
 import Partial.Unsafe (unsafeCrashWith)
 import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
@@ -187,7 +188,7 @@ newtype ThunkRecord3 msg a b c = ThunkRecord3
 
 -- | Not an `Eq` instance, because it's not deciable ... will be some false
 -- | negatives.
-equalThunks :: ∀ msg. Thunk msg -> Thunk msg -> Bool
+equalThunks :: ∀ a b. Thunk a -> Thunk b -> Bool
 equalThunks left right =
     left # runExists (\(ThunkRecord1 a) ->
     right # runExists (\(ThunkRecord1 b) ->
@@ -201,7 +202,7 @@ equalThunks left right =
 
 -- | Not an `Eq` instance, because it's not deciable ... will be some false
 -- | negatives.
-equalThunks2 :: ∀ msg. Thunk2 msg -> Thunk2 msg -> Bool
+equalThunks2 :: ∀ a b. Thunk2 a -> Thunk2 b -> Bool
 equalThunks2 left right =
     left # runExists2 (\(ThunkRecord2 a) ->
     right # runExists2 (\(ThunkRecord2 b) ->
@@ -216,7 +217,7 @@ equalThunks2 left right =
 
 -- | Not an `Eq` instance, because it's not deciable ... will be some false
 -- | negatives.
-equalThunks3 :: ∀ msg. Thunk3 msg -> Thunk3 msg -> Bool
+equalThunks3 :: ∀ a b. Thunk3 a -> Thunk3 b -> Bool
 equalThunks3 left right =
     left # runExists3 (\(ThunkRecord3 a) ->
     right # runExists3 (\(ThunkRecord3 b) ->
@@ -1056,19 +1057,15 @@ data PatchOp msg
 -- In any event, the idea is that this will be more conceptually clear than the
 -- Elm implementation, while hopefully preserving some of the efficiency of the
 -- Elm implementation.
-type Patch msg =
-    { index :: List Int
-    , type_ :: PatchOp msg
-    }
+data Patch msg
+    = Patch (List Int) (PatchOp msg)
 
 
 -- The Elm version also includes a domNode and eventNode ... we add the domNode
 -- later, and we've changed the implementation so that we don't use an eventNode
-makePatch :: ∀ msg. PatchOp msg -> List Int -> Patch msg
+makePatch :: ∀ msg. PatchOp msg -> List Int -> Exists Patch
 makePatch type_ index =
-    { index
-    , type_
-    }
+    mkExists $ Patch index type_
 
 
 data Traversal
@@ -1216,14 +1213,12 @@ traversal (Cons c cs) (Cons d ds) =         -- Something left on both sides, so 
 
 -- This represents a patch with a domNode filled in ... that is,
 -- a patch where we've now determined exactly what it is going to patch.
-type PatchWithNodes msg =
-    { patch :: Patch msg
-    , domNode :: DOM.Node
-    }
+data PatchWithNodes msg
+    = PatchWithNodes (Patch msg) DOM.Node
 
 
-diff :: ∀ msg. Node msg -> Node msg -> List (Patch msg)
-diff a b = diffHelp a b Nil Nil
+diff :: ∀ msg. Node msg -> Node msg -> List (Exists Patch)
+diff a b = diffHelp (Just id) a b Nil Nil
 
 
 -- We accumulate the needed patches, by calling ourself recursively.  The `List
@@ -1231,14 +1226,23 @@ diff a b = diffHelp a b Nil Nil
 -- we're at the root node, and then each list item represent an offset into
 -- descendants.
 --
+-- Elm's Virtual DOM continues to diff children past taggers which are not
+-- necessarily equal. Thus, we can't insist that the old node and the new node
+-- have the same `msg` type -- we need to try to continue to diff even where
+-- they do not. However, we use Leibniz equality to track whether we have
+-- evidence that they are the same, so our behaviour can be a bit different in
+-- one case vs. the other.
+--
+-- We use an existential type for accumulating patches in a single list.
+--
 -- TODO: Should probably not use a `List` for the offsets or the patches, since
 -- we're appending.  Or, I should prepend and then document that you should
 -- reverse once at the end.
-diffHelp :: ∀ msg. Node msg -> Node msg -> List Int -> List (Patch msg) -> List (Patch msg)
-diffHelp a b index accum =
+diffHelp :: ∀ msg1 msg2. Maybe (msg1 ~ msg2) -> Node msg1 -> Node msg2 -> List Int -> List (Exists Patch) -> List (Exists Patch)
+diffHelp proof a b index accum =
     -- We could have a distinct `equalNodes` function but it doesn't seem
     -- necessary ... we just return the patches unchanged if we're equal.
-    if unsafeRefEq a b
+    if reallyUnsafeRefEq a b
         then accum
         else
             case a, b of
@@ -1271,21 +1275,21 @@ diffHelp a b index accum =
                         -- optimization mentioned above ... would be nice to do
                         -- that here as well, but we'll start this way ... we'll
                         -- only pay when the thunks aren't equal.
-                        diffHelp (force aLazy) (force bLazy) index accum
+                        diffHelp proof (force aLazy) (force bLazy) index accum
 
                 Thunk2 aLazy aThunk, Thunk2 bLazy bThunk ->
                     -- See comments on the `Thunk` case
                     if equalThunks2 aThunk bThunk then
                         accum
                     else
-                        diffHelp (force aLazy) (force bLazy) index accum
+                        diffHelp proof (force aLazy) (force bLazy) index accum
 
                 Thunk3 aLazy aThunk, Thunk3 bLazy bThunk ->
                     -- See comments on the `Thunk` case
                     if equalThunks3 aThunk bThunk then
                         accum
                     else
-                        diffHelp (force aLazy) (force bLazy) index accum
+                        diffHelp proof (force aLazy) (force bLazy) index accum
 
                 Tagger aTagger, Tagger bTagger ->
                     unsafeCrashWith "TODO"
@@ -1350,7 +1354,7 @@ diffHelp a b index accum =
                         else
                             let
                                 factsDiff =
-                                    diffFacts aNode.facts bNode.facts
+                                    diffFacts proof aNode.facts bNode.facts
 
                                 patchesWithFacts =
                                     if Array.null factsDiff
@@ -1362,7 +1366,7 @@ diffHelp a b index accum =
                                 -- possibly won't be tail-recursive, because it's not calling
                                 -- itself? So, may need to do something about that? Or
                                 -- possibly it's not a problem.
-                                diffChildren aChildren bChildren patchesWithFacts index
+                                diffChildren proof aChildren bChildren patchesWithFacts index
 
                 KeyedNode aNode aChildren, KeyedNode bNode bChildren ->
                     unsafeCrashWith "TODO"
@@ -1459,8 +1463,8 @@ initialFactChanges facts =
                     singleton (AddProperty k v)
 
 
-diffFacts :: ∀ msg. OrganizedFacts msg -> OrganizedFacts msg -> Array (FactChange msg)
-diffFacts old new =
+diffFacts :: ∀ oldMsg newMsg. Maybe (oldMsg ~ newMsg) -> OrganizedFacts oldMsg -> OrganizedFacts newMsg -> Array (FactChange newMsg)
+diffFacts proof old new =
     runPure do
         runSTArray do
             -- I suppose the other alternative would be a Writer monad ... perhaps
@@ -1585,7 +1589,7 @@ diffFacts old new =
                 newEvent _ k (newOptions /\ newDecoder) =
                     case lookup k old.events of
                         Just (oldOptions /\ oldDecoder ) ->
-                            unless (equalOptions oldOptions newOptions && equalDecoders oldDecoder newDecoder) do
+                            unless (equalOptions oldOptions newOptions && equalDecodersL proof oldDecoder newDecoder) do
                                 void $ pushSTArray accum (MutateEvent (wrap k) newOptions newDecoder)
 
                         Nothing ->
@@ -1637,8 +1641,8 @@ diffFacts old new =
             pure accum
 
 
-diffChildren :: ∀ msg. List (Node msg) -> List (Node msg) -> List (Patch msg) -> List Int -> List (Patch msg)
-diffChildren aChildren bChildren patches rootIndex =
+diffChildren :: ∀ msg1 msg2. Maybe (msg1 ~ msg2) -> List (Node msg1) -> List (Node msg2) -> List (Exists Patch) -> List Int -> List (Exists Patch)
+diffChildren proof aChildren bChildren patches rootIndex =
     let
         aLen = length aChildren
         bLen = length bChildren
@@ -1659,7 +1663,7 @@ diffChildren aChildren bChildren patches rootIndex =
 
         diffChild memo (Tuple aChild bChild) =
             { subIndex: memo.subIndex + 1
-            , patches: diffHelp aChild bChild (snoc rootIndex memo.subIndex) memo.patches
+            , patches: diffHelp proof aChild bChild (snoc rootIndex memo.subIndex) memo.patches
             }
 
     in
@@ -1914,7 +1918,7 @@ function removeNode(changes, localPatches, key, vnode, index)
 -}
 
 
-addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> Eff (dom :: DOM | e) (List (PatchWithNodes msg))
+addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Exists Patch) -> Eff (dom :: DOM | e) (List (Exists PatchWithNodes))
 addDomNodes rootNode vNode patches = do
     patches
         # List.foldM step
@@ -1926,13 +1930,13 @@ addDomNodes rootNode vNode patches = do
             reverse result.accum
 
     where
-        step params patch = do
+        step params = runExists \patch@(Patch index _) -> do
             let
                 fromRoot =
-                    traversal Nil patch.index
+                    traversal Nil index
 
                 fromCurrent =
-                    traversal params.currentIndex patch.index
+                    traversal params.currentIndex index
 
                 best =
                     if (costOfTraversal fromRoot) < (costOfTraversal fromCurrent)
@@ -1946,14 +1950,11 @@ addDomNodes rootNode vNode patches = do
                 Just domNode ->
                     let
                         patchWithNodes =
-                            { patch
-                            , domNode
-                            }
-
+                            mkExists $ PatchWithNodes patch domNode
                     in
                         pure
                             { currentNode: domNode
-                            , currentIndex: patch.index
+                            , currentIndex: index
                             , accum: Cons patchWithNodes params.accum
                             }
 
@@ -2087,7 +2088,7 @@ function addDomNodesHelp(domNode, vNode, patches, i, low, high, eventNode)
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Patch msg) -> EffDOM e DOM.Node
+applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Exists Patch) -> EffDOM e DOM.Node
 applyPatches rootDomNode oldVirtualNode patches =
     if List.null patches
         then
@@ -2098,27 +2099,28 @@ applyPatches rootDomNode oldVirtualNode patches =
             >>= applyPatchesHelp rootDomNode
 
 
-applyPatchesHelp :: ∀ e msg. DOM.Node -> List (PatchWithNodes msg) -> EffDOM e DOM.Node
+applyPatchesHelp :: ∀ e. DOM.Node -> List (Exists PatchWithNodes) -> EffDOM e DOM.Node
 applyPatchesHelp =
-    List.foldM \rootNode patch -> do
-        newNode <- applyPatch patch patch.domNode
+    List.foldM \rootNode ->
+        runExists \(PatchWithNodes patch@(Patch index _) domNode) -> do
+            newNode <- applyPatch patch domNode
 
-        -- This is a little hackish ... should think this through better.
-        -- But, basically the idea is that if the patch index was nil,
-        -- we want to go on with the newNode. If not ... that is, if
-        -- we were patching further on ... then we don't want to change
-        -- the rootNode.
-        if patch.patch.index == Nil
-            then pure newNode
-            else pure rootNode
+            -- This is a little hackish ... should think this through better.
+            -- But, basically the idea is that if the patch index was nil,
+            -- we want to go on with the newNode. If not ... that is, if
+            -- we were patching further on ... then we don't want to change
+            -- the rootNode.
+            if index == Nil
+                then pure newNode
+                else pure rootNode
 
 
-applyPatch :: ∀ e msg. PatchWithNodes msg -> DOM.Node -> EffDOM e DOM.Node
-applyPatch patch domNode = do
+applyPatch :: ∀ e msg. Patch msg -> DOM.Node -> EffDOM e DOM.Node
+applyPatch (Patch index patchOp) domNode = do
     document <-
         documentForNode domNode
 
-    case patch.patch.type_ of
+    case patchOp of
         PRedraw vNode ->
             redraw domNode vNode
 
