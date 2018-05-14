@@ -129,40 +129,33 @@ instance renderableNode :: Renderable (Node msg) where
 -- final subnode ... this just checks the taggers.
 equalTaggers :: ∀ msg1 msg2. Coyoneda Node msg1 -> Coyoneda Node msg2 -> Maybe Bool
 equalTaggers coyo1 coyo2 =
-    coyo1 # unCoyoneda (\func1 subNode1 ->
-    coyo2 # unCoyoneda (\func2 subNode2 ->
-        -- As far as the funcs go, the best we can do is reference equality.
-        if reallyUnsafeRefEq func1 func2 then
-            -- Since the funcs were equal, we have a warrant for believing
-            -- that the subNodes are of the same type.
-            case subNode1, subNode2 of
-                Tagger subcoyo1, Tagger subcoyo2 ->
-                    -- They both have another layer of tagger, so recurse.  I
-                    -- should see if there is some way to carry a witness to
-                    -- the type equality along with the Coyoneda.
-                    equalTaggers subcoyo1 (unsafeCoerce subcoyo2)
+    coyo1 # unCoyoneda \func1 subNode1 ->
+    coyo2 # unCoyoneda \func2 subNode2 ->
+        case subNode1, subNode2 of
+            Tagger subcoyo1, Tagger subcoyo2 ->
+                -- They both have another layer of tagger, so check reference
+                -- equality and recurse. (The recursion may give us a `Just`
+                -- or a `Nothing`, so we carry that through).
+                equalTaggers subcoyo1 subcoyo2
+                    <#> (&&) (reallyUnsafeRefEq func1 func2)
 
-                Tagger subcoyo1, _ ->
-                    -- There's an extra tagger on the left, so we're definitely
-                    -- not equal
-                    Just false
+            Tagger subcoyo1, _ ->
+                -- There's an extra tagger on the left, so we're definitely
+                -- not equal
+                Just false
 
-                _, Tagger subcoyo2 ->
-                    -- There's an extra tagger on the left, so we're definitely
-                    -- not equal
-                    Just false
+            _, Tagger subcoyo2 ->
+                -- There's an extra tagger on the right, so we're definitely
+                -- not equal
+                Just false
 
-                _, _ ->
-                    -- We've reached the end of the taggers on both sides, so
-                    -- we're equal as far as taggers go ... we don't consider
-                    -- the final subNode. But, we do know they have the same
-                    -- type.
+            _, _ ->
+                -- We've reached the end of the taggers on both sides, so we're
+                -- either definitely equal or we can't tell.
+                if reallyUnsafeRefEq func1 func2 then
                     Just true
-        else
-            -- We couldn't match the functions with reference equality, but
-            -- they could still be equal, of course. So, we return `Nothing`.
-            Nothing
-    ))
+                else
+                    Nothing
 
 
 type Thunk msg = Exists (ThunkRecord1 msg)
