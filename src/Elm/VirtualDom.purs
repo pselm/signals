@@ -12,7 +12,7 @@ module Elm.VirtualDom
     , lazy, lazy_, lazy2, lazy2_, lazy3, lazy3_
     , keyedNode
     , fromRenderable
---  , program, programWithFlags
+    , program, programWithFlags
     ) where
 
 
@@ -62,6 +62,7 @@ import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
 import Elm.Graphics.Internal (EventHandler, addEventHandler, detail, documentForNode, eventHandler, eventToCustomEvent, makeCustomEvent, nextEventTarget, nodeToElement, removeAttributeNS, removeEventHandler, removeProperty, removeStyle, setAttributeNS, setHandlerInfo, setProperty, setPropertyIfDifferent, setStyle)
 import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecodersL)
+import Elm.Platform (Cmd, Program, Sub)
 import Elm.Result (Result(..))
 import Partial.Unsafe (unsafeCrashWith)
 import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
@@ -2147,6 +2148,36 @@ redraw domNode vNode = do
 
         Nothing ->
             pure newNode
+
+
+-- | > Check out the docs for [`Html.App.program`][prog].
+-- | > It works exactly the same way.
+-- |
+-- | [prog]: http://package.elm-lang.org/packages/elm-lang/html/latest/Html-App#program
+program :: ∀ flags model msg.
+    { init :: Tuple model (Cmd msg)
+    , update :: msg -> model -> Tuple model (Cmd msg)
+    , subscriptions :: model -> Sub msg
+    , view :: model -> Node msg
+    }
+    -> Program flags model msg
+program impl =
+    unsafeCrashWith "TODO"
+
+
+-- | > Check out the docs for [`Html.App.programWithFlags`][prog].
+-- | > It works exactly the same way.
+-- |
+-- | [prog]: http://package.elm-lang.org/packages/elm-lang/html/latest/Html-App#programWithFlags
+programWithFlags :: ∀ flags model msg.
+    { init :: flags -> Tuple model (Cmd msg)
+    , update :: msg -> model -> Tuple model (Cmd msg)
+    , subscriptions :: model -> Sub msg
+    , view :: model -> Node msg
+    }
+    -> Program flags model msg
+programWithFlags impl =
+    unsafeCrashWith "TODO"
 
 
 {-
