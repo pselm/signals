@@ -23,6 +23,7 @@ import Control.Monad.Aff (forkAff)
 import Control.Monad.Aff.AVar (AVar, makeEmptyVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, forE, runPure, kind Effect)
+import Control.Monad.Eff.AVar (putVar)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Except (runExcept)
@@ -33,11 +34,11 @@ import Control.Monad.Rec.Class (Step(..), tailRecM2)
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import DOM (DOM)
 import DOM.Event.Event (currentTarget, preventDefault, stopPropagation)
-import DOM.Event.EventTarget (dispatchEvent)
+import DOM.Event.EventTarget (addEventListener, dispatchEvent, eventListener)
 import DOM.Event.Types (Event, EventTarget, EventType, customEventToEvent)
 import DOM.HTML (window)
 import DOM.HTML.Document (body)
-import DOM.HTML.Types (htmlDocumentToDocument, htmlElementToNode)
+import DOM.HTML.Types (htmlDocumentToDocument, htmlElementToEventTarget, htmlElementToNode)
 import DOM.HTML.Window (document)
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
@@ -2195,8 +2196,8 @@ programWithFlags config =
         }
 
 
-renderer :: ∀ model msg. (model -> Node msg) -> IO (AVar model)
-renderer view = liftAff do
+renderer :: ∀ model msg. (model -> Node msg) -> AVar msg -> IO (AVar model)
+renderer view mailbox = liftAff do
     models <-
         makeEmptyVar
 
@@ -2221,8 +2222,22 @@ renderer view = liftAff do
                         maybeBody <-
                             body doc
 
-                        for_ maybeBody \b ->
-                            appendChild newNode (htmlElementToNode b)
+                        let listener =
+                                eventListener \event ->
+                                    for_ (eventToCustomEvent event >>= detail) \msg ->
+                                        -- This is a bit hackish ... we rely on things having
+                                        -- been set up correctly so that the msg is of the
+                                        -- correct type ... should revisit at some point.
+                                        --
+                                        -- Also, we're (necessarily?) in an Eff context here.
+                                        -- So, we supply a callback that does nothing, and
+                                        -- we get a canceler back which we're ignoring. Should
+                                        -- think about what that means in terms of control flow.
+                                        putVar (unsafeCoerce msg) mailbox (const $ pure unit)
+
+                        for_ maybeBody \b -> do
+                            void $ appendChild newNode (htmlElementToNode b)
+                            addEventListener elmMsgEvent listener false (htmlElementToEventTarget b)
 
                         pure newNode
 
