@@ -19,10 +19,15 @@ module Elm.VirtualDom
 import Control.Apply (lift2)
 import Control.Comonad (extract)
 import Control.Monad (when, unless, (>=>))
+import Control.Monad.Aff (forkAff)
+import Control.Monad.Aff.AVar (AVar, makeEmptyVar, takeVar)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, forE, runPure, kind Effect)
+import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Except.Trans (runExceptT, throwError)
+import Control.Monad.IO (IO)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Rec.Class (Step(..), tailRecM2)
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
@@ -30,6 +35,10 @@ import DOM (DOM)
 import DOM.Event.Event (currentTarget, preventDefault, stopPropagation)
 import DOM.Event.EventTarget (dispatchEvent)
 import DOM.Event.Types (Event, EventTarget, EventType, customEventToEvent)
+import DOM.HTML (window)
+import DOM.HTML.Document (body)
+import DOM.HTML.Types (htmlDocumentToDocument, htmlElementToNode)
+import DOM.HTML.Window (document)
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
 import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
@@ -120,7 +129,7 @@ instance renderableNode :: Renderable (Node msg) where
     render = render
 
     update old current =
-        applyPatches old.result old.value $
+        applyPatches old.result $
             diff old.value current
 
 
@@ -1910,8 +1919,8 @@ function removeNode(changes, localPatches, key, vnode, index)
 -}
 
 
-addDomNodes :: ∀ e msg. DOM.Node -> Node msg -> List (Exists Patch) -> Eff (dom :: DOM | e) (List (Exists PatchWithNodes))
-addDomNodes rootNode vNode patches = do
+addDomNodes :: ∀ e. DOM.Node -> List (Exists Patch) -> Eff (dom :: DOM | e) (List (Exists PatchWithNodes))
+addDomNodes rootNode patches = do
     patches
         # List.foldM step
             { currentNode: rootNode
@@ -1961,14 +1970,14 @@ addDomNodes rootNode vNode patches = do
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e msg. DOM.Node -> Node msg -> List (Exists Patch) -> EffDOM e DOM.Node
-applyPatches rootDomNode oldVirtualNode patches =
+applyPatches :: ∀ e. DOM.Node -> List (Exists Patch) -> EffDOM e DOM.Node
+applyPatches rootDomNode patches =
     if List.null patches
         then
             pure rootDomNode
 
         else
-            addDomNodes rootDomNode oldVirtualNode patches
+            addDomNodes rootDomNode patches
             >>= applyPatchesHelp rootDomNode
 
 
@@ -2161,8 +2170,9 @@ program :: ∀ flags model msg.
     , view :: model -> Node msg
     }
     -> Program flags model msg
-program impl =
-    unsafeCrashWith "TODO"
+program config =
+    programWithFlags $
+        config { init = const config.init }
 
 
 -- | > Check out the docs for [`Html.App.programWithFlags`][prog].
@@ -2176,8 +2186,57 @@ programWithFlags :: ∀ flags model msg.
     , view :: model -> Node msg
     }
     -> Program flags model msg
-programWithFlags impl =
-    unsafeCrashWith "TODO"
+programWithFlags config =
+    wrap
+        { init : config.init
+        , update : config.update
+        , subscriptions : config.subscriptions
+        , view : Just (renderer config.view)
+        }
+
+
+renderer :: ∀ model msg. (model -> Node msg) -> IO (AVar model)
+renderer view = liftAff do
+    models <-
+        makeEmptyVar
+
+    -- Eventually this will need to be parameterized to make `embed`
+    -- work ... for the moment, just assume `fullScreen`
+    doc <-
+        liftEff $ window >>= document
+
+    -- TODO: Integrate with requestAnimationFrame
+    let loop state = do
+            newModel <-
+                takeVar models
+
+            let newView = view newModel
+
+            newNode <- liftEff
+                case state of
+                    Nothing -> do
+                        newNode <-
+                            render (htmlDocumentToDocument doc) (view newModel)
+
+                        maybeBody <-
+                            body doc
+
+                        for_ maybeBody \b ->
+                            appendChild newNode (htmlElementToNode b)
+
+                        pure newNode
+
+                    Just (oldView /\ oldNode) -> do
+                        void $ applyPatches oldNode $
+                            diff oldView newView
+
+                        pure oldNode
+
+            loop $ Just (newView /\ newNode)
+
+    void $ forkAff $ loop Nothing
+
+    pure models
 
 
 {-
