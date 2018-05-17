@@ -57,7 +57,7 @@ import Data.Foldable (class Foldable, foldl, for_)
 import Data.Foreign (ForeignError(..), readString, toForeign)
 import Data.Lazy (Lazy, defer, force)
 import Data.Leibniz (type (~), Leibniz(..))
-import Data.List (List(..), length, reverse, singleton, snoc, drop, zip)
+import Data.List (List(..), drop, fromFoldable, length, reverse, singleton, snoc, zip)
 import Data.List (foldM, null) as List
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Newtype (unwrap, wrap)
@@ -271,13 +271,16 @@ equalArgs (Tuple left leftEq) (Tuple right rightEq) =
 -- | >       node "div"
 -- | >         [ property "id" (Json.string "greeting") ]
 -- | >         [ text "Hello!" ]
-node :: ∀ msg. String -> List (Property msg) -> List (Node msg) -> Node msg
-node tag properties =
+node :: ∀ f g msg. Foldable f => Foldable g => String -> f (Property msg) -> g (Node msg) -> Node msg
+node tag properties children =
     PlainNode
         { tag
         , namespace: organized.namespace
         , facts: organized.facts
         }
+        -- TODO: It would be nice to modify `diffChildren` so we could keep the
+        -- supplied foldable rather than turning it into a list!
+        (fromFoldable children)
 
     where
         organized =
@@ -288,13 +291,14 @@ node tag properties =
 -- | > node. You want this when you have a list of nodes that is changing: adding
 -- | > nodes, removing nodes, etc. In these cases, the unique identifiers help make
 -- | > the DOM modifications more efficient.
-keyedNode :: ∀ msg. String -> List (Property msg) -> List (Tuple String (Node msg)) -> Node msg
-keyedNode tag properties =
+keyedNode :: ∀ f g msg. Foldable f => Foldable g => String -> f (Property msg) -> g (Tuple String (Node msg)) -> Node msg
+keyedNode tag properties children =
     KeyedNode
         { tag
         , namespace: organized.namespace
         , facts: organized.facts
         }
+        (fromFoldable children)
 
     where
         organized =
@@ -395,7 +399,7 @@ type Key = String
 -- the memo. But that might be more inefficient. I should
 -- profile the overall code sometime and see where optimizations
 -- might be wise.
-organizeFacts :: ∀ msg. List (Property msg) -> {namespace :: Maybe String, facts :: OrganizedFacts msg}
+organizeFacts :: ∀ f msg. Foldable f => f (Property msg) -> {namespace :: Maybe String, facts :: OrganizedFacts msg}
 organizeFacts factList =
     pureST do
         -- Create a bunch of accumulators for StrMap
