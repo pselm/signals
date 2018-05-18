@@ -345,11 +345,31 @@ data Property msg
     = CustomProperty Key Value
     | Attribute Key String
     | AttributeNS Namespace Key String
-    | Styles (List (Tuple String String))
+    | Styles (∀ r. (∀ f. Foldable f => f (Tuple String String) -> r) -> r)
     | OnEvent Key Options (Decoder msg)
 
 
-derive instance functorProperty :: Functor Property
+instance functorProperty :: Functor Property where
+    map func prop =
+        case prop of
+            CustomProperty key value ->
+                CustomProperty key value
+
+            Attribute key value ->
+                Attribute key value
+
+            AttributeNS ns key value ->
+                AttributeNS ns key value
+
+            Styles cc ->
+                -- It looks like you need to call back out to the external
+                -- function to "re-capture" the Foldable instance. Both
+                -- `derive instance functor ...` and `Styles cc` result
+                -- in compiler errors.
+                cc style
+
+            OnEvent key options decoder ->
+                OnEvent key options (map func decoder)
 
 
 -- | > Transform the messages produced by a `Property`.
@@ -437,9 +457,10 @@ organizeFacts factList =
                 OnEvent key options decoder ->
                     void $ poke mutableEvents key (Tuple options decoder)
 
-                Styles list ->
-                    for_ list \(Tuple key value) ->
-                        void $ poke mutableStyles key value
+                Styles cc ->
+                    cc \foldable ->
+                        for_ foldable \(Tuple key value) ->
+                            void $ poke mutableStyles key value
 
                 CustomProperty key value ->
                     -- So, the normal case here is that we're setting an arbitrary property
@@ -559,8 +580,9 @@ attributeNS = AttributeNS
 -- | >     greeting :: Node msg
 -- | >     greeting =
 -- | >       node "div" [ myStyle ] [ text "Hello!" ]
-style :: ∀ msg. List (Tuple String String) -> Property msg
-style = Styles
+style :: ∀ f msg. Foldable f => f (Tuple String String) -> Property msg
+style styles =
+    Styles \func -> func styles
 
 
 -- EVENTS
