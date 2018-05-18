@@ -18,63 +18,47 @@ module Elm.Graphics.Collage
     ) where
 
 
-import Elm.Color (Color, Gradient, black, toCss, toCanvasGradient)
+import Control.Bind ((=<<), (>=>))
+import Control.Comonad (extract)
+import Control.Monad (when)
+import Control.Monad.Eff (Eff, untilE)
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Reader.Class (asks)
+import Control.Monad.Reader.Trans (ReaderT, runReaderT)
+import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
+import Control.Monad.State.Class (gets, modify)
+import Control.Monad.State.Trans (StateT, evalStateT)
+import DOM (DOM)
+import DOM.HTML.Types (Window)
+import DOM.Node.Element (setAttribute)
+import DOM.Node.Node (nodeName, removeChild, appendChild, insertBefore, firstChild, nextSibling)
+import DOM.Node.Types (Document, Node, elementToNode)
+import DOM.Node.Types (Element) as DOM
+import DOM.Renderable (class Renderable, AnyRenderable, Position(..), EffDOM, renderIntoDOM, toAnyRenderable)
+import Data.Bifunctor (bimap)
+import Data.Foldable (for_)
+import Data.Int (toNumber)
+import Data.List (List(..), (..), (:), snoc, toUnfoldable, head, tail, reverse)
+import Data.List.Zipper (Zipper(..), down)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Nullable (toMaybe)
+import Data.Traversable (traverse_)
+import Data.Tuple (Tuple(..), fst, snd)
 import Elm.Basics (Float)
-import Elm.Text (Text, drawCanvas)
-import Elm.Transform2D (Transform2D)
-import Elm.Transform2D (identity, multiply, rotation, matrix, toCSS) as T2D
+import Elm.Color (Color, Gradient, black, toCss, toCanvasGradient)
 import Elm.Graphics.Element (Element)
 import Elm.Graphics.Element (fromRenderable) as Element
 import Elm.Graphics.Internal (createNode, setStyle, getDimensions, measure, addTransform, documentToHtmlDocument, documentForNode, defaultView)
-
-import Data.List (List(..), (..), (:), snoc, toUnfoldable, head, tail, reverse)
-import Data.List.Zipper (Zipper(..), down)
-import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Foldable (for_)
-import Data.Traversable (traverse_)
-import Data.Nullable (toMaybe)
-import Data.Tuple (Tuple(..), fst, snd)
-import Data.Bifunctor (bimap)
-
-import Unsafe.Coerce (unsafeCoerce)
-import Math (pi, cos, sin, sqrt, (%))
+import Elm.Text (Text, drawCanvas)
+import Elm.Transform2D (Transform2D)
+import Elm.Transform2D (identity, multiply, rotation, matrix, toCSS) as T2D
 import Global (isNaN)
-
-import DOM (DOM)
-import DOM.Renderable (class Renderable, AnyRenderable, Position(..), toAnyRenderable, renderIntoDOM)
-import DOM.Node.Node (nodeName, removeChild, appendChild, insertBefore, firstChild, nextSibling)
-import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (Document, Node, elementToNode)
-import DOM.Node.Element (setAttribute)
-import DOM.HTML.Types (Window)
-
-import Control.Monad.Eff (Eff, untilE)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
-import Control.Monad.State.Trans (StateT, evalStateT)
-import Control.Monad.State.Class (gets, modify)
-import Control.Monad.Reader.Trans (ReaderT, runReaderT)
-import Control.Monad.Reader.Class (asks)
-import Control.Comonad (extract)
-import Control.Monad (when)
-import Control.Bind ((=<<), (>=>))
-
 import Graphics.Canvas (Context2D, CANVAS, CanvasElement, PatternRepeat(Repeat))
-
-import Graphics.Canvas
-    ( LineCap(..), LineJoin(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore
-    , setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath, getContext2D
-    , lineTo, moveTo, scale, stroke, fillText, strokeText, rotate, save, transform
-    , tryLoadImage, createPattern, fill, translate, drawImageFull, setLineJoin, setMiterLimit
-    ) as Canvas
-
-import Prelude
-    ( class Eq, eq, not, (<<<), (>>>), Unit, unit, (||)
-    , bind, discard, (>>=), pure, void
-    , (*), (/), ($), (#), map, (<$>), (<#>), (+), (-), (<>)
-    , show, (<), negate, (/=), (==)
-    )
+import Graphics.Canvas (LineCap(..), LineJoin(..), setLineWidth, setLineCap, setStrokeStyle, setGlobalAlpha, restore, setFillStyle, setPatternFillStyle, setGradientFillStyle, beginPath, getContext2D, lineTo, moveTo, scale, stroke, fillText, strokeText, rotate, save, transform, tryLoadImage, createPattern, fill, translate, drawImageFull, setLineJoin, setMiterLimit) as Canvas
+import Math (pi, cos, sin, sqrt, (%))
+import Prelude (class Eq, eq, not, (<<<), (>>>), Unit, unit, (||), bind, discard, (>>=), pure, void, (*), (/), ($), (#), map, (<$>), (<#>), (+), (-), (<>), show, (<), negate, (/=), (==))
+import Unsafe.Coerce (unsafeCoerce)
 
 
 -- | A visual `Form` has a shape and texture. This can be anything from a red
@@ -505,7 +489,7 @@ outlinedText ls t =
 -- RENDER
 ---------
 
-render :: ∀ e. Document -> Collage -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+render :: ∀ e. Document -> Collage -> EffDOM e DOM.Element
 render document model@(Collage {w, h}) = do
     div <- createNode document "div"
 
@@ -538,7 +522,7 @@ render document model@(Collage {w, h}) = do
 -- trying to do something that seems equivalent in purpose, but not having quite
 -- the same structure. So, ultimately I'll need to test it against example code
 -- to see that it produces the same results.
-update :: ∀ e. Boolean -> Node -> Collage -> Eff (dom :: DOM, canvas :: CANVAS | e) Node
+update :: ∀ e. Boolean -> Node -> Collage -> EffDOM e Node
 update redoWhenImageLoads parent c@(Collage {forms}) = do
     evalUpdate redoWhenImageLoads parent c $
         traverse_ renderForm forms
@@ -596,10 +580,10 @@ newtype UpdateEnv = UpdateEnv
 
 
 type Update m a = ReaderT UpdateEnv (StateT UpdateState m) a
-type UpdateEffects e a = Update (Eff (canvas :: CANVAS, dom :: DOM | e)) a
+type UpdateEffects e a = Update (Eff (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e)) a
 
 
-evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> Eff (canvas :: CANVAS, dom :: DOM | e) a
+evalUpdate :: ∀ e a. Boolean -> Node -> Collage -> UpdateEffects e a -> EffDOM e a
 evalUpdate redoWhenImageLoads parent c cb = do
     document <-
         documentForNode parent

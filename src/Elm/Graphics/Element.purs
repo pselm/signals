@@ -23,53 +23,40 @@ module Elm.Graphics.Element
     ) where
 
 
-import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure, removePaddingAndMargin, nodeToElement)
-import Elm.Basics (Float, truncate)
-import Elm.Color (Color, toCss)
-import Elm.Text (Text, renderHtml)
-import Elm.Text (fromString, monospace) as Text
-
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
-import Data.List (List(..), null, (:), reverse, length, index)
-import Data.Int (ceil, toNumber)
-import Data.Ord (max)
-import Data.Foldable (maximum, sum, for_)
-import Data.Nullable (Nullable, toMaybe)
-import Data.String (joinWith)
-import Data.Array (catMaybes)
-import Data.Tuple (Tuple(..))
-
-import DOM (DOM)
-import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
-import DOM.Renderable (render, update) as Renderable
-import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToElement, htmlImageElementToHTMLElement)
-import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLImageElement
-import DOM.HTML.Event.EventTypes (load)
-import DOM.Node.Document (createElement)
-import DOM.Node.Types (Element) as DOM
-import DOM.Node.Types (Document, Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
-import DOM.Node.Element (setId, setAttribute, tagName, removeAttribute)
-import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild)
-import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
-import DOM.Node.HTMLCollection (length, item) as HTMLCollection
-import DOM.Event.EventTarget (addEventListener, eventListener)
-
+import Control.Monad (when, unless)
 import Control.Monad.Eff (Eff, forE, foreachE)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
-import Control.Monad (when, unless)
-
-import Text.Format (format, precision)
-import Graphics.Canvas (CANVAS)
-
-import Prelude
-    ( class Show, class Eq, Unit, unit
-    , flip, map, (<$>), (<#>), ($), (>>>)
-    , bind, discard, (>>=), pure, void
-    , (+), (-), (/), (*), (<>)
-    , (==), (/=), (>), (||), (&&), negate
-    )
-
+import DOM (DOM)
+import DOM.Event.EventTarget (addEventListener, eventListener)
+import DOM.HTML.Event.EventTypes (load)
+import DOM.HTML.HTMLImageElement (create, naturalWidth, naturalHeight) as HTMLImageElement
+import DOM.HTML.Types (HTMLDocument, htmlDocumentToDocument, htmlElementToElement, htmlImageElementToHTMLElement)
+import DOM.Node.Document (createElement)
+import DOM.Node.Element (setId, setAttribute, tagName, removeAttribute)
+import DOM.Node.HTMLCollection (length, item) as HTMLCollection
+import DOM.Node.Node (firstChild, appendChild, parentNode, parentElement, replaceChild)
+import DOM.Node.ParentNode (firstElementChild, children) as ParentNode
+import DOM.Node.Types (Document, Node, elementToNode, elementToParentNode, elementToEventTarget, ElementId(..))
+import DOM.Node.Types (Element) as DOM
+import DOM.Renderable (class Renderable, AnyRenderable, EffDOM, toAnyRenderable)
+import DOM.Renderable (render, update) as Renderable
+import Data.Array (catMaybes)
+import Data.Foldable (maximum, sum, for_)
+import Data.Int (ceil, toNumber)
+import Data.List (List(..), null, (:), reverse, length, index)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Nullable (Nullable, toMaybe)
+import Data.Ord (max)
+import Data.String (joinWith)
+import Data.Tuple (Tuple(..))
+import Elm.Basics (Float, truncate)
+import Elm.Color (Color, toCss)
+import Elm.Graphics.Internal (createNode, setStyle, removeStyle, addTransform, removeTransform, measure, removePaddingAndMargin, nodeToElement)
+import Elm.Text (Text, renderHtml)
+import Elm.Text (fromString, monospace) as Text
+import Prelude (class Show, class Eq, Unit, unit, flip, map, (<$>), (<#>), ($), (>>>), bind, discard, (>>=), pure, void, (+), (-), (/), (*), (<>), (==), (/=), (>), (||), (&&), negate)
 import Prelude (show) as Prelude
+import Text.Format (format, precision)
 
 
 -- FOREIGN
@@ -975,7 +962,7 @@ needsReversal DIn = true
 needsReversal _ = false
 
 
-makeFlow :: ∀ e. Document -> Direction -> List Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+makeFlow :: ∀ e. Document -> Direction -> List Element -> EffDOM e DOM.Element
 makeFlow document dir elist = do
     parent <- createNode document "div"
 
@@ -1066,7 +1053,7 @@ setPos pos (Element {element, props}) elem =
             ] \op -> op elem
 
 
-makeContainer :: ∀ e. Document -> RawPosition -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+makeContainer :: ∀ e. Document -> RawPosition -> Element -> EffDOM e DOM.Element
 makeContainer document pos elem = do
     e <- render document elem
     setPos pos elem e
@@ -1098,13 +1085,13 @@ rawHtml document html align = do
 
 -- RENDER
 
-render :: ∀ e. Document -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+render :: ∀ e. Document -> Element -> EffDOM e DOM.Element
 render document e =
     makeElement document e
     >>= setProps document e
 
 
-makeElement :: ∀ e. Document -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+makeElement :: ∀ e. Document -> Element -> EffDOM e DOM.Element
 makeElement document (Element {element, props}) =
     case element of
         Image imageStyle imageWidth imageHeight src ->
@@ -1134,7 +1121,7 @@ makeElement document (Element {element, props}) =
 
 -- UPDATE
 
-updateAndReplace :: ∀ e. Document -> DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+updateAndReplace :: ∀ e. Document -> DOM.Element -> Element -> Element -> EffDOM e DOM.Element
 updateAndReplace document node curr next = do
     newNode <- update document node curr next
 
@@ -1146,7 +1133,7 @@ updateAndReplace document node curr next = do
     pure newNode
 
 
-updateFromNode :: ∀ e. Document -> Node -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) Node
+updateFromNode :: ∀ e. Document -> Node -> Element -> Element -> EffDOM e Node
 updateFromNode document node curr next =
     case nodeToElement node of
         Just element ->
@@ -1158,7 +1145,7 @@ updateFromNode document node curr next =
             elementToNode <$> render document next
 
 
-update :: ∀ e. Document -> DOM.Element -> Element -> Element -> Eff (canvas :: CANVAS, dom :: DOM | e) DOM.Element
+update :: ∀ e. Document -> DOM.Element -> Element -> Element -> EffDOM e DOM.Element
 update document outerNode (Element curr) (Element next) = do
     innerNode <-
         if tagName outerNode == "A"

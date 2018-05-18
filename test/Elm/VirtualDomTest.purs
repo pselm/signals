@@ -1,34 +1,31 @@
 module Test.Elm.VirtualDomTest (tests) where
 
-import Test.Unit (TestSuite, Test, suite, test, success, failure)
-import Test.Unit.Assert (equal)
-import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
-import Test.QuickCheck.LCG (randomSeed)
-import Test.QuickCheck.Gen (GenState, elements, runGen)
-
-import Test.Elm.Graphics.Internal (innerHtml)
-
 import Elm.VirtualDom
 
+import Control.Monad.Eff.Class (class MonadEff, liftEff)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Random (RANDOM)
+import Control.Monad.Rec.Class (Step(..), tailRecM3)
 import DOM (DOM)
-import DOM.Renderable (Position(..), renderIntoDOM, renderOrUpdate)
 import DOM.JSDOM (JSDOM, jsdom)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (Element, ElementId(..), documentToNonElementParentNode, elementToNode)
-
+import DOM.Renderable (Position(..), renderIntoDOM, renderOrUpdate)
+import Data.Foldable (traverse_)
+import Data.List (List(..), (:), toUnfoldable)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.NonEmpty (NonEmpty(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Elm.Json.Encode as Json
 import Graphics.Canvas (CANVAS)
-import Data.Maybe (Maybe(..), fromJust)
-import Data.List (List(..), (:), toUnfoldable)
-import Data.Tuple (Tuple(..), fst, snd)
-import Data.Foldable (traverse_)
-import Data.NonEmpty (NonEmpty(..))
-import Control.Monad.Eff.Class (class MonadEff, liftEff)
-import Control.Monad.Eff.Random (RANDOM)
-import Control.Monad.Rec.Class (Step(..), tailRecM3)
 import Partial.Unsafe (unsafePartial, unsafeCrashWith)
-
 import Prelude (class Show, class Eq, flip, bind, discard, void, ($), (<>), show, pure, unit, (<=), (==), (/=), (-))
+import Test.Elm.Graphics.Internal (innerHtml)
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary)
+import Test.QuickCheck.Gen (GenState, elements, runGen)
+import Test.QuickCheck.LCG (randomSeed)
+import Test.Unit (TestSuite, Test, suite, test, success, failure)
+import Test.Unit.Assert (equal)
 
 
 infixl 9 equals as ===
@@ -61,7 +58,7 @@ withContainer callback = do
     unsafePartial (callback (fromJust node))
 
 
-tests :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+tests :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 tests =
     suite "Elm.VirtualDom" do
         suite "Static Tests" $
@@ -71,14 +68,14 @@ tests =
         randomTransitions
 
 
-specificTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+specificTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 specificTransitions =
     test "Specific Transitions" do
         makeTransitionTest attributeTest helloWorld
         makeTransitionTest propertyTest attributeNsTest
 
 
-randomTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+randomTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 randomTransitions =
     test "Random Transitions" $
         withContainer \container -> do
@@ -91,7 +88,7 @@ randomTransitions =
                 } Nothing
 
 
-makeUpdateTest :: ∀ e msg. Element -> Int -> NodeTest msg -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM | e)
+makeUpdateTest :: ∀ e msg. Element -> Int -> NodeTest msg -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e)
 makeUpdateTest container remaining (NodeTest nodeTest) previous = do
     result <-
         liftEff do
@@ -119,7 +116,7 @@ makeUpdateTest container remaining (NodeTest nodeTest) previous = do
                     ", with remaining " <> show remaining
 
 
-runFor :: ∀ e msg. Element -> Int -> GenState -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM | e)
+runFor :: ∀ e msg. Element -> Int -> GenState -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e)
 runFor container =
     tailRecM3 \remaining genState previous ->
         if remaining <= 0
@@ -140,7 +137,7 @@ runFor container =
                     }
 
 
-makeTransitionTest :: ∀ e msg. NodeTest msg -> NodeTest msg -> Test (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+makeTransitionTest :: ∀ e msg. NodeTest msg -> NodeTest msg -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 makeTransitionTest (NodeTest from) (NodeTest to) =
     withContainer \container -> do
         resultFrom <-
@@ -170,7 +167,7 @@ makeTransitionTest (NodeTest from) (NodeTest to) =
                             " actual " <> show resultTo
 
 
-makeStaticTest :: ∀ e msg. NodeTest msg -> TestSuite (canvas :: CANVAS, dom :: DOM, jsdom :: JSDOM | e)
+makeStaticTest :: ∀ e msg. NodeTest msg -> TestSuite (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 makeStaticTest (NodeTest nodeTest) =
     test nodeTest.title do
         container <-

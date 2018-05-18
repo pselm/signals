@@ -7,34 +7,28 @@
 module Examples.Graphics.UpdateCollage where
 
 
-import Examples.Graphics.CollageExamples (Example)
-
-import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Random (RANDOM)
 import Control.Monad.ST (newSTRef, readSTRef, writeSTRef, runST)
-import Graphics.Canvas (CANVAS)
-import Data.Foldable (for_)
-import Data.Tuple (fst, snd)
-import Test.QuickCheck.Arbitrary (arbitrary)
-import Test.QuickCheck.LCG (randomSeed)
-import Test.QuickCheck.Gen (Gen, runGen)
-
-import DOM (DOM)
-import DOM.Renderable (renderOrUpdate)
+import DOM.Event.EventTarget (eventListener, addEventListener)
 import DOM.HTML (window)
+import DOM.HTML.Event.EventTypes (keydown)
 import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.HTML.Window (document)
-import DOM.HTML.Event.EventTypes (keydown)
-import DOM.Node.NonElementParentNode (getElementById)
-import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonElementParentNode, documentToEventTarget)
 import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Node (appendChild)
-import DOM.Event.EventTarget (eventListener, addEventListener)
-
+import DOM.Node.NonElementParentNode (getElementById)
+import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonElementParentNode, documentToEventTarget)
+import DOM.Renderable (EffDOM, renderOrUpdate)
+import Data.Foldable (for_)
+import Data.Tuple (fst, snd)
+import Examples.Graphics.CollageExamples (Example)
 import Prelude (Unit, bind, discard, (<$>), (>>=), const, ($), void)
+import Test.QuickCheck.Arbitrary (arbitrary)
+import Test.QuickCheck.Gen (Gen, runGen)
+import Test.QuickCheck.LCG (randomSeed)
 
 
-main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM, random :: RANDOM | e) Unit
+main :: ∀ e. EffDOM (random :: RANDOM | e) Unit
 main = do
     doc <-
         htmlDocumentToDocument <$>

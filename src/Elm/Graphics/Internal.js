@@ -50,6 +50,14 @@ exports.setProperty = function (key) {
     };
 };
 
+exports.getProperty = function (key) {
+    return function (element) {
+        return function () {
+            return element[key];
+        };
+    };
+};
+
 exports.removeProperty = function (key) {
     return function (element) {
         return function () {
@@ -124,4 +132,74 @@ exports.removeAttributeNS = function (ns) {
 
 exports.defaultView = function (htmlDoc) {
     return htmlDoc.defaultView;
+};
+
+exports.eventHandler = function (fn) {
+    return function (i) {
+        return function () {
+            function handler (event) {
+                fn(handler.info)(event)();
+            };
+
+            handler.info = i;
+
+            return handler;
+        };
+    };
+};
+
+exports.setHandlerInfo = function (i) {
+    return function (handler) {
+        return function () {
+            handler.info = i;
+            return {};
+        };
+    };
+};
+
+exports.addEventHandler = function (type) {
+    return function (handler) {
+        return function (useCapture) {
+            return function (target) {
+                return function () {
+                    target.addEventListener(type, handler, useCapture);
+                    return {};
+                };
+            };
+        };
+    };
+};
+
+exports.removeEventHandler = function (type) {
+    return function (handler) {
+        return function (useCapture) {
+            return function (target) {
+                return function () {
+                    target.removeEventListener(type, handler, useCapture);
+                    return {};
+                };
+            };
+        };
+    };
+};
+
+exports.makeCustomEvent = function (eventName) {
+    return function (detail) {
+        return function () {
+            if (typeof(CustomEvent) === 'function') {
+                return new CustomEvent(eventName, {
+                    detail: detail,
+                    bubbles: true
+                });
+            } else {
+                var event = document.createEvent('CustomEvent');
+                event.initCustomEvent(eventName, true, false, detail);
+                return event;
+            }
+        };
+    };
+};
+
+exports._detail = function (customEvent) {
+    return customEvent.detail;
 };

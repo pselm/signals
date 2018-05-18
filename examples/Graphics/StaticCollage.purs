@@ -7,26 +7,20 @@
 module Examples.Graphics.StaticCollage where
 
 
-import Examples.Graphics.CollageExamples (examples)
-
-import Control.Monad.Eff (Eff)
-import Graphics.Canvas (CANVAS)
-import Data.Foldable (for_)
-
-import DOM (DOM)
-import DOM.Renderable (renderIntoDOM, Position(AfterLastChild))
 import DOM.HTML (window)
 import DOM.HTML.Types (htmlDocumentToDocument)
 import DOM.HTML.Window (document)
-import DOM.Node.NonElementParentNode (getElementById)
-import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonElementParentNode)
 import DOM.Node.Document (createElement, createTextNode)
 import DOM.Node.Node (appendChild)
-
+import DOM.Node.NonElementParentNode (getElementById)
+import DOM.Node.Types (elementToNode, ElementId(..), textToNode, documentToNonElementParentNode)
+import DOM.Renderable (Position(AfterLastChild), EffDOM, renderIntoDOM)
+import Data.Foldable (for_)
+import Examples.Graphics.CollageExamples (examples)
 import Prelude (Unit, ($), void, bind, discard, (<$>), (>>=))
 
 
-main :: ∀ e. Eff (canvas :: CANVAS, dom :: DOM | e) Unit
+main :: ∀ e. EffDOM e Unit
 main = do
     doc <-
         htmlDocumentToDocument <$>

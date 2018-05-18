@@ -8,31 +8,37 @@ module Elm.Graphics.Internal
     , setStyle, removeStyle
     , addTransform, removeTransform
     , getDimensions, measure
-    , setProperty, removeProperty, setPropertyIfDifferent
+    , setProperty, getProperty, removeProperty, setPropertyIfDifferent
     , setAttributeNS, getAttributeNS, removeAttributeNS
     , defaultView
     , nodeToElement, documentToHtmlDocument
+    , nextEventTarget
     , documentForNode
+    , EventHandler, eventHandler, addEventHandler, setHandlerInfo, removeEventHandler
+    , makeCustomEvent, eventToCustomEvent, detail
     ) where
 
 
-import DOM (DOM)
-import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode, readHTMLDocument)
-import DOM.HTML.Document (body)
-import DOM.Node.Document (createElement)
-import DOM.Node.Types (Document, Element, Node, elementToNode)
-import DOM.Node.NodeType (NodeType(ElementNode))
-import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType, ownerDocument)
-import Data.Nullable (Nullable)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Either (either)
-import Data.Foreign (Foreign, toForeign)
 import Control.Comonad (extract)
-import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff (Eff, foreachE, kind Effect)
+import Control.Monad.Except (runExcept)
 import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.Rec.Class (Step(..), tailRecM)
+import DOM (DOM)
+import DOM.Event.Types (CustomEvent, Event, EventTarget, EventType, readCustomEvent, readEventTarget)
+import DOM.HTML.Document (body)
+import DOM.HTML.Types (Window, HTMLDocument, htmlElementToNode, readHTMLDocument)
+import DOM.Node.Document (createElement)
+import DOM.Node.Node (appendChild, removeChild, nextSibling, insertBefore, parentNode, nodeType, ownerDocument)
+import DOM.Node.NodeType (NodeType(ElementNode))
+import DOM.Node.Types (Document, Element, Node, elementToNode)
+import Data.Either (Either(..), either, hush)
+import Data.Foreign (Foreign, toForeign)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Nullable (Nullable, toMaybe)
 import Partial.Unsafe (unsafePartial)
+import Prelude (Unit, bind, const, discard, pure, void, ($), (<#>), (<$>), (<<<), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude (bind, discard, pure, void, Unit, (<#>), (<$>), ($), const)
 
 
 -- Sets the style named in the first param to the value of the second param
@@ -49,6 +55,9 @@ foreign import getDimensions :: ∀ e. Element -> Eff (dom :: DOM | e) {width ::
 
 -- Set arbitrary property. TODO: Should suggest for purescript-dom
 foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
+
+-- Get arbitrary property.
+foreign import getProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) (Nullable Foreign)
 
 -- Remove a property.
 foreign import removeProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
@@ -194,3 +203,78 @@ documentToHtmlDocument :: Document -> Maybe HTMLDocument
 documentToHtmlDocument doc =
     extract $ either (const Nothing) Just <$>
         runExceptT (readHTMLDocument (toForeign doc))
+
+
+-- | Like `DOM.Event.EventTarget.EventListener`, but parameterized by the `msg`
+-- | type, and you can mutate the "info" that it uses without removing and
+-- | adding the listener.
+foreign import data EventHandler :: # Effect -> Type -> Type
+
+
+-- | Like `DOM.Event.EventTarget.eventListener`, but your function also gets
+-- | some info of type `i`, and you can change that info without removing and
+-- | re-applying the handler. And, since you can mutate the result, producing
+-- | it needs to be an `Eff` itself.
+-- |
+-- | You have to supply some initial info (which you can change using
+-- | `setHandlerInfo`).
+foreign import eventHandler :: ∀ e i a.
+    (i -> Event -> Eff e a) -> i -> Eff e (EventHandler e i)
+
+
+-- | Like `addEventListener`, but for handlers. The `Boolean` arg indicates
+-- | whether to use the "capture" phase.
+foreign import addEventHandler :: ∀ e i.
+    EventType ->
+    EventHandler (dom :: DOM | e) i ->
+    Boolean ->
+    EventTarget ->
+    Eff (dom :: DOM | e) Unit
+
+
+-- | Supply a different value for the handler, for use with the callback
+-- | function, without removing and re-applying the handler.
+foreign import setHandlerInfo :: ∀ e1 e2 i.
+    i -> EventHandler e1 i -> Eff (dom :: DOM | e2) Unit
+
+
+-- | Like `removeEventListener`
+foreign import removeEventHandler :: ∀ e i.
+    EventType ->
+    EventHandler (dom :: DOM | e) i ->
+    Boolean ->
+    EventTarget ->
+    Eff (dom :: DOM | e) Unit
+
+
+-- | It feels as though purescript-dom ought to have a way to do this, but I
+-- | can't find it. Stores the `Foreign` in the `detail` field of the custom
+-- | event.
+foreign import makeCustomEvent :: ∀ e. EventType -> Foreign -> Eff e CustomEvent
+
+
+eventToCustomEvent :: Event -> Maybe CustomEvent
+eventToCustomEvent = hush <<< runExcept <<< readCustomEvent <<< toForeign
+
+
+foreign import _detail :: CustomEvent -> Nullable Foreign
+
+
+detail :: CustomEvent -> Maybe Foreign
+detail = toMaybe <<< _detail
+
+
+nextEventTarget :: ∀ e. Node -> Eff (dom :: DOM | e) (Maybe EventTarget)
+nextEventTarget =
+    tailRecM \node ->
+        parentNode node >>= case _ of
+            Just parent ->
+                case runExcept $ readEventTarget $ toForeign parent of
+                    Right eventTarget ->
+                        pure $ Done $ Just eventTarget
+
+                    Left _ ->
+                        pure $ Loop parent
+
+            Nothing ->
+                pure $ Done $ Nothing
