@@ -210,7 +210,6 @@ nodeTests =
     : styleTest
     : attributeNsTest
     : namespacedNode
-    : custom1 : custom2
     : Nil
     )
 
@@ -283,36 +282,6 @@ helloWorld5 = NodeTest
     , expected:
         "<div><p>Hello to the World!</p></div>"
     }
-
-
-custom1 :: ∀ msg. NodeTest msg
-custom1 =
-    NodeTest
-        { title: "custom1"
-        , node:
-            node "div"
-                Nil
-                ( fromRenderable "String 1"
-                : Nil
-                )
-        , expected:
-            "<div>String 1</div>"
-        }
-
-
-custom2 :: ∀ msg. NodeTest msg
-custom2 =
-    NodeTest
-        { title: "custom2"
-        , node:
-            node "div"
-                Nil
-                ( fromRenderable "String 2"
-                : Nil
-                )
-        , expected:
-            "<div>String 2</div>"
-        }
 
 
 propertyTest :: ∀ msg. NodeTest msg
