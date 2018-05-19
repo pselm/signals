@@ -106,35 +106,27 @@ makeUpdateTest container remaining (NodeTest nodeTest) previous = do
 
                         Just (NodeTest p) ->
                             "from " <> p.title
-
-            in
-                failure $
-                    "expected " <> show nodeTest.expected <>
-                    ", got " <> show result <>
-                    ", for " <> nodeTest.title <>
-                    ", " <> context <>
-                    ", with remaining " <> show remaining
+            in failure $
+                "expected " <> show nodeTest.expected <>
+                ", got " <> show result <>
+                ", for " <> nodeTest.title <>
+                ", " <> context <>
+                ", with remaining " <> show remaining
 
 
 runFor :: ∀ e msg. Element -> Int -> GenState -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e)
 runFor container =
     tailRecM3 \remaining genState previous ->
-        if remaining <= 0
-            then
-                pure $ Done unit
-
-            else do
-                let
-                    state =
-                        runGen arbitrary genState
-
-                makeUpdateTest container remaining (fst state) previous
-
-                pure $ Loop
-                    { a: remaining - 1
-                    , b: snd state
-                    , c: Just (fst state)
-                    }
+        if remaining <= 0 then
+            pure $ Done unit
+        else do
+            let state = runGen arbitrary genState
+            makeUpdateTest container remaining (fst state) previous
+            pure $ Loop
+                { a: remaining - 1
+                , b: snd state
+                , c: Just (fst state)
+                }
 
 
 makeTransitionTest :: ∀ e msg. NodeTest msg -> NodeTest msg -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
@@ -151,7 +143,6 @@ makeTransitionTest (NodeTest from) (NodeTest to) =
                     from.title <> " --> " <> to.title <>
                     " failed at from: expected " <> show from.expected <>
                     " actual " <> show resultFrom
-
             else do
                 resultTo <-
                     liftEff do
