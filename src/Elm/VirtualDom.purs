@@ -30,20 +30,21 @@ import Control.Monad.Except (runExcept)
 import Control.Monad.Except.Trans (runExceptT, throwError)
 import Control.Monad.IO (IO)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Control.Monad.Rec.Class (Step(..), tailRecM2)
+import Control.Monad.Rec.Class (Step(..), tailRecM, tailRecM2)
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
 import DOM (DOM)
 import DOM.Event.Event (currentTarget, preventDefault, stopPropagation)
 import DOM.Event.EventTarget (addEventListener, dispatchEvent, eventListener)
-import DOM.Event.Types (Event, EventTarget, EventType, customEventToEvent)
+import DOM.Event.Types (CustomEvent, Event, EventTarget, EventType, customEventToEvent, readCustomEvent, readEventTarget)
 import DOM.HTML (window)
 import DOM.HTML.Document (body)
 import DOM.HTML.Types (htmlDocumentToDocument, htmlElementToEventTarget, htmlElementToNode)
 import DOM.HTML.Window (document)
 import DOM.Node.Document (createTextNode, createElement, createElementNS)
 import DOM.Node.Element (setAttribute, removeAttribute)
-import DOM.Node.Node (appendChild, parentNode, replaceChild, lastChild, setTextContent, removeChild, childNodes, nextSibling, previousSibling)
+import DOM.Node.Node (appendChild, childNodes, lastChild, nextSibling, nodeType, ownerDocument, parentNode, previousSibling, removeChild, replaceChild, setTextContent)
 import DOM.Node.NodeList (item)
+import DOM.Node.NodeType (NodeType(..))
 import DOM.Node.Types (Document, Element, elementToEventTarget, elementToNode, textToNode)
 import DOM.Node.Types (Node) as DOM
 import DOM.Renderable (class Renderable, AnyRenderable, EffDOM, toAnyRenderable)
@@ -51,10 +52,10 @@ import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Coyoneda (Coyoneda, coyoneda, unCoyoneda)
-import Data.Either (Either(..), either)
+import Data.Either (Either(..), either, hush)
 import Data.Exists (Exists, mkExists, runExists)
 import Data.Foldable (class Foldable, foldl, for_)
-import Data.Foreign (ForeignError(..), readString, toForeign)
+import Data.Foreign (Foreign, ForeignError(..), readString, toForeign)
 import Data.Lazy (Lazy, defer, force)
 import Data.Leibniz (type (~), Leibniz(..))
 import Data.List (List(..), drop, fromFoldable, length, reverse, singleton, snoc, zip)
@@ -70,11 +71,10 @@ import Data.StrMap.ST.Unsafe (unsafeFreeze)
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\), type (/\))
 import Elm.Basics (Bool)
-import Elm.Graphics.Internal (EventHandler, addEventHandler, detail, documentForNode, eventHandler, eventToCustomEvent, makeCustomEvent, nextEventTarget, nodeToElement, removeAttributeNS, removeEventHandler, removeProperty, removeStyle, setAttributeNS, setHandlerInfo, setProperty, setPropertyIfDifferent, setStyle)
 import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecodersL)
 import Elm.Platform (Cmd, Program, Sub)
 import Elm.Result (Result(..))
-import Partial.Unsafe (unsafeCrashWith)
+import Partial.Unsafe (unsafeCrashWith, unsafePartial)
 import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
@@ -2481,3 +2481,131 @@ function makeStepper(domNode, view, initialVirtualNode, eventNode)
 }
 
 -}
+
+-- UTILITIES
+
+
+unsafeNodeToElement :: DOM.Node -> Element
+unsafeNodeToElement = unsafeCoerce
+
+
+-- Perhaps should suggest this for purescript-dom?
+nodeToElement :: DOM.Node -> Maybe Element
+nodeToElement n =
+    unsafePartial
+        case nodeType n of
+            ElementNode ->
+                Just (unsafeNodeToElement n)
+
+            _ ->
+                Nothing
+
+
+-- | Like `DOM.Event.EventTarget.EventListener`, but parameterized by the `msg`
+-- | type, and you can mutate the "info" that it uses without removing and
+-- | adding the listener.
+foreign import data EventHandler :: # Effect -> Type -> Type
+
+
+-- | Like `DOM.Event.EventTarget.eventListener`, but your function also gets
+-- | some info of type `i`, and you can change that info without removing and
+-- | re-applying the handler. And, since you can mutate the result, producing
+-- | it needs to be an `Eff` itself.
+-- |
+-- | You have to supply some initial info (which you can change using
+-- | `setHandlerInfo`).
+foreign import eventHandler :: ∀ e i a.
+    (i -> Event -> Eff e a) -> i -> Eff e (EventHandler e i)
+
+
+-- | Like `addEventListener`, but for handlers. The `Boolean` arg indicates
+-- | whether to use the "capture" phase.
+foreign import addEventHandler :: ∀ e i.
+    EventType ->
+    EventHandler (dom :: DOM | e) i ->
+    Boolean ->
+    EventTarget ->
+    Eff (dom :: DOM | e) Unit
+
+
+-- | Supply a different value for the handler, for use with the callback
+-- | function, without removing and re-applying the handler.
+foreign import setHandlerInfo :: ∀ e1 e2 i.
+    i -> EventHandler e1 i -> Eff (dom :: DOM | e2) Unit
+
+
+-- | Like `removeEventListener`
+foreign import removeEventHandler :: ∀ e i.
+    EventType ->
+    EventHandler (dom :: DOM | e) i ->
+    Boolean ->
+    EventTarget ->
+    Eff (dom :: DOM | e) Unit
+
+
+-- | It feels as though purescript-dom ought to have a way to do this, but I
+-- | can't find it. Stores the `Foreign` in the `detail` field of the custom
+-- | event.
+foreign import makeCustomEvent :: ∀ e. EventType -> Foreign -> Eff e CustomEvent
+
+
+eventToCustomEvent :: Event -> Maybe CustomEvent
+eventToCustomEvent = hush <<< runExcept <<< readCustomEvent <<< toForeign
+
+
+foreign import _detail :: CustomEvent -> Nullable Foreign
+
+
+detail :: CustomEvent -> Maybe Foreign
+detail = toMaybe <<< _detail
+
+
+nextEventTarget :: ∀ e. DOM.Node -> Eff (dom :: DOM | e) (Maybe EventTarget)
+nextEventTarget =
+    tailRecM \n ->
+        parentNode n >>= case _ of
+            Just parent ->
+                case runExcept $ readEventTarget $ toForeign parent of
+                    Right eventTarget ->
+                        pure $ Done $ Just eventTarget
+
+                    Left _ ->
+                        pure $ Loop parent
+
+            Nothing ->
+                pure $ Done $ Nothing
+
+
+-- Set arbitrary property. TODO: Should suggest for purescript-dom
+foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
+
+-- Get arbitrary property.
+foreign import getProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) (Nullable Foreign)
+
+-- Remove a property.
+foreign import removeProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
+
+-- Set if not already equal. A bit of a hack ... not suitable for general use.
+foreign import setPropertyIfDifferent :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
+
+
+-- TODO: Should suggest these for purescript-dom
+foreign import setAttributeNS :: ∀ e. String -> String -> String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import getAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) (Nullable String)
+foreign import removeAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
+
+
+-- Sets the style named in the first param to the value of the second param
+foreign import setStyle :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
+
+-- Removes the style
+foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
+
+
+-- | Given a node, returns the document which the node belongs to.
+documentForNode :: ∀ e. DOM.Node -> Eff (dom :: DOM | e) Document
+documentForNode n =
+    -- The unsafeCoerce should be safe, because if `ownerDocument`
+    -- returns null, then the node itself must be the document.
+    ownerDocument n
+        <#> fromMaybe (unsafeCoerce n)
