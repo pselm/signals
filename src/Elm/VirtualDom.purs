@@ -11,7 +11,6 @@ module Elm.VirtualDom
     , on, onWithOptions, Options, defaultOptions, equalOptions
     , lazy, lazy_, lazy2, lazy2_, lazy3, lazy3_
     , keyedNode
-    , fromRenderable
     , program, programWithFlags
     ) where
 
@@ -47,8 +46,6 @@ import DOM.Node.NodeList (item)
 import DOM.Node.NodeType (NodeType(..))
 import DOM.Node.Types (Document, Element, elementToEventTarget, elementToNode, textToNode)
 import DOM.Node.Types (Node) as DOM
-import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
-import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
 import Data.Coyoneda (Coyoneda, coyoneda, unCoyoneda)
@@ -109,7 +106,6 @@ data Node msg
     | Thunk (Lazy (Node msg)) (Thunk msg)
     | Thunk2 (Lazy (Node msg)) (Thunk2 msg)
     | Thunk3 (Lazy (Node msg)) (Thunk3 msg)
-    | Custom AnyRenderable
 
 
 instance functorNode :: Functor Node where
@@ -292,17 +288,6 @@ keyedNode tag properties children =
     where
         organized =
             organizeFacts properties
-
-
--- | Create a `Node` from anything that has a `Renderable` instance.
-fromRenderable :: ∀ a msg. (Renderable a) => a -> Node msg
-fromRenderable =
-    -- The original Elm allows a list of facts here as well, but that ends up being
-    -- incoherent, since if we change what the renderable produces, then the
-    -- renderable can be out of sync for updates.
-    --
-    -- TODO: Revisit this for Elm 0.18's version ...
-    Custom <<< toAnyRenderable
 
 
 -- | > Just put plain text in the DOM. It will escape the string so that it appears
@@ -830,13 +815,6 @@ render doc vNode =
 
                 pure domNode
 
-        Custom renderable ->
-            liftEff $ Renderable.render doc renderable
-            -- The original Elm code also tracks Facts and applies them here
-            -- ...  in my structure, it seems best not to do that, since it's
-            -- really the job of the renderable, but this may need to be
-            -- revisited at some point.
-
 
 -- APPLY FACTS
 
@@ -1046,7 +1024,6 @@ data PatchOp msg
     | PTagger (Exists (TaggerFunc msg))
     | PRemoveLast Int
     | PAppend (List (Node msg))
-    | PCustom AnyRenderable AnyRenderable
 
 
 newtype TaggerFunc msg a
@@ -1409,8 +1386,6 @@ diffHelp proof a b index accum =
 			return;
 -}
 
-                Custom oldRenderable, Custom newRenderable ->
-                    snoc accum (makePatch (PCustom oldRenderable newRenderable) index)
 {-
 		case 'custom':
 			if (a.impl !== b.impl)
@@ -2134,16 +2109,6 @@ function applyPatchReorderEndInsertsHelp(endInserts, patch)
 	return frag;
 }
 -}
-
-        PCustom old new ->
-            liftEff $
-            Renderable.updateDOM
-                { value: old
-                , result: domNode
-                , document
-                }
-                new
-            <#> \x -> x.result
 
             {-
             var impl = patch.data;
