@@ -22,17 +22,17 @@ import Control.Monad (when, unless, (>=>))
 import Control.Monad.Aff (forkAff)
 import Control.Monad.Aff.AVar (AVar, makeEmptyVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff (Eff, forE, runPure, kind Effect)
+import Control.Monad.Eff (forE, runPure)
 import Control.Monad.Eff.AVar (putVar)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Except.Trans (runExceptT, throwError)
-import Control.Monad.IO (IO)
+import Control.Monad.IO (IO, runIO')
+import Control.Monad.IOSync (IOSync)
+import Control.Monad.IOSync.Class (liftIOSync)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Rec.Class (Step(..), tailRecM, tailRecM2)
 import Control.Monad.ST (pureST, newSTRef, writeSTRef, readSTRef)
-import DOM (DOM)
 import DOM.Event.Event (currentTarget, preventDefault, stopPropagation)
 import DOM.Event.EventTarget (addEventListener, dispatchEvent, eventListener)
 import DOM.Event.Types (CustomEvent, Event, EventTarget, EventType, customEventToEvent, readCustomEvent, readEventTarget)
@@ -47,7 +47,7 @@ import DOM.Node.NodeList (item)
 import DOM.Node.NodeType (NodeType(..))
 import DOM.Node.Types (Document, Element, elementToEventTarget, elementToNode, textToNode)
 import DOM.Node.Types (Node) as DOM
-import DOM.Renderable (class Renderable, AnyRenderable, EffDOM, toAnyRenderable)
+import DOM.Renderable (class Renderable, AnyRenderable, toAnyRenderable)
 import DOM.Renderable (render, updateDOM) as Renderable
 import Data.Array (null) as Array
 import Data.Array.ST (runSTArray, emptySTArray, pushSTArray)
@@ -75,7 +75,7 @@ import Elm.Json.Decode (Decoder, Value, decodeValue, equalDecodersL)
 import Elm.Platform (Cmd, Program, Sub)
 import Elm.Result (Result(..))
 import Partial.Unsafe (unsafeCrashWith, unsafePartial)
-import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (||))
+import Prelude (class Eq, class Functor, class Show, Unit, bind, const, discard, eq, flip, id, map, not, pure, show, unit, void, (#), ($), (&&), (*), (+), (-), (/=), (<), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (>>>), (||))
 import Prelude (map) as Virtual
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (reallyUnsafeRefEq, unsafeRefEq)
@@ -121,17 +121,6 @@ type NodeRecord msg =
     , namespace :: Maybe String
     , facts :: OrganizedFacts msg
     }
-
-
--- Note that something will need to be listening for the Elm `msg` custom
--- events and send them back into an event loop for this to be fully
--- functional.
-instance renderableNode :: Renderable (Node msg) where
-    render = render
-
-    update old current =
-        applyPatches old.result $
-            diff old.value current
 
 
 -- Try to determine whether two taggers are equal ... as best we can. We return
@@ -754,7 +743,7 @@ composeTaggers coyo =
                 coyo
 
 
-render :: ∀ e msg. Document -> Node msg -> EffDOM e DOM.Node
+render :: ∀ msg. Document -> Node msg -> IOSync DOM.Node
 render doc vNode =
     case vNode of
         Thunk l _ ->
@@ -769,21 +758,22 @@ render doc vNode =
         Text string ->
             createTextNode string doc
             <#> textToNode
+            # liftEff
 
         PlainNode rec children -> do
             domNode <-
                 case rec.namespace of
                     Just ns ->
-                        createElementNS rec.namespace rec.tag doc
+                        liftEff $ createElementNS rec.namespace rec.tag doc
 
                     Nothing ->
-                        createElement rec.tag doc
+                        liftEff $ createElement rec.tag doc
 
             applyFacts (initialFactChanges rec.facts) domNode
 
             for_ children \child -> do
                 renderedChild <- render doc child
-                appendChild renderedChild (elementToNode domNode)
+                liftEff $ appendChild renderedChild (elementToNode domNode)
 
             pure (elementToNode domNode)
 
@@ -791,16 +781,16 @@ render doc vNode =
             domNode <-
                 case rec.namespace of
                     Just ns ->
-                        createElementNS rec.namespace rec.tag doc
+                        liftEff $ createElementNS rec.namespace rec.tag doc
 
                     Nothing ->
-                        createElement rec.tag doc
+                        liftEff $ createElement rec.tag doc
 
             applyFacts (initialFactChanges rec.facts) domNode
 
             for_ children \(Tuple key child) -> do
                 renderedChild <- render doc child
-                appendChild renderedChild (elementToNode domNode)
+                liftEff $ appendChild renderedChild (elementToNode domNode)
 
             pure (elementToNode domNode)
 
@@ -841,7 +831,7 @@ render doc vNode =
                 pure domNode
 
         Custom renderable ->
-            Renderable.render doc renderable
+            liftEff $ Renderable.render doc renderable
             -- The original Elm code also tracks Facts and applies them here
             -- ...  in my structure, it seems best not to do that, since it's
             -- really the job of the renderable, but this may need to be
@@ -850,15 +840,15 @@ render doc vNode =
 
 -- APPLY FACTS
 
-applyFacts :: ∀ e f msg. (Foldable f) => f (FactChange msg) -> Element -> EffDOM e Unit
+applyFacts :: ∀ f msg. (Foldable f) => f (FactChange msg) -> Element -> IOSync Unit
 applyFacts operations elem = do
     for_ operations \operation ->
         case operation of
             AddAttribute key value ->
-                setAttribute key value elem
+                liftEff $ setAttribute key value elem
 
             RemoveAttribute key ->
-                removeAttribute key elem
+                liftEff $ removeAttribute key elem
 
             AddAttributeNS ns key value ->
                 setAttributeNS ns key value elem
@@ -919,7 +909,7 @@ applyFacts operations elem = do
                 removeStyle key elem
 
             RemoveAllStyles ->
-                removeAttribute "style" elem
+                liftEff $ removeAttribute "style" elem
 
             AddProperty key value ->
                 if key == "value"
@@ -936,13 +926,13 @@ applyFacts operations elem = do
 
 -- These store & retrieve some data as properties in the DOM ... should
 -- re-assess that strategy at some point!
-foreign import getHandlers :: ∀ e1 e2 msg. Element -> Eff e1 (Nullable (StrMap (MsgHandler e2 msg)))
-foreign import setHandlers :: ∀ e1 e2 msg. StrMap (MsgHandler e1 msg) -> Element -> Eff e2 Unit
-foreign import removeHandlers :: ∀ e. Element -> Eff e Unit
+foreign import getHandlers :: ∀ msg. Element -> IOSync (Nullable (StrMap (MsgHandler msg)))
+foreign import setHandlers :: ∀ msg. StrMap (MsgHandler msg) -> Element -> IOSync Unit
+foreign import removeHandlers :: Element -> IOSync Unit
 
-foreign import getTagger :: ∀ e a b. Element -> Eff e (Nullable (TaggerHandler e a b))
-foreign import setTagger :: ∀ e1 e2 a b. TaggerHandler e1 a b -> Element -> Eff e2 Unit
-foreign import removeTagger :: ∀ e. Element -> Eff e Unit
+foreign import getTagger :: ∀ a b. Element -> IOSync (Nullable (TaggerHandler a b))
+foreign import setTagger :: ∀ a b. TaggerHandler a b -> Element -> IOSync Unit
+foreign import removeTagger :: Element -> IOSync Unit
 
 
 -- When Elm knows that there previously was a listener for an event, it does a
@@ -963,8 +953,8 @@ type HandlerInfo msg =
     }
 
 
-type MsgHandler e msg =
-    EventHandler (dom :: DOM, err :: EXCEPTION | e) (HandlerInfo msg)
+type MsgHandler msg =
+    EventHandler (HandlerInfo msg)
 
 
 -- | The name for the custom event we use to dispatch Elm messages up the tree.
@@ -974,7 +964,7 @@ elmMsgEvent = wrap "elm_msg_event"
 
 -- | Attaches the initial info to a newly produced handler. The info is
 -- | mutable, so this is an `Eff`
-makeEventHandler :: ∀ e msg. HandlerInfo msg -> Eff (dom :: DOM, err :: EXCEPTION | e) (MsgHandler e msg)
+makeEventHandler :: ∀ msg. HandlerInfo msg -> IOSync (MsgHandler msg)
 makeEventHandler = eventHandler handleEvent
 
 
@@ -983,7 +973,7 @@ makeEventHandler = eventHandler handleEvent
 -- | passing things up that chain, we apply our decoder and then re-dispatch a
 -- | custom event with the results. So, whatever is above us in the DOM can do
 -- | what it likes with that -- less book-keeping is needed.
-handleEvent :: ∀ e msg. HandlerInfo msg -> Event -> Eff (dom :: DOM, err :: EXCEPTION | e) Unit
+handleEvent :: ∀ msg. HandlerInfo msg -> Event -> IOSync Unit
 handleEvent info event =
     case decodeValue info.decoder (toForeign event) of
         Err _ ->
@@ -999,10 +989,10 @@ handleEvent info event =
             -- preventDefault unless the decoder succeeds ... so, we'll do that
             -- as well.
             when info.options.preventDefault $
-                preventDefault event
+                liftEff $ preventDefault event
 
             when info.options.stopPropagation $
-                stopPropagation event
+                liftEff $ stopPropagation event
 
             -- We re-dispatch the transformed message from the point in the
             -- DOM where the listener was attached, not necessarily where the
@@ -1010,8 +1000,8 @@ handleEvent info event =
             msgEvent <-
                 makeCustomEvent elmMsgEvent (toForeign msg)
 
-            -- dispatchEvent adds the `EXCEPTION` effect
-            void $ dispatchEvent (customEventToEvent msgEvent) (currentEventTarget event)
+            void $ liftEff $
+                dispatchEvent (customEventToEvent msgEvent) (currentEventTarget event)
 
 
 -- | Oddly, currentTarget returns a `Node` rather than an `EventTarget`, so
@@ -1021,15 +1011,15 @@ currentEventTarget :: Event -> EventTarget
 currentEventTarget = unsafeCoerce currentTarget
 
 
-type TaggerHandler e a b =
-    EventHandler (dom :: DOM, err :: EXCEPTION | e) (a -> b)
+type TaggerHandler a b =
+    EventHandler (a -> b)
 
 
-makeTagger :: ∀ e a b. (a -> b) -> Eff (dom :: DOM, err :: EXCEPTION | e) (TaggerHandler e a b)
+makeTagger :: ∀ a b. (a -> b) -> IOSync (TaggerHandler a b)
 makeTagger = eventHandler handleTagger
 
 
-handleTagger :: ∀ e a b. (a -> b) -> Event -> Eff (dom :: DOM, err :: EXCEPTION | e) Unit
+handleTagger :: ∀ a b. (a -> b) -> Event -> IOSync Unit
 handleTagger tagger event =
     for_ (eventToCustomEvent event >>= detail) \msg -> do
         -- So, we're not giving ourselves very much type-safety here ... we're
@@ -1042,7 +1032,7 @@ handleTagger tagger event =
         maybeNext <-
             nextEventTarget $ currentTarget event
 
-        for_ maybeNext \next -> do
+        for_ maybeNext \next -> liftEff do
             stopPropagation event
             dispatchEvent (customEventToEvent taggedMsg) next
 
@@ -1155,30 +1145,27 @@ costOfTraversal =
 
 -- The first param is a sibling offset ... i.e. +1 for next sibling, -1 for
 -- previous sibling, +2 for two siblings ahead, etc.
-goSibling :: ∀ e. Int -> DOM.Node -> MaybeT (Eff (dom :: DOM | e)) DOM.Node
+goSibling :: Int -> DOM.Node -> MaybeT IOSync DOM.Node
 goSibling =
     tailRecM2 \which domNode ->
-        if which == 0
-            then
-                pure $ Done domNode
-
-            else
-                if which > 0
-                    then
-                        nextSibling domNode
-                        # MaybeT
-                        <#> {a: which - 1, b: _}
-                        <#> Loop
-
-                    else
-                        previousSibling domNode
-                        # MaybeT
-                        <#> {a: which + 1, b: _}
-                        <#> Loop
+        if which == 0 then
+            pure $ Done domNode
+        else if which > 0 then
+            nextSibling domNode
+            # liftEff
+            # MaybeT
+            <#> {a: which - 1, b: _}
+            <#> Loop
+        else
+            previousSibling domNode
+            # liftEff
+            # MaybeT
+            <#> {a: which + 1, b: _}
+            <#> Loop
 
 
 -- Actually do the traversal ..
-performTraversal :: ∀ e. Traversal -> DOM.Node -> MaybeT (Eff (dom :: DOM | e)) DOM.Node
+performTraversal :: Traversal -> DOM.Node -> MaybeT IOSync DOM.Node
 performTraversal =
     tailRecM2 \t domNode ->
         case t of
@@ -1189,6 +1176,7 @@ performTraversal =
                 if x > 0
                     then
                         parentNode domNode
+                        # liftEff
                         # MaybeT
                         <#> {a: TParent (x - 1), b: _}
                         <#> Loop
@@ -1199,6 +1187,7 @@ performTraversal =
             TChild (Cons c cs) ->
                 childNodes domNode
                 >>= item c
+                # liftEff
                 # MaybeT
                 <#> {a: TChild cs, b: _}
                 <#> Loop
@@ -1946,7 +1935,7 @@ function removeNode(changes, localPatches, key, vnode, index)
 -}
 
 
-addDomNodes :: ∀ e. DOM.Node -> List (Exists Patch) -> Eff (dom :: DOM | e) (List (Exists PatchWithNodes))
+addDomNodes :: DOM.Node -> List (Exists Patch) -> IOSync (List (Exists PatchWithNodes))
 addDomNodes rootNode patches = do
     patches
         # List.foldM step
@@ -1997,7 +1986,7 @@ addDomNodes rootNode patches = do
 
 -- APPLY PATCHES
 
-applyPatches :: ∀ e. DOM.Node -> List (Exists Patch) -> EffDOM e DOM.Node
+applyPatches :: DOM.Node -> List (Exists Patch) -> IOSync DOM.Node
 applyPatches rootDomNode patches =
     if List.null patches
         then
@@ -2008,7 +1997,7 @@ applyPatches rootDomNode patches =
             >>= applyPatchesHelp rootDomNode
 
 
-applyPatchesHelp :: ∀ e. DOM.Node -> List (Exists PatchWithNodes) -> EffDOM e DOM.Node
+applyPatchesHelp :: DOM.Node -> List (Exists PatchWithNodes) -> IOSync DOM.Node
 applyPatchesHelp =
     List.foldM \rootNode ->
         runExists \(PatchWithNodes patch@(Patch index _) domNode) -> do
@@ -2024,7 +2013,7 @@ applyPatchesHelp =
                 else pure rootNode
 
 
-applyPatch :: ∀ e msg. Patch msg -> DOM.Node -> EffDOM e DOM.Node
+applyPatch :: ∀ msg. Patch msg -> DOM.Node -> IOSync DOM.Node
 applyPatch (Patch index patchOp) domNode = do
     document <-
         documentForNode domNode
@@ -2041,7 +2030,7 @@ applyPatch (Patch index patchOp) domNode = do
             pure domNode
 
         PText string -> do
-            setTextContent string domNode
+            liftEff $ setTextContent string domNode
             pure domNode
 
         PTagger taggerFunc -> do
@@ -2061,7 +2050,7 @@ applyPatch (Patch index patchOp) domNode = do
 
             pure domNode
 
-        PRemoveLast howMany -> do
+        PRemoveLast howMany -> liftEff do
             -- There must be a replicateM somewhere I'm forgetting ...
             forE 0 howMany \_ ->
                 lastChild domNode >>=
@@ -2076,7 +2065,7 @@ applyPatch (Patch index patchOp) domNode = do
 
         PAppend newNodes -> do
             for_ newNodes $
-                render document >=> (flip appendChild) domNode
+                render document >=> ((flip appendChild) domNode >>> liftEff)
 
             pure domNode
 
@@ -2147,6 +2136,7 @@ function applyPatchReorderEndInsertsHelp(endInserts, patch)
 -}
 
         PCustom old new ->
+            liftEff $
             Renderable.updateDOM
                 { value: old
                 , result: domNode
@@ -2161,10 +2151,10 @@ function applyPatchReorderEndInsertsHelp(endInserts, patch)
             -}
 
 
-redraw :: ∀ e msg. DOM.Node -> Node msg -> EffDOM e DOM.Node
+redraw :: ∀ msg. DOM.Node -> Node msg -> IOSync DOM.Node
 redraw domNode vNode = do
     document <- documentForNode domNode
-    parentNode <- parentNode domNode
+    parentNode <- liftEff $ parentNode domNode
     newNode <- render document vNode
 
     -- We transfer a tagger from the old node to the new node, if there was
@@ -2179,7 +2169,7 @@ redraw domNode vNode = do
 
     case parentNode of
         Just p -> do
-            void $ replaceChild newNode domNode p
+            void $ liftEff $ replaceChild newNode domNode p
             pure newNode
 
         Nothing ->
@@ -2235,18 +2225,18 @@ renderer view mailbox = liftAff do
     -- TODO: Integrate with requestAnimationFrame
     let loop state = do
             newModel <-
-                takeVar models
+                liftAff $ takeVar models
 
             let newView = view newModel
 
-            newNode <- liftEff
+            newNode <-
                 case state of
                     Nothing -> do
                         newNode <-
-                            render (htmlDocumentToDocument doc) (view newModel)
+                            liftIOSync $ render (htmlDocumentToDocument doc) (view newModel)
 
                         maybeBody <-
-                            body doc
+                            liftEff $ body doc
 
                         let listener =
                                 eventListener \event ->
@@ -2259,23 +2249,23 @@ renderer view mailbox = liftAff do
                                         -- So, we supply a callback that does nothing, and
                                         -- we get a canceler back which we're ignoring. Should
                                         -- think about what that means in terms of control flow.
-                                        putVar (unsafeCoerce msg) mailbox (const $ pure unit)
+                                        liftEff $ putVar (unsafeCoerce msg) mailbox (const $ pure unit)
 
-                        for_ maybeBody \b -> do
+                        for_ maybeBody \b -> liftEff do
                             void $ appendChild newNode (htmlElementToNode b)
                             addEventListener elmMsgEvent listener false (htmlElementToEventTarget b)
 
                         pure newNode
 
                     Just (oldView /\ oldNode) -> do
-                        void $ applyPatches oldNode $
-                            diff oldView newView
+                        void $ liftIOSync $
+                            applyPatches oldNode $ diff oldView newView
 
                         pure oldNode
 
             loop $ Just (newView /\ newNode)
 
-    void $ forkAff $ loop Nothing
+    void $ forkAff $ runIO' $ loop Nothing
 
     pure models
 
@@ -2504,7 +2494,7 @@ nodeToElement n =
 -- | Like `DOM.Event.EventTarget.EventListener`, but parameterized by the `msg`
 -- | type, and you can mutate the "info" that it uses without removing and
 -- | adding the listener.
-foreign import data EventHandler :: # Effect -> Type -> Type
+foreign import data EventHandler :: Type -> Type
 
 
 -- | Like `DOM.Event.EventTarget.eventListener`, but your function also gets
@@ -2514,39 +2504,39 @@ foreign import data EventHandler :: # Effect -> Type -> Type
 -- |
 -- | You have to supply some initial info (which you can change using
 -- | `setHandlerInfo`).
-foreign import eventHandler :: ∀ e i a.
-    (i -> Event -> Eff e a) -> i -> Eff e (EventHandler e i)
+foreign import eventHandler :: ∀ i a.
+    (i -> Event -> IOSync a) -> i -> IOSync (EventHandler i)
 
 
 -- | Like `addEventListener`, but for handlers. The `Boolean` arg indicates
 -- | whether to use the "capture" phase.
-foreign import addEventHandler :: ∀ e i.
+foreign import addEventHandler :: ∀ i.
     EventType ->
-    EventHandler (dom :: DOM | e) i ->
+    EventHandler i ->
     Boolean ->
     EventTarget ->
-    Eff (dom :: DOM | e) Unit
+    IOSync Unit
 
 
 -- | Supply a different value for the handler, for use with the callback
 -- | function, without removing and re-applying the handler.
-foreign import setHandlerInfo :: ∀ e1 e2 i.
-    i -> EventHandler e1 i -> Eff (dom :: DOM | e2) Unit
+foreign import setHandlerInfo :: ∀ i.
+    i -> EventHandler i -> IOSync Unit
 
 
 -- | Like `removeEventListener`
-foreign import removeEventHandler :: ∀ e i.
+foreign import removeEventHandler :: ∀ i.
     EventType ->
-    EventHandler (dom :: DOM | e) i ->
+    EventHandler i ->
     Boolean ->
     EventTarget ->
-    Eff (dom :: DOM | e) Unit
+    IOSync Unit
 
 
 -- | It feels as though purescript-dom ought to have a way to do this, but I
 -- | can't find it. Stores the `Foreign` in the `detail` field of the custom
 -- | event.
-foreign import makeCustomEvent :: ∀ e. EventType -> Foreign -> Eff e CustomEvent
+foreign import makeCustomEvent :: EventType -> Foreign -> IOSync CustomEvent
 
 
 eventToCustomEvent :: Event -> Maybe CustomEvent
@@ -2560,10 +2550,10 @@ detail :: CustomEvent -> Maybe Foreign
 detail = toMaybe <<< _detail
 
 
-nextEventTarget :: ∀ e. DOM.Node -> Eff (dom :: DOM | e) (Maybe EventTarget)
+nextEventTarget :: DOM.Node -> IOSync (Maybe EventTarget)
 nextEventTarget =
     tailRecM \n ->
-        parentNode n >>= case _ of
+        liftEff $ parentNode n >>= case _ of
             Just parent ->
                 case runExcept $ readEventTarget $ toForeign parent of
                     Right eventTarget ->
@@ -2577,35 +2567,36 @@ nextEventTarget =
 
 
 -- Set arbitrary property. TODO: Should suggest for purescript-dom
-foreign import setProperty :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
+foreign import setProperty :: String -> Foreign -> Element -> IOSync Unit
 
 -- Get arbitrary property.
-foreign import getProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) (Nullable Foreign)
+foreign import getProperty :: String -> Element -> IOSync (Nullable Foreign)
 
 -- Remove a property.
-foreign import removeProperty :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import removeProperty :: String -> Element -> IOSync Unit
 
 -- Set if not already equal. A bit of a hack ... not suitable for general use.
-foreign import setPropertyIfDifferent :: ∀ e. String -> Foreign -> Element -> Eff (dom :: DOM | e) Unit
+foreign import setPropertyIfDifferent :: String -> Foreign -> Element -> IOSync Unit
 
 
 -- TODO: Should suggest these for purescript-dom
-foreign import setAttributeNS :: ∀ e. String -> String -> String -> Element -> Eff (dom :: DOM | e) Unit
-foreign import getAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) (Nullable String)
-foreign import removeAttributeNS :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import setAttributeNS :: String -> String -> String -> Element -> IOSync Unit
+foreign import getAttributeNS :: String -> String -> Element -> IOSync (Nullable String)
+foreign import removeAttributeNS :: String -> String -> Element -> IOSync Unit
 
 
 -- Sets the style named in the first param to the value of the second param
-foreign import setStyle :: ∀ e. String -> String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import setStyle :: String -> String -> Element -> IOSync Unit
 
 -- Removes the style
-foreign import removeStyle :: ∀ e. String -> Element -> Eff (dom :: DOM | e) Unit
+foreign import removeStyle :: String -> Element -> IOSync Unit
 
 
 -- | Given a node, returns the document which the node belongs to.
-documentForNode :: ∀ e. DOM.Node -> Eff (dom :: DOM | e) Document
+documentForNode :: DOM.Node -> IOSync Document
 documentForNode n =
     -- The unsafeCoerce should be safe, because if `ownerDocument`
     -- returns null, then the node itself must be the document.
     ownerDocument n
         <#> fromMaybe (unsafeCoerce n)
+        # liftEff
