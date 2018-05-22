@@ -61,20 +61,25 @@ withContainer callback = do
 tests :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 tests =
     suite "Elm.VirtualDom" do
+        pure unit
+        {-
         suite "Static Tests" $
             traverse_ makeStaticTest nodeTests
 
         specificTransitions
         randomTransitions
+        -}
 
 
+{-
 specificTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 specificTransitions =
     test "Specific Transitions" do
         makeTransitionTest attributeTest helloWorld
         makeTransitionTest propertyTest attributeNsTest
+-}
 
-
+{-
 randomTransitions :: ∀ e. TestSuite (random :: RANDOM, canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 randomTransitions =
     test "Random Transitions" $
@@ -86,8 +91,9 @@ randomTransitions =
                 { newSeed: seed
                 , size: 1
                 } Nothing
+-}
 
-
+{-
 makeUpdateTest :: ∀ e msg. Element -> Int -> NodeTest msg -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e)
 makeUpdateTest container remaining (NodeTest nodeTest) previous = do
     result <-
@@ -112,8 +118,9 @@ makeUpdateTest container remaining (NodeTest nodeTest) previous = do
                 ", for " <> nodeTest.title <>
                 ", " <> context <>
                 ", with remaining " <> show remaining
+-}
 
-
+{-
 runFor :: ∀ e msg. Element -> Int -> GenState -> Maybe (NodeTest msg) -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION | e)
 runFor container =
     tailRecM3 \remaining genState previous ->
@@ -127,8 +134,9 @@ runFor container =
                 , b: snd state
                 , c: Just (fst state)
                 }
+-}
 
-
+{-
 makeTransitionTest :: ∀ e msg. NodeTest msg -> NodeTest msg -> Test (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 makeTransitionTest (NodeTest from) (NodeTest to) =
     withContainer \container -> do
@@ -156,8 +164,9 @@ makeTransitionTest (NodeTest from) (NodeTest to) =
                             from.title <> " --> " <> to.title <>
                             " failed at to expected " <> show to.expected <>
                             " actual " <> show resultTo
+-}
 
-
+{-
 makeStaticTest :: ∀ e msg. NodeTest msg -> TestSuite (canvas :: CANVAS, dom :: DOM, err :: EXCEPTION, jsdom :: JSDOM | e)
 makeStaticTest (NodeTest nodeTest) =
     test nodeTest.title do
@@ -171,6 +180,7 @@ makeStaticTest (NodeTest nodeTest) =
             liftEff $ innerHtml container
 
         result === nodeTest.expected
+-}
 
 
 newtype NodeTest msg = NodeTest (NodeTestRec msg)
