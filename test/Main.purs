@@ -18,7 +18,6 @@ import Graphics.Canvas (CANVAS)
 
 import Test.Elm.TextTest as TextTest
 import Test.Elm.SignalTest as SignalTest
-import Test.Elm.VirtualDomTest as VirtualDomTest
 import Test.Elm.Graphics.StaticElementTest as StaticElementTest
 
 import Prelude (Unit, discard)
@@ -43,5 +42,4 @@ main =
     runTest do
         TextTest.tests
         SignalTest.tests
-        VirtualDomTest.tests
         StaticElementTest.tests

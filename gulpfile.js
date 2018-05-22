@@ -58,10 +58,6 @@ var bundles = [{
     purs: "examples/Graphics/UpdateCollage.purs",
     html: "examples/Graphics/UpdateCollage.html"
 },{
-    module: "Examples.VirtualDom.StaticVirtualDom",
-    purs: "examples/VirtualDom/StaticVirtualDom.purs",
-    html: "examples/VirtualDom/StaticVirtualDom.html"
-},{
     module: "Examples.Keyboard.Console",
     purs: "examples/Keyboard/Console.purs",
     html: "examples/Keyboard/Console.html"
@@ -154,16 +150,10 @@ gulp.task("docs", ["make"], function () {
             "DOM.Renderable": "docs/DOM/Renderable.md",
             "Elm.Graphics.Collage": "docs/Elm/Graphics/Collage.md",
             "Elm.Graphics.Element": "docs/Elm/Graphics/Element.md",
-            "Elm.Color": "docs/Elm/Color.md",
-            "Elm.Default": "docs/Elm/Default.md",
             "Elm.Keyboard": "docs/Elm/Keyboard.md",
             "Elm.Mouse": "docs/Elm/Mouse.md",
             "Elm.Signal": "docs/Elm/Signal.md",
-            "Elm.Task": "docs/Elm/Task.md",
             "Elm.Text": "docs/Elm/Text.md",
-            "Elm.Transform2D": "docs/Elm/Transform2D.md",
-            "Elm.Time": "docs/Elm/Time.md",
-            "Elm.VirtualDom": "docs/Elm/VirtualDom.md",
             "Elm.Window": "docs/Elm/Window.md"
         }
     });

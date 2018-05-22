@@ -20,58 +20,6 @@ Show Text
 Semigroup Text
 ```
 
-#### `Line`
-
-``` purescript
-data Line
-  = Under
-  | Over
-  | Through
-```
-
-Styles for lines on text. This allows you to add an underline, an overline,
-or a strike out text:
-
-    line Under   (fromString "underline")
-    line Over    (fromString "overline")
-    line Through (fromString "strike out")
-
-#### `Style`
-
-``` purescript
-type Style = { typeface :: List String, height :: Maybe Float, color :: Color, bold :: Bool, italic :: Bool, line :: Maybe Line }
-```
-
-Represents all the ways you can style `Text`. If the `typeface` list is
-empty or the `height` is `Nothing`, the users will fall back on their browser's
-default settings. The following `Style` is black, 16 pixel tall, underlined, and
-Times New Roman (assuming that typeface is available on the user's computer):
-
-    { typeface = [ "Times New Roman", "serif" ]
-    , height   = Just 16
-    , color    = black
-    , bold     = false
-    , italic   = false
-    , line     = Just Under
-    }
-
-#### `defaultStyle`
-
-``` purescript
-defaultStyle :: Style
-```
-
-Plain black text. It uses the browsers default typeface and text height.
-No decorations are used.
-
-    { typeface = []
-    , height = Nothing
-    , color = black
-    , bold = False
-    , italic = False
-    , line = Nothing
-    }
-
 #### `fromString`
 
 ``` purescript
@@ -130,6 +78,35 @@ Put many chunks of text together with a separator.
 
     join (fromString ", ") chunks == fromString "lions, tigers, bears"
 
+#### `link`
+
+``` purescript
+link :: String -> Text -> Text
+```
+
+Create a link by providing a URL and the text of the link.
+
+    link "http://elm-lang.org" (fromString "Elm Website")
+
+#### `Style`
+
+``` purescript
+type Style = { typeface :: List String, height :: Maybe Float, color :: Color, bold :: Bool, italic :: Bool, line :: Maybe Line }
+```
+
+Represents all the ways you can style `Text`. If the `typeface` list is
+empty or the `height` is `Nothing`, the users will fall back on their browser's
+default settings. The following `Style` is black, 16 pixel tall, underlined, and
+Times New Roman (assuming that typeface is available on the user's computer):
+
+    { typeface = [ "Times New Roman", "serif" ]
+    , height   = Just 16
+    , color    = black
+    , bold     = false
+    , italic   = false
+    , line     = Just Under
+    }
+
 #### `style`
 
 ``` purescript
@@ -144,6 +121,39 @@ it to text like this:
 
 Note that this method will only *add* styles to text ... if some styles
 have already been set, this will not remove them.
+
+#### `defaultStyle`
+
+``` purescript
+defaultStyle :: Style
+```
+
+Plain black text. It uses the browsers default typeface and text height.
+No decorations are used.
+
+    { typeface = []
+    , height = Nothing
+    , color = black
+    , bold = False
+    , italic = False
+    , line = Nothing
+    }
+
+#### `Line`
+
+``` purescript
+data Line
+  = Under
+  | Over
+  | Through
+```
+
+Styles for lines on text. This allows you to add an underline, an overline,
+or a strike out text:
+
+    line Under   (fromString "underline")
+    line Over    (fromString "overline")
+    line Through (fromString "strike out")
 
 #### `typeface`
 
@@ -169,16 +179,6 @@ monospace :: Text -> Text
 Switch to a monospace typeface. Good for code snippets.
 
     monospace (fromString "foldl (+) 0 [1,2,3]")
-
-#### `link`
-
-``` purescript
-link :: String -> Text -> Text
-```
-
-Create a link by providing a URL and the text of the link.
-
-    link "http://elm-lang.org" (fromString "Elm Website")
 
 #### `height`
 

@@ -2,6 +2,47 @@
 
 Library for working with mouse input.
 
+#### `position`
+
+``` purescript
+position :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal (Tuple Int Int))
+```
+
+The current mouse position.
+
+#### `x`
+
+``` purescript
+x :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal Int)
+```
+
+The current x-coordinate of the mouse.
+
+#### `y`
+
+``` purescript
+y :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal Int)
+```
+
+The current y-coordinate of the mouse.
+
+#### `isDown`
+
+``` purescript
+isDown :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m (Signal Bool)
+```
+
+The current state of the mouse.
+True when any mouse button is down, and false otherwise.
+
+#### `clicks`
+
+``` purescript
+clicks :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m (Signal Unit)
+```
+
+Always equal to unit. Event triggers on every mouse click.
+
 #### `Mouse`
 
 ``` purescript
@@ -43,46 +84,5 @@ Setup mouse signals, where the mouse is relative to the window.
 
     setupMouse node do
         altSignal <- alt
-
-#### `position`
-
-``` purescript
-position :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal (Tuple Int Int))
-```
-
-The current mouse position.
-
-#### `x`
-
-``` purescript
-x :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal Int)
-```
-
-The current x-coordinate of the mouse.
-
-#### `y`
-
-``` purescript
-y :: forall e m. MonadEff (ref :: REF | e) m => Mouse m (Signal Int)
-```
-
-The current y-coordinate of the mouse.
-
-#### `isDown`
-
-``` purescript
-isDown :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m (Signal Bool)
-```
-
-The current state of the mouse.
-True when any mouse button is down, and false otherwise.
-
-#### `clicks`
-
-``` purescript
-clicks :: forall e m. MonadEff (ref :: REF, delay :: DELAY, dom :: DOM, now :: NOW, console :: CONSOLE | e) m => Mouse m (Signal Unit)
-```
-
-Always equal to unit. Event triggers on every mouse click.
 
 

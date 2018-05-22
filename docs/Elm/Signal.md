@@ -4,44 +4,6 @@ A *signal* is a value that changes over time.
 
 TODO: Notes about usage.
 
-#### `Graph`
-
-``` purescript
-newtype Graph
-```
-
-A representation of the entirety of the signal graph. Among other things,
-
-#### `GraphState`
-
-``` purescript
-type GraphState m a = StateT Graph m a
-```
-
-A computational context that tracks the state of the signal graph
-
-#### `setup`
-
-``` purescript
-setup :: forall e m a. MonadEff (ref :: REF, now :: NOW | e) m => GraphState m a -> m a
-```
-
-Setup the signal graph.
-
-Basically, this provides a context in which you can do whatever you need to setup your
-signal graph. So, you might have something like:
-
-    main =
-        setup do
-            mbox <- mailbox "Initial value"
-            map <- map ((<>) " concat") mbox
-            ...
-
-TODO: Write out a trivial working example once I have one!
-
-Technically, this runs whatever commands you supply in the context of a newly initialized
-signal graph, and returns whatever your commands return.
-
 #### `Signal`
 
 ``` purescript
@@ -63,12 +25,6 @@ Create a signal that never changes. This can be useful if you need
 to pass a combination of signals and normal values to a function:
 
     map3 view Window.dimensions Mouse.position (constant initialModel)
-
-#### `output`
-
-``` purescript
-output :: forall e1 e2 m a. MonadEff (ref :: REF | e1) m => String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
-```
 
 #### `foldp`
 
@@ -95,59 +51,6 @@ Note: The behavior of the outgoing signal is not influenced at all by
 the initial value of the incoming signal, only by updates occurring on
 the latter. So the initial value of `sig` is completely ignored in
 `foldp f s sig`.
-
-#### `timestamp`
-
-``` purescript
-timestamp :: forall e m a. MonadEff (ref :: REF | e) m => Signal a -> GraphState m (Signal (Tuple Time a))
-```
-
-Add a timestamp to any signal. Timestamps increase monotonically. When you
-create `(timestamp Mouse.x)`, an initial timestamp is produced. The timestamp
-updates whenever `Mouse.x` updates.
-
-Timestamp updates are tied to individual events, so `(timestamp Mouse.x)` and
-`(timestamp Mouse.y)` will always have the same timestamp because they rely on
-the same underlying event (`Mouse.position`).
-
-#### `filter`
-
-``` purescript
-filter :: forall e m a. MonadEff (ref :: REF | e) m => (a -> Boolean) -> a -> Signal a -> GraphState m (Signal a)
-```
-
-Filter out some updates. The given function decides whether we should
-*keep* an update. If no updates ever flow through, we use the default value
-provided. The following example only keeps even numbers and has an initial
-value of zero.
-
-    numbers :: Signal Int
-
-    isEven :: Int -> Bool
-
-    evens :: Signal Int
-    evens =
-        filter isEven 0 numbers
-
-#### `filterMap`
-
-``` purescript
-filterMap :: forall e m a b. MonadEff (ref :: REF | e) m => (a -> Maybe b) -> b -> Signal a -> GraphState m (Signal b)
-```
-
-Filter out some updates. When the filter function gives back `Just` a
-value, we send that value along. When it returns `Nothing` we drop it.
-If the initial value of the incoming signal turns into `Nothing`, we use the
-default value provided. The following example keeps only strings that can be
-read as integers.
-
-    userInput : Signal String
-
-    toInt : String -> Maybe Int
-
-    numbers : Signal Int
-    numbers =
-        filterMap toInt 0 userInput
 
 #### `map`
 
@@ -202,33 +105,6 @@ map4 :: forall eff m a b c d r. MonadEff (ref :: REF | eff) m => (a -> b -> c ->
 map5 :: forall eff m a b c d e r. MonadEff (ref :: REF | eff) m => (a -> b -> c -> d -> e -> r) -> Signal a -> Signal b -> Signal c -> Signal d -> Signal e -> GraphState m (Signal r)
 ```
 
-#### `sampleOn`
-
-``` purescript
-sampleOn :: forall e m a b. MonadEff (ref :: REF | e) m => Signal a -> Signal b -> GraphState m (Signal b)
-```
-
-Sample from the second input every time an event occurs on the first input.
-For example, `(sampleOn Mouse.clicks (Time.every Time.second))` will give the
-approximate time of the latest click.
-
-#### `dropRepeats`
-
-``` purescript
-dropRepeats :: forall e m a. (MonadEff (ref :: REF | e) m, Eq a) => Signal a -> GraphState m (Signal a)
-```
-
-Drop updates that repeat the current value of the signal.
-
-    numbers : Signal Int
-
-    noDups : Signal Int
-    noDups =
-        dropRepeats numbers
-
-    --  numbers => 0 0 3 3 5 5 5 4 ...
-    --  noDups  => 0   3   5     4 ...
-
 #### `merge`
 
 ``` purescript
@@ -270,6 +146,72 @@ update wins, just like with `merge`.
             , map (always Click) Mouse.clicks
             ]
 
+#### `filter`
+
+``` purescript
+filter :: forall e m a. MonadEff (ref :: REF | e) m => (a -> Boolean) -> a -> Signal a -> GraphState m (Signal a)
+```
+
+Filter out some updates. The given function decides whether we should
+*keep* an update. If no updates ever flow through, we use the default value
+provided. The following example only keeps even numbers and has an initial
+value of zero.
+
+    numbers :: Signal Int
+
+    isEven :: Int -> Bool
+
+    evens :: Signal Int
+    evens =
+        filter isEven 0 numbers
+
+#### `filterMap`
+
+``` purescript
+filterMap :: forall e m a b. MonadEff (ref :: REF | e) m => (a -> Maybe b) -> b -> Signal a -> GraphState m (Signal b)
+```
+
+Filter out some updates. When the filter function gives back `Just` a
+value, we send that value along. When it returns `Nothing` we drop it.
+If the initial value of the incoming signal turns into `Nothing`, we use the
+default value provided. The following example keeps only strings that can be
+read as integers.
+
+    userInput : Signal String
+
+    toInt : String -> Maybe Int
+
+    numbers : Signal Int
+    numbers =
+        filterMap toInt 0 userInput
+
+#### `dropRepeats`
+
+``` purescript
+dropRepeats :: forall e m a. MonadEff (ref :: REF | e) m => Eq a => Signal a -> GraphState m (Signal a)
+```
+
+Drop updates that repeat the current value of the signal.
+
+    numbers : Signal Int
+
+    noDups : Signal Int
+    noDups =
+        dropRepeats numbers
+
+    --  numbers => 0 0 3 3 5 5 5 4 ...
+    --  noDups  => 0   3   5     4 ...
+
+#### `sampleOn`
+
+``` purescript
+sampleOn :: forall e m a b. MonadEff (ref :: REF | e) m => Signal a -> Signal b -> GraphState m (Signal b)
+```
+
+Sample from the second input every time an event occurs on the first input.
+For example, `(sampleOn Mouse.clicks (Time.every Time.second))` will give the
+approximate time of the latest click.
+
 #### `Mailbox`
 
 ``` purescript
@@ -280,6 +222,16 @@ A `Mailbox` is a communication hub. It is made up of
 
   * an `Address` that you can send messages to
   * a `Signal` of messages sent to the mailbox
+
+#### `mailbox`
+
+``` purescript
+mailbox :: forall e m a. MonadEff (ref :: REF, delay :: DELAY | e) m => a -> GraphState m (Mailbox a)
+```
+
+Create a mailbox you can send messages to. The primary use case is
+receiving updates from tasks and UI elements. The argument is a default value
+for the custom signal.
 
 #### `Address`
 
@@ -293,15 +245,24 @@ signals, so you can provide your own signal updates.
 The primary use case is when a `Task` or UI element needs to talk back to the
 main part of your application.
 
-#### `mailbox`
+#### `send`
 
 ``` purescript
-mailbox :: forall e m a. MonadEff (ref :: REF, delay :: DELAY | e) m => a -> GraphState m (Mailbox a)
+send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit
 ```
 
-Create a mailbox you can send messages to. The primary use case is
-receiving updates from tasks and UI elements. The argument is a default value
-for the custom signal.
+Send a message to an `Address`.
+
+    type Action = Undo | Remove Int
+
+    address : Address Action
+
+    requestUndo : Task x ()
+    requestUndo =
+        send address Undo
+
+The `Signal` associated with `address` will receive the `Undo` message
+and push it through the Elm program.
 
 #### `forwardTo`
 
@@ -348,24 +309,47 @@ Create a message that may be sent to a `Mailbox` at a later time.
 Most importantly, this lets us create APIs that can send values to ports
 *without* allowing people to run arbitrary tasks.
 
-#### `send`
+#### `timestamp`
 
 ``` purescript
-send :: forall e a. Address a -> a -> Eff (ref :: REF, now :: NOW, delay :: DELAY, console :: CONSOLE | e) Unit
+timestamp :: forall e m a. MonadEff (ref :: REF | e) m => Signal a -> GraphState m (Signal (Tuple Time a))
 ```
 
-Send a message to an `Address`.
+Add a timestamp to any signal. Timestamps increase monotonically. When you
+create `(timestamp Mouse.x)`, an initial timestamp is produced. The timestamp
+updates whenever `Mouse.x` updates.
 
-    type Action = Undo | Remove Int
+Timestamp updates are tied to individual events, so `(timestamp Mouse.x)` and
+`(timestamp Mouse.y)` will always have the same timestamp because they rely on
+the same underlying event (`Mouse.position`).
 
-    address : Address Action
+#### `output`
 
-    requestUndo : Task x ()
-    requestUndo =
-        send address Undo
+``` purescript
+output :: forall e1 e2 m a. MonadEff (ref :: REF | e1) m => String -> (a -> Eff e2 Unit) -> Signal a -> GraphState m Unit
+```
 
-The `Signal` associated with `address` will receive the `Undo` message
-and push it through the Elm program.
+#### `setup`
+
+``` purescript
+setup :: forall e m a. MonadEff (ref :: REF, now :: NOW | e) m => GraphState m a -> m a
+```
+
+Setup the signal graph.
+
+Basically, this provides a context in which you can do whatever you need to setup your
+signal graph. So, you might have something like:
+
+    main =
+        setup do
+            mbox <- mailbox "Initial value"
+            map <- map ((<>) " concat") mbox
+            ...
+
+TODO: Write out a trivial working example once I have one!
+
+Technically, this runs whatever commands you supply in the context of a newly initialized
+signal graph, and returns whatever your commands return.
 
 #### `current`
 
@@ -390,7 +374,7 @@ delay applying `current` in some cases to get the results you expect.
 #### `DELAY`
 
 ``` purescript
-data DELAY :: !
+data DELAY :: Effect
 ```
 
 #### `delay`
@@ -398,6 +382,22 @@ data DELAY :: !
 ``` purescript
 delay :: forall eff a. Int -> Eff (delay :: DELAY | eff) a -> Eff (delay :: DELAY | eff) Unit
 ```
+
+#### `Graph`
+
+``` purescript
+newtype Graph
+```
+
+A representation of the entirety of the signal graph. Among other things,
+
+#### `GraphState`
+
+``` purescript
+type GraphState m a = StateT Graph m a
+```
+
+A computational context that tracks the state of the signal graph
 
 #### `runSignal`
 

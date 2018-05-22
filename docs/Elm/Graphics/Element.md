@@ -19,141 +19,6 @@ easily.
 Renderable Element
 ```
 
-#### `Position`
-
-``` purescript
-newtype Position
-```
-
-Specifies a position for an element within a `container`, like “the top
-left corner”.
-
-##### Instances
-``` purescript
-Eq Position
-```
-
-#### `Pos`
-
-``` purescript
-data Pos
-```
-
-Specifies a distance from a particular location within a `container`, like
-“20 pixels right and up from the center”. You can use `absolute` or `relative`
-to specify a `Pos` in pixels or as a percentage of the container.
-
-##### Instances
-``` purescript
-Eq Pos
-```
-
-#### `Direction`
-
-``` purescript
-data Direction
-```
-
-Represents a `flow` direction for a list of elements.
-
-##### Instances
-``` purescript
-Eq Direction
-```
-
-#### `empty`
-
-``` purescript
-empty :: Element
-```
-
-An Element that takes up no space. Good for things that appear conditionally:
-
-    flow down [ img1, if showMore then img2 else empty ]
-
-#### `widthOf`
-
-``` purescript
-widthOf :: Element -> Int
-```
-
-Get the width of an Element
-
-#### `heightOf`
-
-``` purescript
-heightOf :: Element -> Int
-```
-
-Get the height of an Element
-
-#### `sizeOf`
-
-``` purescript
-sizeOf :: Element -> { width :: Int, height :: Int }
-```
-
-Get the width and height of an Element
-
-#### `width`
-
-``` purescript
-width :: Int -> Element -> Element
-```
-
-Create an `Element` with a given width.
-
-#### `height`
-
-``` purescript
-height :: Int -> Element -> Element
-```
-
-Create an `Element` with a given height.
-
-#### `size`
-
-``` purescript
-size :: Int -> Int -> Element -> Element
-```
-
-Create an `Element` with a new width and height.
-
-#### `opacity`
-
-``` purescript
-opacity :: Float -> Element -> Element
-```
-
-Create an `Element` with a given opacity. Opacity is a number between 0 and 1
-where 0 means totally clear.
-
-#### `color`
-
-``` purescript
-color :: Color -> Element -> Element
-```
-
-Create an `Element` with a given background color.
-
-#### `tag`
-
-``` purescript
-tag :: String -> Element -> Element
-```
-
-Create an `Element` with a tag. This lets you link directly to it.
-The element `(tag "all-about-badgers" thirdParagraph)` can be reached
-with a link like this: `/facts-about-animals.elm#all-about-badgers`
-
-#### `link`
-
-``` purescript
-link :: String -> Element -> Element
-```
-
-Create an `Element` that is a hyper-link.
-
 #### `image`
 
 ``` purescript
@@ -192,14 +57,6 @@ tiledImage :: Int -> Int -> String -> Element
 Create a tiled image. Repeat the image to fill the given width and height.
 
     tiledImage 100 100 "yogi.jpg"
-
-#### `fromRenderable`
-
-``` purescript
-fromRenderable :: forall a. Renderable a => Int -> Int -> a -> Element
-```
-
-Create an `Element` from a custom type that is `Renderable`.
 
 #### `leftAligned`
 
@@ -253,28 +110,88 @@ the browser. Excellent for debugging.
     show value =
         leftAligned (Text.monospace (Text.fromString (toString value)))
 
-#### `container`
+#### `width`
 
 ``` purescript
-container :: Int -> Int -> Position -> Element -> Element
+width :: Int -> Element -> Element
 ```
 
-Put an element in a container. This lets you position the element really
-easily, and there are tons of ways to set the `Position`.
-To center `element` exactly in a 300-by-300 square you would say:
+Create an `Element` with a given width.
 
-    container 300 300 middle element
-
-By setting the color of the container, you can create borders.
-
-#### `spacer`
+#### `height`
 
 ``` purescript
-spacer :: Int -> Int -> Element
+height :: Int -> Element -> Element
 ```
 
-Create an empty box. This is useful for getting your spacing right and
-for making borders.
+Create an `Element` with a given height.
+
+#### `size`
+
+``` purescript
+size :: Int -> Int -> Element -> Element
+```
+
+Create an `Element` with a new width and height.
+
+#### `color`
+
+``` purescript
+color :: Color -> Element -> Element
+```
+
+Create an `Element` with a given background color.
+
+#### `opacity`
+
+``` purescript
+opacity :: Float -> Element -> Element
+```
+
+Create an `Element` with a given opacity. Opacity is a number between 0 and 1
+where 0 means totally clear.
+
+#### `link`
+
+``` purescript
+link :: String -> Element -> Element
+```
+
+Create an `Element` that is a hyper-link.
+
+#### `tag`
+
+``` purescript
+tag :: String -> Element -> Element
+```
+
+Create an `Element` with a tag. This lets you link directly to it.
+The element `(tag "all-about-badgers" thirdParagraph)` can be reached
+with a link like this: `/facts-about-animals.elm#all-about-badgers`
+
+#### `widthOf`
+
+``` purescript
+widthOf :: Element -> Int
+```
+
+Get the width of an Element
+
+#### `heightOf`
+
+``` purescript
+heightOf :: Element -> Int
+```
+
+Get the height of an Element
+
+#### `sizeOf`
+
+``` purescript
+sizeOf :: Element -> { width :: Int, height :: Int }
+```
+
+Get the width and height of an Element
 
 #### `flow`
 
@@ -291,169 +208,17 @@ The `Direction` starts from the first element in the list.
         | a | b | c |
         +---+---+---+
 
-#### `above`
+#### `Direction`
 
 ``` purescript
-above :: Element -> Element -> Element
+data Direction
 ```
 
-Stack elements vertically.
-To put `a` above `b` you would say: ``a `above` b``
+Represents a `flow` direction for a list of elements.
 
-#### `below`
-
+##### Instances
 ``` purescript
-below :: Element -> Element -> Element
-```
-
-Stack elements vertically.
-To put `a` below `b` you would say: ``a `below` b``
-
-#### `beside`
-
-``` purescript
-beside :: Element -> Element -> Element
-```
-
-Put elements beside each other horizontally.
-To put `a` beside `b` you would say: ``a `beside` b``
-
-#### `layers`
-
-``` purescript
-layers :: List Element -> Element
-```
-
-Layer elements on top of each other, starting from the bottom:
-`layers == flow outward`
-
-#### `absolute`
-
-``` purescript
-absolute :: Int -> Pos
-```
-
-A position specified in pixels. If you want something 10 pixels to the
-right of the middle of a container, you would write this:
-
-    middleAt (absolute 10) (absolute 0)
-
-#### `relative`
-
-``` purescript
-relative :: Float -> Pos
-```
-
-A position specified as a percentage. If you want something 10% away from
-the top left corner, you would say:
-
-
-#### `middle`
-
-``` purescript
-middle :: Position
-```
-
-#### `topLeft`
-
-``` purescript
-topLeft :: Position
-```
-
-#### `topRight`
-
-``` purescript
-topRight :: Position
-```
-
-#### `bottomLeft`
-
-``` purescript
-bottomLeft :: Position
-```
-
-#### `bottomRight`
-
-``` purescript
-bottomRight :: Position
-```
-
-#### `midLeft`
-
-``` purescript
-midLeft :: Position
-```
-
-#### `midRight`
-
-``` purescript
-midRight :: Position
-```
-
-#### `midTop`
-
-``` purescript
-midTop :: Position
-```
-
-#### `midBottom`
-
-``` purescript
-midBottom :: Position
-```
-
-#### `middleAt`
-
-``` purescript
-middleAt :: Pos -> Pos -> Position
-```
-
-#### `topLeftAt`
-
-``` purescript
-topLeftAt :: Pos -> Pos -> Position
-```
-
-#### `topRightAt`
-
-``` purescript
-topRightAt :: Pos -> Pos -> Position
-```
-
-#### `bottomLeftAt`
-
-``` purescript
-bottomLeftAt :: Pos -> Pos -> Position
-```
-
-#### `bottomRightAt`
-
-``` purescript
-bottomRightAt :: Pos -> Pos -> Position
-```
-
-#### `midLeftAt`
-
-``` purescript
-midLeftAt :: Pos -> Pos -> Position
-```
-
-#### `midRightAt`
-
-``` purescript
-midRightAt :: Pos -> Pos -> Position
-```
-
-#### `midTopAt`
-
-``` purescript
-midTopAt :: Pos -> Pos -> Position
-```
-
-#### `midBottomAt`
-
-``` purescript
-midBottomAt :: Pos -> Pos -> Position
+Eq Direction
 ```
 
 #### `up`
@@ -491,5 +256,240 @@ inward :: Direction
 ``` purescript
 outward :: Direction
 ```
+
+#### `layers`
+
+``` purescript
+layers :: List Element -> Element
+```
+
+Layer elements on top of each other, starting from the bottom:
+`layers == flow outward`
+
+#### `above`
+
+``` purescript
+above :: Element -> Element -> Element
+```
+
+Stack elements vertically.
+To put `a` above `b` you would say: ``a `above` b``
+
+#### `below`
+
+``` purescript
+below :: Element -> Element -> Element
+```
+
+Stack elements vertically.
+To put `a` below `b` you would say: ``a `below` b``
+
+#### `beside`
+
+``` purescript
+beside :: Element -> Element -> Element
+```
+
+Put elements beside each other horizontally.
+To put `a` beside `b` you would say: ``a `beside` b``
+
+#### `empty`
+
+``` purescript
+empty :: Element
+```
+
+An Element that takes up no space. Good for things that appear conditionally:
+
+    flow down [ img1, if showMore then img2 else empty ]
+
+#### `spacer`
+
+``` purescript
+spacer :: Int -> Int -> Element
+```
+
+Create an empty box. This is useful for getting your spacing right and
+for making borders.
+
+#### `container`
+
+``` purescript
+container :: Int -> Int -> Position -> Element -> Element
+```
+
+Put an element in a container. This lets you position the element really
+easily, and there are tons of ways to set the `Position`.
+To center `element` exactly in a 300-by-300 square you would say:
+
+    container 300 300 middle element
+
+By setting the color of the container, you can create borders.
+
+#### `middle`
+
+``` purescript
+middle :: Position
+```
+
+#### `midTop`
+
+``` purescript
+midTop :: Position
+```
+
+#### `midBottom`
+
+``` purescript
+midBottom :: Position
+```
+
+#### `midLeft`
+
+``` purescript
+midLeft :: Position
+```
+
+#### `midRight`
+
+``` purescript
+midRight :: Position
+```
+
+#### `topLeft`
+
+``` purescript
+topLeft :: Position
+```
+
+#### `topRight`
+
+``` purescript
+topRight :: Position
+```
+
+#### `bottomLeft`
+
+``` purescript
+bottomLeft :: Position
+```
+
+#### `bottomRight`
+
+``` purescript
+bottomRight :: Position
+```
+
+#### `Pos`
+
+``` purescript
+data Pos
+```
+
+Specifies a distance from a particular location within a `container`, like
+“20 pixels right and up from the center”. You can use `absolute` or `relative`
+to specify a `Pos` in pixels or as a percentage of the container.
+
+##### Instances
+``` purescript
+Eq Pos
+```
+
+#### `Position`
+
+``` purescript
+newtype Position
+```
+
+Specifies a position for an element within a `container`, like “the top
+left corner”.
+
+##### Instances
+``` purescript
+Eq Position
+```
+
+#### `absolute`
+
+``` purescript
+absolute :: Int -> Pos
+```
+
+A position specified in pixels. If you want something 10 pixels to the
+right of the middle of a container, you would write this:
+
+    middleAt (absolute 10) (absolute 0)
+
+#### `relative`
+
+``` purescript
+relative :: Float -> Pos
+```
+
+A position specified as a percentage. If you want something 10% away from
+the top left corner, you would say:
+
+
+#### `middleAt`
+
+``` purescript
+middleAt :: Pos -> Pos -> Position
+```
+
+#### `midTopAt`
+
+``` purescript
+midTopAt :: Pos -> Pos -> Position
+```
+
+#### `midBottomAt`
+
+``` purescript
+midBottomAt :: Pos -> Pos -> Position
+```
+
+#### `midLeftAt`
+
+``` purescript
+midLeftAt :: Pos -> Pos -> Position
+```
+
+#### `midRightAt`
+
+``` purescript
+midRightAt :: Pos -> Pos -> Position
+```
+
+#### `topLeftAt`
+
+``` purescript
+topLeftAt :: Pos -> Pos -> Position
+```
+
+#### `topRightAt`
+
+``` purescript
+topRightAt :: Pos -> Pos -> Position
+```
+
+#### `bottomLeftAt`
+
+``` purescript
+bottomLeftAt :: Pos -> Pos -> Position
+```
+
+#### `bottomRightAt`
+
+``` purescript
+bottomRightAt :: Pos -> Pos -> Position
+```
+
+#### `fromRenderable`
+
+``` purescript
+fromRenderable :: forall a. Renderable a => Int -> Int -> a -> Element
+```
+
+Create an `Element` from a custom type that is `Renderable`.
 
 

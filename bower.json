@@ -16,26 +16,17 @@
     "output"
   ],
   "dependencies": {
-    "purescript-arrays": "^4.0.0",
     "purescript-canvas": "^3.0.0",
-    "purescript-colors": "^4.0.0",
     "purescript-dom": "^4.0.0",
     "purescript-exists": "^3.0.0",
     "purescript-format": "^3.0.0",
-    "purescript-js-timers": "^3.0.0",
-    "purescript-lazy": "^3.0.0",
     "purescript-list-zipper": "soupi/purescript-list-zipper#^1.0.0",
-    "purescript-now": "^3.0.0",
-    "purescript-nullable": "^3.0.0",
     "purescript-prelude": "^3.0.0",
-    "purescript-refs": "^3.0.0",
     "purescript-unsafe-coerce": "^3.0.0",
-    "purescript-unsafe-reference": "^2.0.0",
     "purescript-pselm-core": "pselm/core#^4.0.3"
   },
   "devDependencies": {
     "purescript-test-unit": "^13.0.0",
-    "purescript-psci-support": "^3.0.0",
     "purescript-jsdom": "rgrempel/purescript-jsdom#^1.0.0"
   },
   "repository": {
