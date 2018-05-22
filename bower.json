@@ -1,10 +1,10 @@
 {
-  "name": "purescript-elm",
-  "homepage": "https://github.com/rgrempel/purescript-elm",
+  "name": "purescript-pselm-signals",
+  "homepage": "https://github.com/pselm/signals",
   "authors": [
     "Ryan Rempel <rgrempel@gmail.com>"
   ],
-  "description": "Elm libraries in Purescript",
+  "description": "Purescript implementation of Elm 0.16's signals modules",
   "license": "MIT",
   "keywords": [
     "purescript"
@@ -16,21 +16,15 @@
     "output"
   ],
   "dependencies": {
-    "purescript-canvas": "^3.0.0",
-    "purescript-dom": "^4.0.0",
-    "purescript-exists": "^3.0.0",
-    "purescript-format": "^3.0.0",
-    "purescript-list-zipper": "soupi/purescript-list-zipper#^1.0.0",
     "purescript-prelude": "^3.0.0",
-    "purescript-unsafe-coerce": "^3.0.0",
-    "purescript-pselm-core": "pselm/core#^4.0.3"
+    "purescript-pselm-core": "pselm/core#^4.0.3",
+    "purescript-dom": "4 - 5"
   },
   "devDependencies": {
-    "purescript-test-unit": "^13.0.0",
-    "purescript-jsdom": "rgrempel/purescript-jsdom#^1.0.0"
+    "purescript-test-unit": "^13.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/rgrempel/purescript-elm.git"
+    "url": "git://github.com/pselm/signals.git"
   }
 }

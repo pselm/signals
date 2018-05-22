@@ -38,26 +38,6 @@ var foreigns = [
 //     gulp examples/Graphics/StaticElement.purs
 //     gulp examples/Graphics/StaticElement.html
 var bundles = [{
-    module: "Examples.Graphics.StaticElement",
-    purs: "examples/Graphics/StaticElement.purs",
-    html: "examples/Graphics/StaticElement.html"
-},{
-    module: "Examples.Graphics.UpdateElement",
-    purs: "examples/Graphics/UpdateElement.purs",
-    html: "examples/Graphics/UpdateElement.html"
-},{
-    module: "Examples.Graphics.UpdateRandomRenderable",
-    purs: "examples/Graphics/UpdateRandomRenderable.purs",
-    html: "examples/Graphics/UpdateRandomRenderable.html"
-},{
-    module: "Examples.Graphics.StaticCollage",
-    purs: "examples/Graphics/StaticCollage.purs",
-    html: "examples/Graphics/StaticCollage.html"
-},{
-    module: "Examples.Graphics.UpdateCollage",
-    purs: "examples/Graphics/UpdateCollage.purs",
-    html: "examples/Graphics/UpdateCollage.html"
-},{
     module: "Examples.Keyboard.Console",
     purs: "examples/Keyboard/Console.purs",
     html: "examples/Keyboard/Console.html"
@@ -147,13 +127,9 @@ gulp.task("docs", ["make"], function () {
         src: sources,
         format: "markdown",
         docgen: {
-            "DOM.Renderable": "docs/DOM/Renderable.md",
-            "Elm.Graphics.Collage": "docs/Elm/Graphics/Collage.md",
-            "Elm.Graphics.Element": "docs/Elm/Graphics/Element.md",
             "Elm.Keyboard": "docs/Elm/Keyboard.md",
             "Elm.Mouse": "docs/Elm/Mouse.md",
             "Elm.Signal": "docs/Elm/Signal.md",
-            "Elm.Text": "docs/Elm/Text.md",
             "Elm.Window": "docs/Elm/Window.md"
         }
     });
